@@ -5,7 +5,7 @@
 - `docker-compose.yml`: stack productivo con imágenes `stevenrq/*`.
 - `docker-compose.dev.yml`: stack local con MySQL/PostgreSQL incluidos y los mismos servicios SGIVU.
 - `.env.example` y `.env.dev.example`: plantillas; mantén tus `.env*` sin versionar.
-- Scripts clave: `run.bash` (entrada unificada), `build-and-push-images.bash` (recorre microservicios en `../` y construye/pusha), `copy-from-local-to-remote.sh` (rsync a EC2), `remove-containers-images.sh` (limpieza agresiva).
+- Scripts clave: `run.bash` (entrada unificada), `build-and-push-images.bash` (recorre microservicios en `../` y construye/pusha), `rebuild-service.bash` (reconstruye/publica un servicio y recrea el contenedor en Compose), `copy-from-local-to-remote.sh` (rsync a EC2), `remove-containers-images.sh` (limpieza agresiva).
 - Documentos: diagramas PlantUML en `../../../docs/diagrams/*.puml`.
 
 ## Comandos de Build, Pruebas y Desarrollo
@@ -15,6 +15,7 @@
 - `docker compose -f docker-compose.dev.yml --env-file .env.dev config`: valida sintaxis y variables.
 - `docker compose -f docker-compose.dev.yml down -v`: detiene y borra volúmenes locales.
 - `./build-and-push-images.bash`: construye/publica `stevenrq/<servicio>:v1`; ajusta `SERVICES` y tags si versionas.
+- `./rebuild-service.bash --dev sgivu-auth`: reconstruye/publica una imagen y recrea solo ese contenedor en Compose.
 - Monitoreo rápido: `docker compose ps` y `docker logs -f sgivu-gateway` para ver arranque.
 
 ## Estilo de Código y Convenciones
