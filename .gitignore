@@ -1,0 +1,25 @@
+# Build artifacts
+**/target/
+**/node_modules/
+**/.angular/
+**/.venv/
+**/__pycache__/
+**/.pytest_cache/
+
+# Package outputs
+build/
+dist/
+
+# Editor/IDE
+.vscode/
+.idea/
+
+# Environment and secrets
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.*.example
+**/*.pem
+
+# Generated diagrams
+docs/diagrams/**/*.svg

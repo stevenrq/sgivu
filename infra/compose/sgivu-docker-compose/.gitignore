@@ -1,0 +1,7 @@
+.idea/
+.vscode/
+
+.env.dev
+*.env
+*.pem
+*.sh

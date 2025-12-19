@@ -1,0 +1,162 @@
+services:
+  sgivu-mysql:
+    container_name: sgivu-mysql
+    image: mysql:8.0
+    ports:
+      - "3307:3306" # 3307 expuesto para el host, 3306 para el contenedor
+    restart: always
+    env_file: .env.dev
+    networks:
+      - sgivu-network
+    volumes:
+      - mysql-data:/var/lib/mysql
+
+  sgivu-postgres:
+    container_name: sgivu-postgres
+    image: postgres:17.6
+    ports:
+      - "5433:5432" # 5433 expuesto para el host, 5432 para el contenedor
+    restart: always
+    env_file: .env.dev
+    networks:
+      - sgivu-network
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  sgivu-config:
+    container_name: sgivu-config
+    image: stevenrq/sgivu-config:v1
+    ports:
+      - "8888:8888"
+    restart: always
+    networks:
+      - sgivu-network
+    environment:
+      - SPRING_PROFILES_ACTIVE=git
+      - SPRING_CLOUD_CONFIG_SERVER_GIT_URI=https://github.com/stevenrq/sgivu-config-repo.git
+      - SPRING_CLOUD_CONFIG_SERVER_GIT_DEFAULT_LABEL=develop
+
+  sgivu-discovery:
+    container_name: sgivu-discovery
+    image: stevenrq/sgivu-discovery:v1
+    ports:
+      - "8761:8761"
+    restart: always
+    networks:
+      - sgivu-network
+    env_file: .env.dev
+
+  sgivu-zipkin:
+    container_name: sgivu-zipkin
+    image: openzipkin/zipkin
+    ports:
+      - "9411:9411"
+    restart: always
+    networks:
+      - sgivu-network
+    env_file: .env.dev
+    depends_on:
+      - sgivu-mysql
+
+  sgivu-auth:
+    container_name: sgivu-auth
+    image: stevenrq/sgivu-auth:v1
+    ports:
+      - "9000:9000"
+    restart: always
+    networks:
+      - sgivu-network
+    env_file: .env.dev
+    depends_on:
+      - sgivu-config
+      - sgivu-discovery
+
+  sgivu-user:
+    container_name: sgivu-user
+    image: stevenrq/sgivu-user:v1
+    ports:
+      - "8081:8081"
+    restart: always
+    networks:
+      - sgivu-network
+    env_file: .env.dev
+    depends_on:
+      - sgivu-config
+      - sgivu-discovery
+      - sgivu-auth
+
+  sgivu-client:
+    container_name: sgivu-client
+    image: stevenrq/sgivu-client:v1
+    ports:
+      - "8082:8082"
+    restart: always
+    networks:
+      - sgivu-network
+    env_file: .env.dev
+    depends_on:
+      - sgivu-config
+      - sgivu-discovery
+      - sgivu-auth
+
+  sgivu-vehicle:
+    container_name: sgivu-vehicle
+    image: stevenrq/sgivu-vehicle:v1
+    ports:
+      - "8083:8083"
+    restart: always
+    networks:
+      - sgivu-network
+    env_file: .env.dev
+    depends_on:
+      - sgivu-config
+      - sgivu-discovery
+      - sgivu-auth
+
+  sgivu-purchase-sale:
+    container_name: sgivu-purchase-sale
+    image: stevenrq/sgivu-purchase-sale:v1
+    ports:
+      - "8084:8084"
+    restart: always
+    networks:
+      - sgivu-network
+    env_file: .env.dev
+    depends_on:
+      - sgivu-config
+      - sgivu-discovery
+      - sgivu-auth
+
+  sgivu-ml:
+    container_name: sgivu-ml
+    image: stevenrq/sgivu-ml:v1
+    ports:
+      - "8000:8000"
+    restart: always
+    networks:
+      - sgivu-network
+    env_file: .env.dev
+    depends_on:
+      - sgivu-auth
+
+  sgivu-gateway:
+    container_name: sgivu-gateway
+    image: stevenrq/sgivu-gateway:v1
+    ports:
+      - "8080:8080"
+    restart: always
+    networks:
+      - sgivu-network
+    env_file: .env.dev
+    depends_on:
+      - sgivu-config
+      - sgivu-discovery
+      - sgivu-auth
+
+networks:
+  sgivu-network:
+    driver: bridge
+
+volumes:
+  mysql-data:
+  postgres-data:

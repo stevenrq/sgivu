@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: sgivu-config
+  profiles:
+    active: git
+  cloud:
+    config:
+      server:
+        git:
+          # Repositorio Git que versiona la configuracion sensible de cada microservicio
+          # (URLs de integracion, credenciales de OAuth2/JWT y parametros de resiliencia).
+          uri: https://github.com/stevenrq/sgivu-config-repo.git
+          default-label: main
+
+server:
+  port: 8888
