@@ -126,6 +126,12 @@ class LoginFormHandler {
         this.handleFormSubmit(event)
       );
     }
+
+    if (this.togglePassword) {
+      this.togglePassword.addEventListener("click", () =>
+        this.togglePasswordVisibility()
+      );
+    }
   }
 
   async handleFormSubmit(event) {

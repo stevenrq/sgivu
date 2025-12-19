@@ -19,6 +19,7 @@ Repositorio de infraestructura para levantar el ecosistema de microservicios de 
 ├── docker-compose.yml          # Definición principal orientada a entornos productivos
 ├── docker-compose.dev.yml      # Variante local con bases de datos autogestionadas
 ├── build-and-push-images.bash  # Script para construir y publicar todas las imágenes
+├── rebuild-service.bash        # Script para reconstruir un servicio y recrearlo en Compose
 └── README.md
 ```
 
@@ -84,6 +85,7 @@ Puertos típicos en local (según `docker-compose*.yml`):
 
 - `./build-and-push-images.bash` construye y publica todas las imágenes `stevenrq/*` recorriendo los servicios hermanos.
 - Invoca `build-image.bash` cuando existe o compila con Maven en proyectos Java.
+- `./rebuild-service.bash --dev sgivu-auth` reconstruye/publica la imagen y recrea solo ese contenedor en el stack.
 
 ## Despliegue
 
