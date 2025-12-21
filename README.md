@@ -48,12 +48,33 @@ Documentación central del sistema SGIVU (backend, frontend, ML e infraestructur
 - Claves internas para comunicación service-to-service.
 - Nunca versionar secretos ni `.env` reales.
 
-## Dependencias
+## Servicios y Componentes
 
-- Orquestación local: `infra/compose/sgivu-docker-compose/README.md`.
-- Backend: `apps/backend/*/README.md`.
-- Frontend: `apps/frontend/sgivu-frontend/README.md`.
-- ML: `apps/ml/sgivu-ml/README.md`.
+### Backend
+
+- [sgivu-auth](apps/backend/sgivu-auth/README.md) — Servicio de autenticación y autorización (OAuth 2.1/OIDC, JWT).
+- [sgivu-gateway](apps/backend/sgivu-gateway/README.md) — Gateway de API con enrutamiento y rate limiting.
+- [sgivu-config](apps/backend/sgivu-config/README.md) — Servidor de configuración centralizada.
+- [sgivu-discovery](apps/backend/sgivu-discovery/README.md) — Registro y descubrimiento de servicios (Eureka).
+- [sgivu-user](apps/backend/sgivu-user/README.md) — Servicio de gestión de usuarios.
+- [sgivu-vehicle](apps/backend/sgivu-vehicle/README.md) — Servicio de gestión de vehículos.
+- [sgivu-purchase-sale](apps/backend/sgivu-purchase-sale/README.md) — Servicio de compra-venta.
+- [sgivu-client](apps/backend/sgivu-client/README.md) — Servicio de gestión de clientes.
+
+### Frontend
+
+- [sgivu-frontend](apps/frontend/sgivu-frontend/README.md) — Aplicación Angular.
+
+### Machine Learning
+
+- [sgivu-ml](apps/ml/sgivu-ml/README.md) — Servicio de ML con FastAPI.
+
+### Infraestructura
+
+- [sgivu-docker-compose](infra/compose/sgivu-docker-compose/README.md) — Orquestación local con Docker Compose.
+- [sgivu-config-repo](https://github.com/stevenrq/sgivu-config-repo/blob/main/README.md) — Repositorio centralizado de configuración para todos los servicios (Git-based Config Server).
+
+## Dependencias
 
 ## Dockerización
 
