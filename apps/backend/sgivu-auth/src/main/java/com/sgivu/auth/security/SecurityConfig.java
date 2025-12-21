@@ -150,7 +150,9 @@ public class SecurityConfig {
                     .loginPage(LOGIN_PATH)
                     .permitAll()
                     .defaultSuccessUrl(LOGIN_PATH, true)
-                    .failureHandler(customAuthenticationFailureHandler()));
+                    .failureHandler(customAuthenticationFailureHandler()))
+        .sessionManagement(
+            session -> session.maximumSessions(5).sessionRegistry(sessionRegistry()));
     return http.cors(Customizer.withDefaults()).build();
   }
 
