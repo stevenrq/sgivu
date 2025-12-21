@@ -19,7 +19,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.boot.autoconfigure.security.servlet.PathRequest;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -205,7 +204,7 @@ public class SecurityConfig {
       RSAKey rsaKey =
           new RSAKey.Builder(publicKey)
               .privateKey(privateKey)
-              .keyID(UUID.randomUUID().toString())
+              .keyID(jwtProperties.key().alias())
               .build();
 
       JWKSet jwkSet = new JWKSet(rsaKey);
