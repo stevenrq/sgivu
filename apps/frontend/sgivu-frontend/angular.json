@@ -64,6 +64,12 @@
         },
         "serve": {
           "builder": "@angular/build:dev-server",
+          "options": {
+            "allowedHosts": [
+              "localhost",
+              "sgivu-gateway"
+            ]
+          },
           "configurations": {
             "production": {
               "buildTarget": "sgivu-frontend:build:production"

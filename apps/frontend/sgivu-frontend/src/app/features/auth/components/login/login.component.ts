@@ -8,7 +8,7 @@ import { AuthService } from '../../services/auth.service';
   styleUrl: './login.component.css',
 })
 /**
- * Punto de entrada para iniciar el flujo OAuth; redirige al proveedor de identidad.
+ * Punto de entrada para iniciar el flujo BFF; redirige al gateway.
  */
 export class LoginComponent implements OnInit {
   private readonly authService = inject(AuthService);

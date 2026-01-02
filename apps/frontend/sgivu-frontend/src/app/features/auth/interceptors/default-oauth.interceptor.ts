@@ -1,46 +1,37 @@
 import { inject } from '@angular/core';
 import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
-import { catchError } from 'rxjs/operators';
-import {
-  OAuthStorage,
-  OAuthResourceServerErrorHandler,
-  OAuthModuleConfig,
-} from 'angular-oauth2-oidc';
+import { catchError, throwError } from 'rxjs';
 import { AuthService } from '../services/auth.service';
+import { environment } from '../../../../environments/environment';
 
 export const defaultOAuthInterceptor: HttpInterceptorFn = (req, next) => {
-  const authStorage = inject(OAuthStorage);
-  const errorHandler = inject(OAuthResourceServerErrorHandler);
-  const moduleConfig = inject(OAuthModuleConfig, { optional: true });
   const authService = inject(AuthService);
+  const apiUrl = environment.apiUrl;
 
-  const isUrlAllowed = (url: string): boolean =>
-    moduleConfig?.resourceServer?.allowedUrls?.some((u) => url.startsWith(u)) ??
-    false;
-
-  if (
-    !moduleConfig?.resourceServer?.allowedUrls ||
-    !isUrlAllowed(req.url.toLowerCase())
-  ) {
+  if (!req.url.startsWith(apiUrl)) {
     return next(req);
   }
 
-  if (moduleConfig.resourceServer.sendAccessToken) {
-    const token = authStorage.getItem('access_token');
-    req = req.clone({
-      headers: req.headers.set('Authorization', `Bearer ${token}`),
-    });
-  }
+  const request = req.clone({ withCredentials: true });
+  const isSessionCheck = req.url.includes('/auth/session');
+  const isLogout = req.url.endsWith('/logout');
 
-  return next(req).pipe(
+  return next(request).pipe(
     catchError((err) => {
-      if (err instanceof HttpErrorResponse && err.status === 401) {
+      if (
+        err instanceof HttpErrorResponse &&
+        err.status === 401 &&
+        !isSessionCheck &&
+        !isLogout
+      ) {
         console.error(
-          'El token ha expirado o no es válido. Redirigiendo para iniciar sesión.',
+          'La sesión expiró o no es válida. Redirigiendo para iniciar sesión.',
         );
-        authService.startLoginFlow();
+        authService.startLoginFlow(
+          `${window.location.pathname}${window.location.search}`,
+        );
       }
-      return errorHandler.handleError(err);
+      return throwError(() => err);
     }),
   );
 };
