@@ -12,8 +12,8 @@ import {
   FormGroup,
   ReactiveFormsModule,
   Validators,
+  FormsModule,
 } from '@angular/forms';
-import { FormsModule } from '@angular/forms';
 import { ChartConfiguration, ChartOptions } from 'chart.js';
 import { BaseChartDirective } from 'ng2-charts';
 import { Subscription, forkJoin, of, map, catchError } from 'rxjs';
