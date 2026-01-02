@@ -14,11 +14,6 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class GatewayRoutesConfig {
 
-  /**
-   * Construye el {@link RouteLocator} con circuit breakers y fallbacks por dominio de negocio.
-   *
-   * @see com.sgivu.gateway.controller.FallbackController
-   */
   @Bean
   RouteLocator customRouteLocator(RouteLocatorBuilder builder) {
     return builder
@@ -40,10 +35,11 @@ public class GatewayRoutesConfig {
                 r.path("/v1/users/**", "/v1/roles/**", "/v1/permissions/**")
                     .filters(
                         f ->
-                            f.circuitBreaker(
-                                c ->
-                                    c.setName("userServiceCircuitBreaker")
-                                        .setFallbackUri("forward:/fallback/user")))
+                            f.tokenRelay()
+                                .circuitBreaker(
+                                    c ->
+                                        c.setName("userServiceCircuitBreaker")
+                                            .setFallbackUri("forward:/fallback/user")))
                     .uri("lb://sgivu-user"))
         .route(
             "sgivu-client",
@@ -51,10 +47,11 @@ public class GatewayRoutesConfig {
                 r.path("/v1/persons/**", "/v1/companies/**")
                     .filters(
                         f ->
-                            f.circuitBreaker(
-                                c ->
-                                    c.setName("clientServiceCircuitBreaker")
-                                        .setFallbackUri("forward:/fallback/client")))
+                            f.tokenRelay()
+                                .circuitBreaker(
+                                    c ->
+                                        c.setName("clientServiceCircuitBreaker")
+                                            .setFallbackUri("forward:/fallback/client")))
                     .uri("lb://sgivu-client"))
         .route(
             "sgivu-vehicle",
@@ -62,10 +59,11 @@ public class GatewayRoutesConfig {
                 r.path("/v1/vehicles/**", "/v1/cars/**", "/v1/motorcycles/**")
                     .filters(
                         f ->
-                            f.circuitBreaker(
-                                c ->
-                                    c.setName("vehicleServiceCircuitBreaker")
-                                        .setFallbackUri("forward:/fallback/vehicle")))
+                            f.tokenRelay()
+                                .circuitBreaker(
+                                    c ->
+                                        c.setName("vehicleServiceCircuitBreaker")
+                                            .setFallbackUri("forward:/fallback/vehicle")))
                     .uri("lb://sgivu-vehicle"))
         .route(
             "sgivu-purchase-sale",
@@ -73,10 +71,11 @@ public class GatewayRoutesConfig {
                 r.path("/v1/purchase-sales/**")
                     .filters(
                         f ->
-                            f.circuitBreaker(
-                                c ->
-                                    c.setName("purchaseSaleServiceCircuitBreaker")
-                                        .setFallbackUri("forward:/fallback/purchase-sale")))
+                            f.tokenRelay()
+                                .circuitBreaker(
+                                    c ->
+                                        c.setName("purchaseSaleServiceCircuitBreaker")
+                                            .setFallbackUri("forward:/fallback/purchase-sale")))
                     .uri("lb://sgivu-purchase-sale"))
         .route(
             "sgivu-ml",
@@ -84,10 +83,11 @@ public class GatewayRoutesConfig {
                 r.path("/v1/ml/**")
                     .filters(
                         f ->
-                            f.circuitBreaker(
-                                c ->
-                                    c.setName("mlServiceCircuitBreaker")
-                                        .setFallbackUri("forward:/fallback/ml")))
+                            f.tokenRelay()
+                                .circuitBreaker(
+                                    c ->
+                                        c.setName("mlServiceCircuitBreaker")
+                                            .setFallbackUri("forward:/fallback/ml")))
                     .uri("http://sgivu-ml:8000"))
         .build();
   }
