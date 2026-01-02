@@ -23,7 +23,7 @@ Microservicio de autenticación centralizada. Expone un Authorization Server OAu
 
 ## Configuración
 
-- Variables clave: `SPRING_CONFIG_IMPORT`, `SPRING_PROFILES_ACTIVE`, `SERVICE_INTERNAL_SECRET_KEY`, `issuer.url`, propiedades de datasource y keystore (`KEYSTORE_PASSWORD`, `KEY_PASSWORD`, `KEY_ALIAS`).
+w- Variables clave: `SPRING_CONFIG_IMPORT`, `SPRING_PROFILES_ACTIVE`, `SERVICE_INTERNAL_SECRET_KEY`, `issuer.url`, `gateway-client.url`, `gateway-client.secret` y propiedades de datasource/keystore (`KEYSTORE_PASSWORD`, `KEY_PASSWORD`, `KEY_ALIAS`).
 - `application-local.yml` recomendado para desarrollo con placeholders y sin secretos versionados.
 
 ## Ejecución Local
@@ -56,6 +56,8 @@ GET  /actuator/health
 ## Seguridad
 
 - OAuth 2.1 Authorization Code y Client Credentials con Spring Authorization Server.
+- Emite refresh tokens rotativos para el cliente confidencial del gateway (BFF).
+- Los clientes públicos (Angular) usan Authorization Code + PKCE sin refresh tokens.
 - Llama a `sgivu-user` con `X-Internal-Service-Key` para validar credenciales y roles/permisos.
 - JWT con claims `sub`, `username`, `rolesAndPermissions`, `isAdmin`; firmados con la clave RSA definida en `sgivu.jwt`.
 
@@ -107,6 +109,7 @@ docker build -t sgivu-auth .
 - Keystore no encontrado/contraseña inválida: valida `KEYSTORE_PASSWORD`, `KEY_PASSWORD`, `KEY_ALIAS` y ruta `keystore.jks`.
 - Llamada a sgivu-user rechazada: confirma header `X-Internal-Service-Key` y valor de `SERVICE_INTERNAL_SECRET_KEY`.
 - No aparece en Eureka: revisa `EUREKA_CLIENT_SERVICEURL_DEFAULTZONE` y `SPRING_CONFIG_IMPORT`.
+- Acceso desde host: si el navegador no resuelve `sgivu-auth`, revisa `sgivu-auth-access.md`.
 
 ## Buenas Prácticas y Convenciones
 

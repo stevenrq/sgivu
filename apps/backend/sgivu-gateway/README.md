@@ -9,20 +9,21 @@ Gateway reactivo que centraliza y enruta el tráfico HTTP del ecosistema SGIVU a
 - Microservicio Spring Boot / Spring Cloud Gateway (WebFlux).
 - Interactúa con `sgivu-config`, `sgivu-discovery`, `sgivu-auth`, `sgivu-user`, `sgivu-client` (y otros servicios proxied).
 - Registra instancias en Eureka y balancea solicitudes con `lb://`; configuración remota vía Config Server.
-- Stateless; actúa como proxy con filtros de seguridad y observabilidad.
+- Actúa como BFF: inicia sesión OIDC en `sgivu-auth`, mantiene sesión HTTP y propaga tokens hacia los microservicios.
 
 ## Tecnologías
 
 - Lenguaje: Java 21
 - Framework: Spring Boot 3.5.8, Spring Cloud 2025.0.0
 - Gateway: Spring Cloud Gateway + Resilience4j
-- Seguridad: OAuth 2.1 Resource Server, JWT (Nimbus Reactive Decoder)
+- Seguridad: OAuth 2.1 Resource Server + OAuth2 Client (BFF), JWT (Nimbus Reactive Decoder)
 - Observabilidad: Micrometer Tracing, Brave, Zipkin, Actuator
 
 ## Configuración
 
-- Variables clave: `SPRING_CLOUD_CONFIG_URI` o `SPRING_CONFIG_IMPORT`, `EUREKA_CLIENT_SERVICEURL_DEFAULTZONE`, `services.sgivu-auth.url`, CORS (`angular-client.url`).
+- Variables clave: `SPRING_CLOUD_CONFIG_URI` o `SPRING_CONFIG_IMPORT`, `EUREKA_CLIENT_SERVICEURL_DEFAULTZONE`, `services.sgivu-auth.url`, CORS (`angular-client.url`) y OAuth2 client (`spring.security.oauth2.client.registration.sgivu-gateway.*`, `spring.security.oauth2.client.provider.sgivu-auth.*`).
 - Perfiles gestionados en Config Server; ajusta rutas y filtros allí.
+- `SGIVU_GATEWAY_URL` (configurado en `sgivu-auth`) solo define el `redirect_uri` usado por el navegador en el flujo OAuth2. No afecta la comunicacion interna entre microservicios.
 
 ## Ejecución Local
 
@@ -39,6 +40,7 @@ Accede a `http://localhost:8080` para consumir rutas proxied.
 
 ```text
 GET/POST /v1/auth/**          -> Proxy sgivu-auth
+GET       /auth/session       -> Estado de sesión BFF para la SPA
 GET       /v1/users/**        -> Proxy sgivu-user
 GET       /v1/roles/**        -> Proxy sgivu-user
 GET       /v1/permissions/**  -> Proxy sgivu-user
@@ -54,8 +56,9 @@ GET       /fallback/*         -> Fallback 503 controlado
 
 ## Seguridad
 
-- Valida JWT emitidos por `sgivu-auth` (`services.sgivu-auth.url`).
-- Rutas públicas limitadas (`/v1/auth/**`, `/authorized`, `/auth`, `/user`, `/logout`).
+- Soporta login OIDC como BFF y valida JWT emitidos por `sgivu-auth` (`services.sgivu-auth.url`).
+- Propaga access tokens a microservicios con token relay y renueva tokens en backend vía refresh tokens.
+- Rutas públicas limitadas (`/v1/auth/**`, `/authorized`, `/auth`, `/user`, `/logout`, `/oauth2/**`, `/login/**`).
 - Rutas internas requieren autenticación; convierte `rolesAndPermissions` a autoridades y propaga `X-User-ID`.
 - CORS dinámico basado en `angular-client.url` desde Config Server.
 
@@ -100,6 +103,8 @@ docker build -t sgivu-gateway .
 - 401/invalid_token: valida issuer y JWKS de `sgivu-auth`.
 - 503/fallback: revisar estado de servicios proxied y circuit breakers.
 - No aparece en Eureka: confirma `EUREKA_CLIENT_SERVICEURL_DEFAULTZONE` y conectividad.
+- Acceso desde host: si el navegador no resuelve `sgivu-gateway`, configura `/etc/hosts`.
+  Ver `sgivu-gateway-access.md`.
 
 ## Buenas Prácticas y Convenciones
 
