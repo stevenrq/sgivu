@@ -1,0 +1,48 @@
+@startuml
+title Flujo BFF con refresh token (SPA)
+skinparam shadowing false
+skinparam componentStyle rectangle
+skinparam packageStyle rectangle
+
+actor "Usuario" as usuario
+participant "SPA\n(Angular)" as spa
+participant "BFF\n(sgivu-gateway)" as bff
+participant "Auth Server\n(sgivu-auth)" as auth
+participant "Microservicios" as ms
+
+== Login (Authorization Code + PKCE) ==
+usuario -> spa : abre la app
+spa -> bff : /oauth2/authorization/sgivu-gateway
+bff -> auth : /oauth2/authorize (PKCE)
+auth -> bff : redirect con code
+bff -> auth : /oauth2/token (code)
+auth -> bff : access_token + refresh_token
+bff -> spa : set-cookie (sesion)
+
+== Sesion activa ==
+spa -> bff : /auth/session (cookie)
+bff -> spa : estado/claims (sin tokens)
+
+== Expiracion y refresh ==
+spa -> bff : request API (cookie)
+bff -> auth : /oauth2/token (refresh_token)
+auth -> bff : access_token nuevo + refresh_token rotado
+bff -> ms : request con access_token
+ms -> bff : respuesta
+bff -> spa : respuesta
+
+note over spa,bff
+La SPA no almacena tokens. El refresh_token vive en el BFF
+como parte de la sesion del servidor.
+end note
+
+note over spa,bff
+Si el refresh_token expira, el BFF responde 401 y la SPA
+reinicia el login con /oauth2/authorization/sgivu-gateway.
+end note
+
+note over auth
+Solo el cliente confidencial (sgivu-gateway) recibe refresh_token.
+Los clientes publicos usan Authorization Code + PKCE sin refresh.
+end note
+@enduml

@@ -8,7 +8,7 @@ import { AuthService } from '../../services/auth.service';
   styleUrl: './callback.component.css',
 })
 /**
- * Maneja el redireccionamiento de OAuth2. Completa el flujo de autenticación
+ * Maneja el redireccionamiento del gateway BFF. Completa el flujo de autenticación
  * al volver del proveedor e inicializa la sesión en la aplicación.
  */
 export class CallbackComponent implements OnInit {

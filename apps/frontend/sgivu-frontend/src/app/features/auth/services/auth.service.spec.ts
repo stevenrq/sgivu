@@ -1,64 +1,52 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
-import { OAuthEvent, OAuthService } from 'angular-oauth2-oidc';
-import { of, Subject } from 'rxjs';
+import {
+  HttpTestingController,
+  provideHttpClientTesting,
+} from '@angular/common/http/testing';
+import { of } from 'rxjs';
+import { provideHttpClient } from '@angular/common/http';
 
 import { AuthService } from './auth.service';
 import { UserService } from '../../users/services/user.service';
 import { User } from '../../users/models/user.model';
+import { environment } from '../../../../environments/environment';
 
-class OAuthServiceMock {
-  events = new Subject<OAuthEvent>();
-  validAccessToken = false;
-  validIdToken = false;
-  accessToken: string | null = null;
-  idToken: string | null = null;
-  identityClaims: Record<string, unknown> | null = null;
-
-  configure = jasmine.createSpy('configure');
-  loadDiscoveryDocumentAndTryLogin = jasmine
-    .createSpy('loadDiscoveryDocumentAndTryLogin')
-    .and.resolveTo();
-  hasValidAccessToken = jasmine
-    .createSpy('hasValidAccessToken')
-    .and.callFake(() => this.validAccessToken);
-  hasValidIdToken = jasmine
-    .createSpy('hasValidIdToken')
-    .and.callFake(() => this.validIdToken);
-  getAccessToken = jasmine
-    .createSpy('getAccessToken')
-    .and.callFake(() => this.accessToken);
-  getIdToken = jasmine.createSpy('getIdToken').and.callFake(() => this.idToken);
-  getIdentityClaims = jasmine
-    .createSpy('getIdentityClaims')
-    .and.callFake(() => this.identityClaims);
-  initCodeFlow = jasmine.createSpy('initCodeFlow');
-  logOut = jasmine.createSpy('logOut');
-  loadUserProfile = jasmine.createSpy('loadUserProfile').and.resolveTo({});
+interface AuthServiceState {
+  isAuthenticatedSubject$: { getValue(): boolean; next(value: boolean): void };
+  isDoneLoadingSubject$: { getValue(): boolean };
+  userSubject$: { getValue(): User | null; next(value: User | null): void };
 }
 
 describe('AuthService', () => {
   let service: AuthService;
-  let oauthService: OAuthServiceMock;
+  let serviceState: AuthServiceState;
   let userService: jasmine.SpyObj<UserService>;
   let router: jasmine.SpyObj<Router>;
+  let httpMock: HttpTestingController;
 
   beforeEach(() => {
-    oauthService = new OAuthServiceMock();
     userService = jasmine.createSpyObj<UserService>('UserService', ['getById']);
     router = jasmine.createSpyObj<Router>('Router', ['navigateByUrl']);
 
     TestBed.configureTestingModule({
       providers: [
         AuthService,
-        { provide: OAuthService, useValue: oauthService },
+        provideHttpClient(),
+        provideHttpClientTesting(),
         { provide: UserService, useValue: userService },
         { provide: Router, useValue: router },
       ],
     });
 
     service = TestBed.inject(AuthService);
+    serviceState = service as unknown as AuthServiceState;
+    httpMock = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => {
+    httpMock.verify();
+    sessionStorage.clear();
   });
 
   it('inicializa autenticación, marca estados y obtiene el usuario', async () => {
@@ -78,29 +66,40 @@ describe('AuthService', () => {
       credentialsNonExpired: true,
       admin: false,
     };
-    oauthService.validAccessToken = true;
-    oauthService.validIdToken = true;
-    oauthService.identityClaims = { userId: user.id };
     userService.getById.and.returnValue(of(user));
 
-    await service.initializeAuthentication();
+    const initPromise = service.initializeAuthentication();
+    const req = httpMock.expectOne(`${environment.apiUrl}/auth/session`);
+    req.flush({
+      authenticated: true,
+      userId: '99',
+      username: 'ada',
+      rolesAndPermissions: [],
+      isAdmin: false,
+    });
 
-    expect(oauthService.loadDiscoveryDocumentAndTryLogin).toHaveBeenCalled();
+    await initPromise;
+
     expect(service.getCurrentAuthenticatedUser()).toEqual(user);
-    expect((service as any).isAuthenticatedSubject$.getValue()).toBeTrue();
-    expect((service as any).isDoneLoadingSubject$.getValue()).toBeTrue();
+    expect(serviceState.isAuthenticatedSubject$.getValue()).toBeTrue();
+    expect(serviceState.isDoneLoadingSubject$.getValue()).toBeTrue();
   });
 
   it('inicia el flujo de login guardando la ruta de retorno', () => {
+    const assignSpy = spyOn(window.location, 'assign');
+
     service.startLoginFlow('/secure');
 
     expect(sessionStorage.getItem('postLoginRedirectUrl')).toBe('/secure');
-    expect(oauthService.initCodeFlow).toHaveBeenCalled();
+    expect(assignSpy).toHaveBeenCalledWith(
+      `${environment.apiUrl}/oauth2/authorization/sgivu-gateway`,
+    );
   });
 
-  it('limpia el estado y llama logout del proveedor', () => {
-    (service as any).isAuthenticatedSubject$.next(true);
-    (service as any).userSubject$.next({
+  it('limpia el estado y redirige al logout del gateway', () => {
+    const assignSpy = spyOn(window.location, 'assign');
+    serviceState.isAuthenticatedSubject$.next(true);
+    serviceState.userSubject$.next({
       id: 1,
       nationalId: 1,
       firstName: 'Test',
@@ -120,23 +119,10 @@ describe('AuthService', () => {
 
     service.logout();
 
-    expect((service as any).isAuthenticatedSubject$.getValue()).toBeFalse();
-    expect((service as any).userSubject$.getValue()).toBeNull();
+    expect(serviceState.isAuthenticatedSubject$.getValue()).toBeFalse();
+    expect(serviceState.userSubject$.getValue()).toBeNull();
     expect(sessionStorage.getItem('postLoginRedirectUrl')).toBeNull();
-    expect(oauthService.logOut).toHaveBeenCalled();
-  });
-
-  it('decodifica claims del access token de forma segura', () => {
-    const payload = { username: 'ada', isAdmin: true };
-    const token = [
-      btoa(JSON.stringify({ alg: 'none' })),
-      btoa(JSON.stringify(payload)),
-      'signature',
-    ].join('.');
-    oauthService.accessToken = token;
-
-    expect(service.getClaimFromAccessToken('username')).toBe('ada');
-    expect(service.getClaimFromAccessToken('isAdmin')).toBeTrue();
+    expect(assignSpy).toHaveBeenCalledWith(`${environment.apiUrl}/logout`);
   });
 
   it('enforceAuthentication dispara login cuando no está autenticado', (done) => {
