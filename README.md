@@ -23,6 +23,7 @@ Documentación central del sistema SGIVU (backend, frontend, ML e infraestructur
 ## Configuración
 
 - Configuración centralizada en `sgivu-config` y repositorio Git de configuración.
+- Soporte para perfil `native` en `sgivu-config` para cargar configuraciones locales sin necesidad de Git.
 - Variables de entorno base en `infra/compose/sgivu-docker-compose/.env.example`.
 - Versiones documentadas validadas con `scripts/check-readme-boot-version.sh`.
 

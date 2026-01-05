@@ -45,6 +45,7 @@ Guía breve para mantener la documentación del sistema SGIVU sincronizada con l
 
 - Usa `infra/compose/sgivu-docker-compose/.env.example` como base; nunca publiques credenciales ni endpoints internos sensibles.
 - Para pruebas locales, mapea `sgivu-auth` en `/etc/hosts` en lugar de hardcodear URLs; en remoto, restringe el puerto 9000 a tu IP en el Security Group de EC2.
+- Al usar el perfil `native` de `sgivu-config` en Docker, asegúrate de tener montado el volumen del repositorio de configuración en `/config-repo` (ver `docker-compose.dev.yml`).
 
 ## Notas Específicas del Servicio
 

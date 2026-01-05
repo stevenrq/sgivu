@@ -23,6 +23,33 @@ Servicio Spring Cloud Config que centraliza y expone la configuración del ecosi
 - Variables clave: `SPRING_PROFILES_ACTIVE` (git por defecto), `SPRING_CLOUD_CONFIG_SERVER_GIT_URI`, `SPRING_CLOUD_CONFIG_SERVER_GIT_DEFAULT_LABEL`.
 - Ajusta `src/main/resources/application.yml` o variables de entorno según el repositorio de configuración.
 
+### Perfil Native
+
+Para desarrollo local, puedes usar el perfil `native` para cargar configuraciones desde el sistema de archivos local en lugar de Git. Esto evita tener que hacer push al repositorio para probar cambios.
+
+Ejemplo de ejecución con perfil native:
+```bash
+./mvnw spring-boot:run -Dspring-boot.run.profiles=native
+```
+
+O usando una variable de entorno:
+```bash
+SPRING_PROFILES_ACTIVE=native ./mvnw spring-boot:run
+```
+
+Por defecto, busca en:
+1. `file:/config-repo` (recomendado para Docker)
+2. `./config-repo`
+3. `../sgivu-config-repo` (si se tiene clonado como hermano del proyecto)
+4. `../../sgivu-config-repo`
+5. `../../../sgivu-config-repo`
+
+### Perfil Native con Docker
+
+Cuando uses el perfil `native` dentro de Docker (vía `docker-compose.dev.yml`), es obligatorio montar el repositorio de configuración como un volumen. El `docker-compose.dev.yml` proporcionado ya mapea el directorio `sgivu-config-repo` (asumiendo que es hermano de la carpeta del proyecto) a `/config-repo` dentro del contenedor.
+
+Puedes personalizar la ubicación con `SPRING_CLOUD_CONFIG_SERVER_NATIVE_SEARCH_LOCATIONS`.
+
 ## Ejecución Local
 
 ```bash
