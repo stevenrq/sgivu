@@ -23,7 +23,7 @@ Microservicio de autenticación centralizada. Expone un Authorization Server OAu
 
 ## Configuración
 
-w- Variables clave: `SPRING_CONFIG_IMPORT`, `SPRING_PROFILES_ACTIVE`, `SERVICE_INTERNAL_SECRET_KEY`, `issuer.url`, `gateway-client.url`, `gateway-client.secret` y propiedades de datasource/keystore (`KEYSTORE_PASSWORD`, `KEY_PASSWORD`, `KEY_ALIAS`).
+- Variables clave: `SPRING_CONFIG_IMPORT`, `SPRING_PROFILES_ACTIVE`, `SERVICE_INTERNAL_SECRET_KEY`, `issuer.url`, `gateway-client.url`, `gateway-client.secret` y propiedades de datasource/keystore (`KEYSTORE_PASSWORD`, `KEY_PASSWORD`, `KEY_ALIAS`).
 - `application-local.yml` recomendado para desarrollo con placeholders y sin secretos versionados.
 
 ## Ejecución Local
