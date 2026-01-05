@@ -10,7 +10,8 @@
 
 ## Comandos de Build, Pruebas y Desarrollo
 
-- `./mvnw spring-boot:run` inicia en el puerto 8888; define `SPRING_PROFILES_ACTIVE` y la URI del repo Git por variables de entorno.
+- `./mvnw spring-boot:run` inicia en el puerto 8888; define `SPRING_PROFILES_ACTIVE` (soporta `git` y `native`) y la URI del repo Git o ruta local por variables de entorno.
+- Usa el perfil `native` (`SPRING_PROFILES_ACTIVE=native`) para desarrollo local cargando archivos desde `../sgivu-config-repo` u otra ruta definida en `SPRING_CLOUD_CONFIG_SERVER_NATIVE_SEARCH_LOCATIONS`. En Docker, mapea el volumen a `/config-repo`.
 - `./mvnw test` ejecuta la suite JUnit; obligatorio antes de cualquier PR.
 - `./mvnw package` genera `target/sgivu-config-0.0.1-SNAPSHOT.jar`.
 - `./build-image.bash` construye y publica la imagen Docker; para local usa `docker build -t sgivu-config .` y `docker run -p 8888:8888 -e SPRING_CLOUD_CONFIG_SERVER_GIT_URI=... sgivu-config`.

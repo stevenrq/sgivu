@@ -31,10 +31,13 @@ services:
     restart: always
     networks:
       - sgivu-network
+    volumes:
+      - ../../../../sgivu-config-repo:/config-repo
     environment:
-      - SPRING_PROFILES_ACTIVE=git
+      - SPRING_PROFILES_ACTIVE=git # Cambiar a native para desarrollo local
       - SPRING_CLOUD_CONFIG_SERVER_GIT_URI=https://github.com/stevenrq/sgivu-config-repo.git
       - SPRING_CLOUD_CONFIG_SERVER_GIT_DEFAULT_LABEL=develop
+      - SPRING_CLOUD_CONFIG_SERVER_NATIVE_SEARCH_LOCATIONS=file:/config-repo
 
   sgivu-discovery:
     container_name: sgivu-discovery

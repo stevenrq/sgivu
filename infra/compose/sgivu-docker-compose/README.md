@@ -104,7 +104,7 @@ Puertos típicos en local (según `docker-compose*.yml`):
 - Puertos ocupados (8000/8080/8081/8082/8083/8084/9000/8888/8761/9411): libera procesos o ajusta mapeos.
 - Dependencias no listas: espera `sgivu-config`/`sgivu-discovery` antes de `auth`/`gateway`.
 - Sin trazas en Zipkin: confirma `ZIPKIN_BASE_URL` y `management.tracing` habilitado.
-- Sin acceso a Config Server: revisa `SPRING_CLOUD_CONFIG_SERVER_GIT_URI` y la etiqueta en Compose.
+- Sin acceso a Config Server: revisa `SPRING_CLOUD_CONFIG_SERVER_GIT_URI` y la etiqueta en Compose. Si usas el perfil `native`, valida el montaje del volumen `/config-repo`.
 - Acceso desde host: agrega alias en `/etc/hosts` para `sgivu-auth` y `sgivu-gateway` si el navegador no resuelve los servicios.
   Ver `apps/backend/sgivu-auth/sgivu-auth-access.md` y `apps/backend/sgivu-gateway/sgivu-gateway-access.md`.
 

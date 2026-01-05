@@ -20,8 +20,35 @@ Servicio Spring Cloud Config que centraliza y expone la configuración del ecosi
 
 ## Configuración
 
-- Variables clave: `SPRING_PROFILES_ACTIVE` (git por defecto), `SPRING_CLOUD_CONFIG_SERVER_GIT_URI`, `SPRING_CLOUD_CONFIG_SERVER_GIT_DEFAULT_LABEL`.
+- Variables clave: `SPRING_PROFILES_ACTIVE` (git por defecto, soporta `native`), `SPRING_CLOUD_CONFIG_SERVER_GIT_URI`, `SPRING_CLOUD_CONFIG_SERVER_GIT_DEFAULT_LABEL`, `SPRING_CLOUD_CONFIG_SERVER_NATIVE_SEARCH_LOCATIONS`.
 - Ajusta `src/main/resources/application.yml` o variables de entorno según el repositorio de configuración.
+
+### Perfil Native
+
+Para desarrollo local, puedes usar el perfil `native` para cargar configuraciones desde el sistema de archivos local en lugar de Git. Esto evita tener que hacer push al repositorio para probar cambios.
+
+Ejemplo de ejecución con perfil native:
+```bash
+./mvnw spring-boot:run -Dspring-boot.run.profiles=native
+```
+
+O usando una variable de entorno:
+```bash
+SPRING_PROFILES_ACTIVE=native ./mvnw spring-boot:run
+```
+
+Por defecto, busca en:
+1. `file:/config-repo` (recomendado para Docker)
+2. `./config-repo`
+3. `../sgivu-config-repo` (si se tiene clonado como hermano del proyecto)
+4. `../../sgivu-config-repo`
+5. `../../../sgivu-config-repo`
+
+### Perfil Native con Docker
+
+Cuando uses el perfil `native` dentro de Docker (vía `docker-compose.dev.yml`), es obligatorio montar el repositorio de configuración como un volumen. El `docker-compose.dev.yml` proporcionado ya mapea el directorio `sgivu-config-repo` (asumiendo que es hermano de la carpeta del proyecto) a `/config-repo` dentro del contenedor.
+
+Puedes personalizar la ubicación con `SPRING_CLOUD_CONFIG_SERVER_NATIVE_SEARCH_LOCATIONS`.
 
 ## Ejecución Local
 
@@ -93,7 +120,7 @@ docker run -p 8888:8888 \
 ## Buenas Prácticas y Convenciones
 
 - Código en inglés; documentación en español; commits en inglés con Conventional Commits.
-- Usa `default` para valores comunes y sobrescribe solo lo necesario en `dev` o `prod`.
+- Usa el archivo base (sin sufijo de perfil) para valores comunes y sobrescribe solo lo necesario en `dev` o `prod`.
 
 ## Diagramas
 
