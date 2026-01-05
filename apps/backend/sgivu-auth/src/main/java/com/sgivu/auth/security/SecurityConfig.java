@@ -54,6 +54,7 @@ import org.springframework.security.web.authentication.SimpleUrlAuthenticationFa
 import org.springframework.security.web.session.HttpSessionEventPublisher;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
 import org.springframework.util.Assert;
+import org.springframework.util.StringUtils;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -95,10 +96,6 @@ public class SecurityConfig {
     return web -> web.ignoring().requestMatchers("/error");
   }
 
-  /**
-   * Cadena dedicada a /.well-known y /oauth2 que redirige a la UI de login cuando el cliente aún no
-   * está autenticado.
-   */
   @Bean
   @Order(1)
   SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http) throws Exception {
@@ -124,10 +121,6 @@ public class SecurityConfig {
     return http.cors(Customizer.withDefaults()).build();
   }
 
-  /**
-   * Cadena para vistas y recursos estáticos, enlazando el form-login y el manejador de errores
-   * usado por la UI.
-   */
   @Bean
   @Order(2)
   SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http) throws Exception {
@@ -155,20 +148,11 @@ public class SecurityConfig {
     return http.cors(Customizer.withDefaults()).build();
   }
 
-  /**
-   * Expone la configuración del Authorization Server incluyendo el issuer.
-   *
-   * @return settings utilizados para discovery y validación de tokens.
-   */
   @Bean
   AuthorizationServerSettings authorizationServerSettings() {
     return AuthorizationServerSettings.builder().issuer(issuerProperties.getUrl()).build();
   }
 
-  /**
-   * Habilita CORS únicamente para la URL del cliente Angular configurado, asegurando que los tokens
-   * se soliciten desde dominios esperados del portal de ventas.
-   */
   @Bean
   CorsConfigurationSource corsConfigurationSource() {
     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
@@ -181,31 +165,22 @@ public class SecurityConfig {
     return source;
   }
 
-  /**
-   * Carga las claves RSA desde el keystore configurado para firmar/validar JWT.
-   *
-   * @throws IllegalStateException si el almacén no puede cargarse, bloqueando la emisión de tokens.
-   */
   @Bean
   JWKSource<SecurityContext> jwkSource() {
     try {
+      String keyAlias = jwtProperties.key().alias();
+      Assert.hasText(keyAlias, "El alias JWT no puede estar vacío.");
       Resource resource = resourceLoader.getResource(jwtProperties.keyStore().location());
       KeyStore keyStore = KeyStore.getInstance("JKS");
       keyStore.load(resource.getInputStream(), jwtProperties.keyStore().password().toCharArray());
 
       RSAPrivateKey privateKey =
-          (RSAPrivateKey)
-              keyStore.getKey(
-                  jwtProperties.key().alias(), jwtProperties.key().password().toCharArray());
+          (RSAPrivateKey) keyStore.getKey(keyAlias, jwtProperties.key().password().toCharArray());
 
-      Certificate certificate = keyStore.getCertificate(jwtProperties.key().alias());
+      Certificate certificate = keyStore.getCertificate(keyAlias);
       RSAPublicKey publicKey = (RSAPublicKey) certificate.getPublicKey();
 
-      RSAKey rsaKey =
-          new RSAKey.Builder(publicKey)
-              .privateKey(privateKey)
-              .keyID(jwtProperties.key().alias())
-              .build();
+      RSAKey rsaKey = new RSAKey.Builder(publicKey).privateKey(privateKey).keyID(keyAlias).build();
 
       JWKSet jwkSet = new JWKSet(rsaKey);
       return new ImmutableJWKSet<>(jwkSet);
@@ -235,6 +210,11 @@ public class SecurityConfig {
       JwtClaimsSet.Builder claims = context.getClaims();
       Authentication principal = context.getPrincipal();
 
+      String keyAlias = jwtProperties.key().alias();
+      if (StringUtils.hasText(keyAlias)) {
+        context.getJwsHeader().keyId(keyAlias);
+      }
+
       String username = principal.getName();
       CustomUserDetails customUserDetails =
           (CustomUserDetails) userDetailsService.loadUserByUsername(username);
@@ -263,8 +243,8 @@ public class SecurityConfig {
       } else if (context.getTokenType().getValue().equals(OidcParameterNames.ID_TOKEN)) {
         claims.claim("userId", userId);
 
-        // TODO: reducir expiración si se habilita rotación de refresh tokens
-        claims.expiresAt(Instant.now().plus(Duration.ofDays(1)));
+        // Expiración corta para alinear con access tokens rotativos.
+        claims.expiresAt(Instant.now().plus(Duration.ofMinutes(15)));
       }
     };
   }

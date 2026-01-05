@@ -1,42 +1,49 @@
 import { Injectable, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { OAuthErrorEvent, OAuthEvent, OAuthService } from 'angular-oauth2-oidc';
-import { BehaviorSubject, combineLatest, map, Observable, tap } from 'rxjs';
-import { authCodeFlowConfig } from '../config/auth-config';
-import { AccessTokenPayload } from '../../../shared/interfaces/access-token-payload.interface';
-import { IdTokenPayload } from '../../../shared/interfaces/id-token-payload.interface';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import {
+  BehaviorSubject,
+  combineLatest,
+  firstValueFrom,
+  map,
+  Observable,
+  of,
+  tap,
+  catchError,
+} from 'rxjs';
 import { User } from '../../users/models/user.model';
 import { UserService } from '../../users/services/user.service';
+import { environment } from '../../../../environments/environment';
 
-enum OAuthEventType {
-  tokenReceived = 'token_received',
-  tokenExpires = 'token_expires',
-  tokenError = 'token_error',
-  sessionTerminated = 'session_terminated',
-  sessionError = 'session_error',
+interface AuthSessionResponse {
+  authenticated: boolean;
+  userId: string;
+  username: string | null;
+  rolesAndPermissions: string[];
+  isAdmin: boolean;
 }
 
+/**
+ * Encapsula la integración BFF: valida la sesión en el gateway, gestiona el estado local
+ * de autenticación y obtiene el usuario actual sin exponer tokens al navegador.
+ */
 @Injectable({
   providedIn: 'root',
 })
-/**
- * Encapsula la integración con `angular-oauth2-oidc`, centralizando la lógica
- * de autenticación, manejo de tokens y recuperación del usuario actual. Este
- * servicio sirve como única fuente de verdad para el estado de sesión en toda
- * la aplicación.
- */
 export class AuthService {
-  private readonly oauthService = inject(OAuthService);
+  private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
   private readonly userService = inject(UserService);
+
+  private readonly apiUrl = environment.apiUrl;
 
   private readonly isAuthenticatedSubject$ = new BehaviorSubject<boolean>(
     false,
   );
-
   private readonly isDoneLoadingSubject$ = new BehaviorSubject<boolean>(false);
-
   private readonly userSubject$ = new BehaviorSubject<User | null>(null);
+  private readonly sessionSubject$ =
+    new BehaviorSubject<AuthSessionResponse | null>(null);
 
   public readonly isAuthenticated$: Observable<boolean> =
     this.isAuthenticatedSubject$.asObservable();
@@ -66,49 +73,58 @@ export class AuthService {
     map(([isAuthenticated, isDoneLoading]) => isAuthenticated && isDoneLoading),
   );
 
-  private readonly oauthInitialization = (() => {
-    this.oauthService.configure(authCodeFlowConfig);
-    this.setupOAuthEventListeners();
-  })();
-
   /**
-   * Realiza la configuración inicial: intenta completar el login silencioso,
-   * actualiza el estado de autenticación y, si aplica, recupera al usuario.
-   * También marca cuando terminó la carga para que los guards puedan avanzar.
+   * Consulta el estado de sesión en el gateway para decidir si el usuario está autenticado.
+   * Si existe sesión, carga los datos del usuario y aplica la navegación post-login.
    */
   public async initializeAuthentication(): Promise<void> {
-    await this.oauthService.loadDiscoveryDocumentAndTryLogin();
-    this.updateAuthState();
+    try {
+      const session = await firstValueFrom(
+        this.http.get<AuthSessionResponse>(`${this.apiUrl}/auth/session`).pipe(
+          catchError((error: HttpErrorResponse) => {
+            if (error.status !== 401) {
+              console.error('Error al validar la sesión en el gateway', error);
+            }
+            return of(null);
+          }),
+        ),
+      );
 
-    if (this.isAuthenticatedSubject$.value) {
-      if (!this.isOAuthCallback()) {
+      if (session?.authenticated) {
+        this.sessionSubject$.next(session);
+        this.isAuthenticatedSubject$.next(true);
         await this.fetchAndStoreCurrentAuthenticatedUser();
+        if (this.isLoginCallback()) {
+          this.navigateAfterLogin();
+        }
+      } else {
+        this.sessionSubject$.next(null);
+        this.isAuthenticatedSubject$.next(false);
       }
+    } finally {
+      this.isDoneLoadingSubject$.next(true);
     }
-
-    this.isDoneLoadingSubject$.next(true);
   }
 
   /**
-   * Inicia el flujo OAuth 2.0 guardando previamente la ruta destino para
-   * retomar la navegación tras un login exitoso.
+   * Inicia el flujo OAuth 2.0 delegando el login al gateway BFF.
    *
    * @param redirectUrl - Ruta a la que se redirige después de autenticarse.
    */
   public startLoginFlow(redirectUrl = '/dashboard'): void {
     sessionStorage.setItem('postLoginRedirectUrl', redirectUrl);
-    this.oauthService.initCodeFlow();
+    window.location.assign(`${this.apiUrl}/oauth2/authorization/sgivu-gateway`);
   }
 
   /**
-   * Limpia el estado local de autenticación y delega el cierre de sesión al
-   * proveedor OAuth (lo que también revoca tokens en el backend).
+   * Limpia el estado local de autenticación y delega el cierre de sesión al gateway.
    */
   public logout(): void {
     this.isAuthenticatedSubject$.next(false);
+    this.sessionSubject$.next(null);
     this.userSubject$.next(null);
     sessionStorage.removeItem('postLoginRedirectUrl');
-    this.oauthService.logOut();
+    window.location.assign(`${this.apiUrl}/logout`);
   }
 
   /**
@@ -122,184 +138,41 @@ export class AuthService {
   public enforceAuthentication(redirectUrl: string): Observable<boolean> {
     return this.isAuthenticated$.pipe(
       tap((isAuthenticated) => {
-        if (!isAuthenticated || !this.hasValidAccessToken) {
+        if (!isAuthenticated) {
           this.startLoginFlow(redirectUrl);
         }
       }),
     );
   }
 
-  public hasValidAccessToken(): boolean {
-    return this.oauthService.hasValidAccessToken();
-  }
-
-  public hasValidIdToken(): boolean {
-    return this.oauthService.hasValidIdToken();
-  }
-
-  public getAccessToken(): string | null {
-    return this.oauthService.getAccessToken() ?? null;
-  }
-
-  public getIdToken(): string | null {
-    return this.oauthService.getIdToken() ?? null;
-  }
-
-  /**
-   * Decodifica el payload del access token JWT sin validarlo criptográficamente.
-   * Sirve para obtener claims personalizados cuando la librería no los expone.
-   *
-   * @returns Payload del token o `null` si no existe o es inválido.
-   */
-  private getAccessTokenPayload(): AccessTokenPayload | null {
-    const accessToken = this.oauthService.getAccessToken();
-    if (!accessToken) {
-      return null;
-    }
-
-    const tokenParts = accessToken.split('.');
-    if (tokenParts.length !== 3) {
-      console.error(
-        'Error al decodificar el payload del token de acceso:',
-        'Formato JWT inválido',
-      );
-      return null;
-    }
-
-    try {
-      const payloadBase64 = tokenParts[1];
-      const payloadJson = atob(payloadBase64);
-      return JSON.parse(payloadJson) as AccessTokenPayload;
-    } catch (error) {
-      console.error(
-        'Error al decodificar el payload del token de acceso:',
-        error,
-      );
-      return null;
-    }
-  }
-
-  public getIdTokenPayload(): IdTokenPayload | null {
-    const claims = this.oauthService.getIdentityClaims();
-    if (!claims) {
-      return null;
-    }
-    return claims as IdTokenPayload;
-  }
-
-  public getClaimFromAccessToken<T>(
-    claimKey: keyof AccessTokenPayload,
-  ): T | null {
-    const payload = this.getAccessTokenPayload();
-    return (payload?.[claimKey] ?? null) as T | null;
-  }
-
   public getCurrentAuthenticatedUser(): User | null {
     return this.userSubject$.value;
   }
 
-  public getClaimFromIdToken<T>(claimKey: keyof IdTokenPayload): T | null {
-    const payload = this.getIdTokenPayload();
-    return (payload?.[claimKey] ?? null) as T | null;
-  }
-
   public getUserId(): number | null {
-    return this.getClaimFromIdToken<number>('userId');
+    const userId = this.sessionSubject$.value?.userId;
+    if (!userId) {
+      return null;
+    }
+    const parsed = Number(userId);
+    return Number.isNaN(parsed) ? null : parsed;
   }
 
   public getUsername(): string | null {
-    return this.getClaimFromAccessToken<string>('username');
+    return this.sessionSubject$.value?.username ?? null;
   }
 
   public isAdmin(): boolean {
-    return this.getClaimFromAccessToken<boolean>('isAdmin') ?? false;
+    return this.sessionSubject$.value?.isAdmin ?? false;
   }
 
   public getRolesAndPermissions(): Set<string> {
-    return new Set(
-      this.getClaimFromAccessToken<string[]>('rolesAndPermissions') ?? [],
-    );
-  }
-
-  /**
-   * Suscribe los eventos emitidos por `OAuthService` para reaccionar a la
-   * recepción/expiración de tokens y errores de sesión en un único punto.
-   */
-  private setupOAuthEventListeners(): void {
-    this.oauthService.events.subscribe((event) => {
-      switch (event.type) {
-        case OAuthEventType.tokenReceived:
-          this.handleTokenReceived();
-          break;
-        case OAuthEventType.tokenError:
-        case OAuthEventType.sessionTerminated:
-        case OAuthEventType.sessionError:
-          this.handleAuthError(event);
-          break;
-        case OAuthEventType.tokenExpires:
-          this.handleTokenExpired();
-          break;
-        default:
-          if (event instanceof OAuthErrorEvent) {
-            console.error('Evento de error OAuth no manejado:', event);
-          }
-      }
-    });
-  }
-
-  /**
-   * Actualiza el estado interno tras recibir nuevos tokens, dispara la carga
-   * del usuario autenticado y redirige cuando proviene del callback OAuth.
-   */
-  private handleTokenReceived(): void {
-    this.updateAuthState();
-
-    this.fetchAndStoreCurrentAuthenticatedUser();
-    this.oauthService
-      .loadUserProfile()
-      .catch((err) =>
-        console.error('Error al cargar el perfil de usuario', err),
-      );
-
-    if (this.isOAuthCallback()) {
-      this.navigateAfterLogin();
-    }
-  }
-
-  /**
-   * Resetea el estado local cuando ocurre un error en el flujo OAuth y deja un
-   * log para facilitar el diagnóstico.
-   *
-   * @param event - Evento original proporcionado por la librería (si existe).
-   */
-  private handleAuthError(event?: OAuthEvent): void {
-    if (event) console.error('Error de autenticación:', event);
-
-    this.isAuthenticatedSubject$.next(false);
-    this.userSubject$.next(null);
-  }
-
-  /**
-   * Marca la sesión como no autenticada cuando el token expira para que los
-   * guards obliguen a relogear.
-   */
-  private handleTokenExpired(): void {
-    this.isAuthenticatedSubject$.next(false);
-  }
-
-  /**
-   * Evalúa los tokens actuales y comunica el estado de autenticación al resto
-   * de la app mediante el `BehaviorSubject`.
-   */
-  private updateAuthState(): void {
-    const isAuthenticated =
-      this.hasValidAccessToken() && this.hasValidIdToken();
-    this.isAuthenticatedSubject$.next(isAuthenticated);
+    return new Set(this.sessionSubject$.value?.rolesAndPermissions ?? []);
   }
 
   /**
    * Recupera la ruta almacenada antes de iniciar sesión y navega hacia ella
-   * al completar el callback OAuth.
+   * al completar el callback del gateway.
    */
   private navigateAfterLogin(): void {
     const redirectUrl =
@@ -308,7 +181,7 @@ export class AuthService {
     this.router.navigateByUrl(redirectUrl, { replaceUrl: true });
   }
 
-  private isOAuthCallback(): boolean {
+  private isLoginCallback(): boolean {
     return window.location.pathname.includes('/callback');
   }
 
@@ -322,7 +195,7 @@ export class AuthService {
     return new Promise((resolve) => {
       const userId = this.getUserId();
       if (!userId) {
-        console.warn('No se encontró el ID del usuario en el id_token');
+        console.warn('No se encontró el ID del usuario en la sesión');
         this.userSubject$.next(null);
         resolve();
         return;
