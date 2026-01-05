@@ -20,7 +20,7 @@ Servicio Spring Cloud Config que centraliza y expone la configuración del ecosi
 
 ## Configuración
 
-- Variables clave: `SPRING_PROFILES_ACTIVE` (git por defecto), `SPRING_CLOUD_CONFIG_SERVER_GIT_URI`, `SPRING_CLOUD_CONFIG_SERVER_GIT_DEFAULT_LABEL`.
+- Variables clave: `SPRING_PROFILES_ACTIVE` (git por defecto, soporta `native`), `SPRING_CLOUD_CONFIG_SERVER_GIT_URI`, `SPRING_CLOUD_CONFIG_SERVER_GIT_DEFAULT_LABEL`, `SPRING_CLOUD_CONFIG_SERVER_NATIVE_SEARCH_LOCATIONS`.
 - Ajusta `src/main/resources/application.yml` o variables de entorno según el repositorio de configuración.
 
 ### Perfil Native
@@ -120,7 +120,7 @@ docker run -p 8888:8888 \
 ## Buenas Prácticas y Convenciones
 
 - Código en inglés; documentación en español; commits en inglés con Conventional Commits.
-- Usa `default` para valores comunes y sobrescribe solo lo necesario en `dev` o `prod`.
+- Usa el archivo base (sin sufijo de perfil) para valores comunes y sobrescribe solo lo necesario en `dev` o `prod`.
 
 ## Diagramas
 
