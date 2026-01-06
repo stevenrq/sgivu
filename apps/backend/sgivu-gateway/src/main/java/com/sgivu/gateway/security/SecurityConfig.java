@@ -55,6 +55,8 @@ import reactor.core.publisher.Mono;
 @EnableWebFluxSecurity
 public class SecurityConfig {
 
+  private static final String LOGOUT_URL = "/logout";
+
   private final ServicesProperties servicesProperties;
   private final AngularClientProperties angularClientProperties;
 
@@ -108,16 +110,16 @@ public class SecurityConfig {
         .logout(
             logout ->
                 logout
-                    .requiresLogout(ServerWebExchangeMatchers.pathMatchers("/logout"))
+                    .requiresLogout(ServerWebExchangeMatchers.pathMatchers(LOGOUT_URL))
                     .logoutSuccessHandler(logoutSuccessHandler(clientRegistrationRepository)))
         .authorizeExchange(
             exchanges ->
                 exchanges
                     .pathMatchers("/oauth2/**", "/login/**")
                     .permitAll()
-                    .pathMatchers(HttpMethod.GET, "/logout")
+                    .pathMatchers(HttpMethod.GET, LOGOUT_URL)
                     .permitAll()
-                    .pathMatchers(HttpMethod.POST, "/logout")
+                    .pathMatchers(HttpMethod.POST, LOGOUT_URL)
                     .permitAll()
                     .pathMatchers(HttpMethod.GET, "/authorized")
                     .permitAll()
