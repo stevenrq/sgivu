@@ -23,6 +23,7 @@ package "Infraestructura" as infra {
   component "Config Server\n(sgivu-config)" as config
   component "Config Repo\n(sgivu-config-repo)" as config_repo
   component "Discovery\n(sgivu-discovery)" as discovery
+  database "Sesiones (Redis)\n(sgivu-redis)" as redis
 }
 
 database "Bases de datos" as db
@@ -30,6 +31,7 @@ database "Bases de datos" as db
 usuario --> frontend
 frontend --> gateway
 gateway --> ms
+gateway --> redis
 
 ms --> db
 

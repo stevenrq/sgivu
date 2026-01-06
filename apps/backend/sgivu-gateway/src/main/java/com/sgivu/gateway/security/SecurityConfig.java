@@ -30,6 +30,7 @@ import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequest
 import org.springframework.security.oauth2.client.web.server.DefaultServerOAuth2AuthorizationRequestResolver;
 import org.springframework.security.oauth2.client.web.server.ServerOAuth2AuthorizationRequestResolver;
 import org.springframework.security.oauth2.client.web.server.ServerOAuth2AuthorizedClientRepository;
+import org.springframework.security.oauth2.client.web.server.WebSessionServerOAuth2AuthorizedClientRepository;
 import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
 import org.springframework.security.oauth2.jwt.*;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
@@ -53,6 +54,8 @@ import reactor.core.publisher.Mono;
 @Configuration
 @EnableWebFluxSecurity
 public class SecurityConfig {
+
+  private static final String LOGOUT_URL = "/logout";
 
   private final ServicesProperties servicesProperties;
   private final AngularClientProperties angularClientProperties;
@@ -87,13 +90,15 @@ public class SecurityConfig {
   SecurityWebFilterChain securityWebFilterChain(
       ServerHttpSecurity http,
       ReactiveClientRegistrationRepository clientRegistrationRepository,
-      ServerOAuth2AuthorizationRequestResolver authorizationRequestResolver) {
+      ServerOAuth2AuthorizationRequestResolver authorizationRequestResolver,
+      ServerOAuth2AuthorizedClientRepository authorizedClientRepository) {
     http.cors(corsSpec -> corsSpec.configurationSource(corsConfigurationSource()))
         .csrf(ServerHttpSecurity.CsrfSpec::disable)
         .oauth2Login(
             oauth2 ->
                 oauth2
                     .authorizationRequestResolver(authorizationRequestResolver)
+                    .authorizedClientRepository(authorizedClientRepository)
                     .authenticationSuccessHandler(authenticationSuccessHandler()))
         .oauth2Client(Customizer.withDefaults())
         .oauth2ResourceServer(
@@ -105,16 +110,16 @@ public class SecurityConfig {
         .logout(
             logout ->
                 logout
-                    .requiresLogout(ServerWebExchangeMatchers.pathMatchers("/logout"))
+                    .requiresLogout(ServerWebExchangeMatchers.pathMatchers(LOGOUT_URL))
                     .logoutSuccessHandler(logoutSuccessHandler(clientRegistrationRepository)))
         .authorizeExchange(
             exchanges ->
                 exchanges
                     .pathMatchers("/oauth2/**", "/login/**")
                     .permitAll()
-                    .pathMatchers(HttpMethod.GET, "/logout")
+                    .pathMatchers(HttpMethod.GET, LOGOUT_URL)
                     .permitAll()
-                    .pathMatchers(HttpMethod.POST, "/logout")
+                    .pathMatchers(HttpMethod.POST, LOGOUT_URL)
                     .permitAll()
                     .pathMatchers(HttpMethod.GET, "/authorized")
                     .permitAll()
@@ -196,6 +201,11 @@ public class SecurityConfig {
     handler.setPostLogoutRedirectUri(angularClientProperties.getUrl().concat("/login"));
     handler.setLogoutSuccessUrl(URI.create(angularClientProperties.getUrl().concat("/login")));
     return handler;
+  }
+
+  @Bean
+  public ServerOAuth2AuthorizedClientRepository authorizedClientRepository() {
+    return new WebSessionServerOAuth2AuthorizedClientRepository();
   }
 
   @Bean
