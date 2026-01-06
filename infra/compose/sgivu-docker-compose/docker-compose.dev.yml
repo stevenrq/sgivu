@@ -23,6 +23,17 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
 
+  sgivu-redis:
+    container_name: sgivu-redis
+    image: redis:7.4
+    ports:
+      - "6380:6379" # 6380 expuesto para el host, 6379 para el contenedor
+    restart: always
+    networks:
+      - sgivu-network
+    volumes:
+      - redis-data:/data
+
   sgivu-config:
     container_name: sgivu-config
     image: stevenrq/sgivu-config:v1
@@ -155,6 +166,7 @@ services:
       - sgivu-config
       - sgivu-discovery
       - sgivu-auth
+      - sgivu-redis
 
 networks:
   sgivu-network:
@@ -163,3 +175,4 @@ networks:
 volumes:
   mysql-data:
   postgres-data:
+  redis-data:
