@@ -16,6 +16,7 @@ Gateway reactivo que centraliza y enruta el tráfico HTTP del ecosistema SGIVU a
 - Lenguaje: Java 21
 - Framework: Spring Boot 3.5.8, Spring Cloud 2025.0.0
 - Gateway: Spring Cloud Gateway + Resilience4j
+- Persistencia de Sesión: Spring Session Data Redis
 - Seguridad: OAuth 2.1 Resource Server + OAuth2 Client (BFF), JWT (Nimbus Reactive Decoder)
 - Observabilidad: Micrometer Tracing, Brave, Zipkin, Actuator
 
