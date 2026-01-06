@@ -112,6 +112,7 @@ Documentación central del sistema SGIVU (backend, frontend, ML e infraestructur
 
 - Arquitectura general: `docs/diagrams/01-system-architecture.puml`.
 - Pipeline de build: `docs/diagrams/02-build-pipeline.puml`.
+- Flujo BFF y Refresh Token: `docs/diagrams/03-bff-refresh-token-flow.puml`.
 
 ## Autor
 
