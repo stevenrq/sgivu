@@ -14,7 +14,7 @@ Documentación central del sistema SGIVU (backend, frontend, ML e infraestructur
 
 ## Tecnologías
 
-- Backend: Spring Boot, Spring Cloud, PostgreSQL.
+- Backend: Spring Boot, Spring Cloud, PostgreSQL, Redis.
 - Frontend: Angular.
 - ML: FastAPI, scikit-learn.
 - Infraestructura: Docker, Docker Compose, AWS.
