@@ -30,6 +30,7 @@ import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequest
 import org.springframework.security.oauth2.client.web.server.DefaultServerOAuth2AuthorizationRequestResolver;
 import org.springframework.security.oauth2.client.web.server.ServerOAuth2AuthorizationRequestResolver;
 import org.springframework.security.oauth2.client.web.server.ServerOAuth2AuthorizedClientRepository;
+import org.springframework.security.oauth2.client.web.server.WebSessionServerOAuth2AuthorizedClientRepository;
 import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
 import org.springframework.security.oauth2.jwt.*;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
@@ -87,13 +88,15 @@ public class SecurityConfig {
   SecurityWebFilterChain securityWebFilterChain(
       ServerHttpSecurity http,
       ReactiveClientRegistrationRepository clientRegistrationRepository,
-      ServerOAuth2AuthorizationRequestResolver authorizationRequestResolver) {
+      ServerOAuth2AuthorizationRequestResolver authorizationRequestResolver,
+      ServerOAuth2AuthorizedClientRepository authorizedClientRepository) {
     http.cors(corsSpec -> corsSpec.configurationSource(corsConfigurationSource()))
         .csrf(ServerHttpSecurity.CsrfSpec::disable)
         .oauth2Login(
             oauth2 ->
                 oauth2
                     .authorizationRequestResolver(authorizationRequestResolver)
+                    .authorizedClientRepository(authorizedClientRepository)
                     .authenticationSuccessHandler(authenticationSuccessHandler()))
         .oauth2Client(Customizer.withDefaults())
         .oauth2ResourceServer(
@@ -196,6 +199,11 @@ public class SecurityConfig {
     handler.setPostLogoutRedirectUri(angularClientProperties.getUrl().concat("/login"));
     handler.setLogoutSuccessUrl(URI.create(angularClientProperties.getUrl().concat("/login")));
     return handler;
+  }
+
+  @Bean
+  public ServerOAuth2AuthorizedClientRepository authorizedClientRepository() {
+    return new WebSessionServerOAuth2AuthorizedClientRepository();
   }
 
   @Bean
