@@ -7,6 +7,7 @@ skinparam packageStyle rectangle
 actor "Usuario" as usuario
 participant "SPA\n(Angular)" as spa
 participant "BFF\n(sgivu-gateway)" as bff
+database "Redis" as redis
 participant "Auth Server\n(sgivu-auth)" as auth
 participant "Microservicios" as ms
 
@@ -17,23 +18,27 @@ bff -> auth : /oauth2/authorize (PKCE)
 auth -> bff : redirect con code
 bff -> auth : /oauth2/token (code)
 auth -> bff : access_token + refresh_token
+bff -> redis : persiste sesion y tokens
 bff -> spa : set-cookie (sesion)
 
 == Sesion activa ==
 spa -> bff : /auth/session (cookie)
+bff -> redis : valida sesion
 bff -> spa : estado/claims (sin tokens)
 
 == Expiracion y refresh ==
 spa -> bff : request API (cookie)
+bff -> redis : recupera tokens
 bff -> auth : /oauth2/token (refresh_token)
 auth -> bff : access_token nuevo + refresh_token rotado
+bff -> redis : actualiza tokens
 bff -> ms : request con access_token
 ms -> bff : respuesta
 bff -> spa : respuesta
 
 note over spa,bff
 La SPA no almacena tokens. El refresh_token vive en el BFF
-como parte de la sesion del servidor.
+como parte de la sesion del servidor (persistida en Redis).
 end note
 
 note over spa,bff
