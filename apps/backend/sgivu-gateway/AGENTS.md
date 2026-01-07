@@ -43,6 +43,7 @@
 
 ## Seguridad y Configuración
 
+- **Gestión de Tokens (BFF):** El gateway implementa el patrón BFF para la aplicación Angular, siendo responsable de almacenar y servir los tokens (`access_token` y `refresh_token`) emitidos por `sgivu-auth`.
 - No versiones secretos; usa variables de entorno o perfiles remotos del Config Server.
 - Verifica que las URLs de `sgivu-auth`, `sgivu-config` y `sgivu-discovery` correspondan al entorno antes de desplegar; revisa los encabezados propagados (`X-User-ID`, `X-Trace-Id`) en logs para trazabilidad.
 
