@@ -45,6 +45,7 @@ Documentación central del sistema SGIVU (backend, frontend, ML e infraestructur
 
 ## Seguridad
 
+- **Patrón BFF (Backend For Frontend):** Implementado vía `sgivu-gateway`, que actúa como BFF encargado de almacenar y servir el `access_token` y el `refresh_token` necesarios para la aplicación Angular. Aunque los tokens son creados por `sgivu-auth`, el gateway centraliza su gestión.
 - OAuth 2.1/OIDC con JWT emitidos por `sgivu-auth`.
 - Claves internas para comunicación service-to-service.
 - Nunca versionar secretos ni `.env` reales.
@@ -54,7 +55,7 @@ Documentación central del sistema SGIVU (backend, frontend, ML e infraestructur
 ### Backend
 
 - [sgivu-auth](apps/backend/sgivu-auth/README.md) — Servicio de autenticación y autorización (OAuth 2.1/OIDC, JWT).
-- [sgivu-gateway](apps/backend/sgivu-gateway/README.md) — Gateway de API con enrutamiento y rate limiting.
+- [sgivu-gateway](apps/backend/sgivu-gateway/README.md) — Gateway de API con enrutamiento y rate limiting (actúa como BFF para tokens).
 - [sgivu-config](apps/backend/sgivu-config/README.md) — Servidor de configuración centralizada.
 - [sgivu-discovery](apps/backend/sgivu-discovery/README.md) — Registro y descubrimiento de servicios (Eureka).
 - [sgivu-user](apps/backend/sgivu-user/README.md) — Servicio de gestión de usuarios.

@@ -38,8 +38,8 @@
 
 ## Seguridad y Configuración
 
+- **Gestión de Tokens (BFF):** El sistema utiliza el gateway como BFF para gestionar la autenticación. `sgivu-gateway` almacena y sirve el `access_token` y el `refresh_token` (emitidos por `sgivu-auth`) al frontend Angular.
 - Define `apiUrl`, `issuer` y `clientId` solo en `src/environments/*`; no hardcodees endpoints ni secretos en servicios/componentes.
-- `angular-oauth2-oidc` maneja los tokens; evita registrar encabezados sensibles o guardar tokens fuera del storage OAuth provisto.
 - Envía nuevas llamadas API a los dominios del gateway indicados por los entornos y mantén los orígenes CORS alineados con el host del frontend.
 
 ## Notas Específicas del Servicio

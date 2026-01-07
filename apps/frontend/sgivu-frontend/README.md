@@ -8,12 +8,12 @@ Frontend Angular que provee vistas para gestión de usuarios, roles, clientes, v
 
 - Aplicación Angular standalone (sin NgModules) con rutas en `app.routes.ts` y configuración en `app.config.ts`.
 - Features en `src/app/features` (auth, dashboard, users, clients, vehicles, purchase-sales) y `shared` para layout, directivas, servicios y validadores.
+- Se integra con `sgivu-gateway` bajo el patrón BFF para la gestión segura de tokens.
 - Configuración de entornos en `src/environments` (`environment.ts`, `environment.development.ts`).
 
 ## Tecnologías
 
 - Angular 21, TypeScript, CSS3.
-- Autenticación: OAuth 2.0 PKCE con `angular-oauth2-oidc`.
 
 ## Configuración
 
@@ -44,7 +44,7 @@ Scripts útiles:
 
 ## Seguridad
 
-- OAuth 2.0 + PKCE (`angular-oauth2-oidc`) con almacenamiento seguro de tokens provisto por la librería.
+- **Patrón BFF (Backend For Frontend):** `sgivu-gateway` actúa como BFF encargado de almacenar y servir el `access_token` y el `refresh_token` necesarios para la aplicación Angular. Aunque los tokens son creados por `sgivu-auth`, el gateway es el punto central de gestión para el frontend.
 - `auth.guard` protege rutas; `auth.interceptor` adjunta `Authorization`.
 - No hardcodear secretos; definirlos en `src/environments/*`.
 

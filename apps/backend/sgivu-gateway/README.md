@@ -57,6 +57,7 @@ GET       /fallback/*         -> Fallback 503 controlado
 
 ## Seguridad
 
+- **Rol como BFF (Backend For Frontend):** `sgivu-gateway` es el encargado de almacenar y servir el `access_token` y el `refresh_token` necesarios para la aplicación Angular. Aunque los tokens son creados y emitidos por `sgivu-auth`, el gateway actúa como el mediador que gestiona estos tokens para el frontend.
 - Soporta login OIDC como BFF y valida JWT emitidos por `sgivu-auth` (`services.sgivu-auth.url`).
 - Propaga access tokens a microservicios con token relay y renueva tokens en backend vía refresh tokens.
 - Rutas públicas limitadas (`/v1/auth/**`, `/authorized`, `/auth`, `/user`, `/logout`, `/oauth2/**`, `/login/**`).

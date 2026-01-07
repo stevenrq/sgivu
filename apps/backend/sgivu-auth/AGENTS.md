@@ -38,6 +38,7 @@
 
 ## Seguridad y Configuración
 
+- **Soporte BFF:** El servicio emite tokens de acceso y refresco para ser gestionados por `sgivu-gateway` (BFF), que es el encargado de almacenarlos y servirlos al frontend Angular.
 - Externaliza valores sensibles (`SERVICE_INTERNAL_SECRET_KEY`, contraseñas de keystore, credenciales DB) vía variables de entorno o Config Server; nunca los hardcodes.
 - Para local, crea `src/main/resources/application-local.yml` con placeholders de DB/issuer y actívalo con `-Dspring.profiles.active=local` o `dev`.
 - Los keystores deben proveerse en runtime mediante montajes seguros o secret managers, no en Git.
