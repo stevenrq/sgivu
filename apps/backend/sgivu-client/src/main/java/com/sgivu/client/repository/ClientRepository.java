@@ -25,8 +25,8 @@ public interface ClientRepository<T extends Client>
   /**
    * Cuenta el número de clientes activos o inactivos según el estado proporcionado.
    *
-   * @param isEnabled estado de activación (true para activos, false para inactivos)
+   * @param enabled estado de activación (true para activos, false para inactivos)
    * @return número de clientes que coinciden con el estado proporcionado
    */
-  long countByIsEnabled(boolean isEnabled);
+  long countByEnabled(boolean enabled);
 }

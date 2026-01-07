@@ -51,8 +51,8 @@ public class User extends Person {
   @Column(nullable = false, length = 60)
   private String password;
 
-  @Column(name = "is_enabled", nullable = false)
-  private boolean isEnabled;
+  @Column(name = "enabled", nullable = false)
+  private boolean enabled;
 
   @Column(name = "account_non_expired", nullable = false)
   private boolean accountNonExpired;
@@ -86,7 +86,7 @@ public class User extends Person {
    * autenticarse inmediatamente.
    */
   public void prePersistUser() {
-    this.isEnabled = true;
+    this.enabled = true;
     this.accountNonExpired = true;
     this.accountNonLocked = true;
     this.credentialsNonExpired = true;

@@ -155,16 +155,16 @@ public class CompanyController {
    * de compra/venta.
    *
    * @param id identificador
-   * @param isEnabled estado deseado
+   * @param enabled estado deseado
    * @return mapa con el nuevo estado o 404 si no existe
    */
   @PatchMapping("/{id}/status")
   @PreAuthorize("hasAuthority('company:update')")
   public ResponseEntity<Map<String, Boolean>> changeStatus(
-      @PathVariable Long id, @RequestBody boolean isEnabled) {
-    boolean isUpdated = companyService.changeStatus(id, isEnabled);
+      @PathVariable Long id, @RequestBody boolean enabled) {
+    boolean isUpdated = companyService.changeStatus(id, enabled);
     if (isUpdated) {
-      return ResponseEntity.ok(Collections.singletonMap("status", isEnabled));
+      return ResponseEntity.ok(Collections.singletonMap("status", enabled));
     }
     return ResponseEntity.notFound().build();
   }
@@ -179,7 +179,7 @@ public class CompanyController {
   @PreAuthorize("hasAuthority('company:read')")
   public ResponseEntity<Map<String, Long>> getCompanyCounts() {
     long totalCompanies = companyService.findAll().size();
-    long activeCompanies = companyService.countByIsEnabled(true);
+    long activeCompanies = companyService.countByEnabled(true);
     long inactiveCompanies = totalCompanies - activeCompanies;
 
     Map<String, Long> counts = new HashMap<>(Map.of("totalCompanies", totalCompanies));

@@ -71,12 +71,12 @@ public abstract class AbstractClientServiceImpl<T extends Client, R extends Clie
 
   @Transactional
   @Override
-  public boolean changeStatus(Long id, boolean isEnabled) {
+  public boolean changeStatus(Long id, boolean enabled) {
     return clientRepository
         .findById(id)
         .map(
             client -> {
-              client.setEnabled(isEnabled);
+              client.setEnabled(enabled);
               clientRepository.save(client);
               return true;
             })
@@ -84,7 +84,7 @@ public abstract class AbstractClientServiceImpl<T extends Client, R extends Clie
   }
 
   @Override
-  public long countByIsEnabled(boolean isEnabled) {
-    return clientRepository.countByIsEnabled(isEnabled);
+  public long countByEnabled(boolean enabled) {
+    return clientRepository.countByEnabled(enabled);
   }
 }

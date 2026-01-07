@@ -24,8 +24,8 @@ public interface UserRepository extends PersonRepository<User>, JpaSpecification
   /**
    * Cuenta usuarios según su estado de habilitación.
    *
-   * @param isEnabled indicador de estado deseado.
+   * @param enabled indicador de estado deseado.
    * @return cantidad de usuarios que cumplen la condición.
    */
-  long countByIsEnabled(boolean isEnabled);
+  long countByEnabled(boolean enabled);
 }

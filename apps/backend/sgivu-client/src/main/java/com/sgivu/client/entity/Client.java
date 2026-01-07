@@ -47,8 +47,8 @@ public abstract class Client implements Serializable {
   @Column(nullable = false, unique = true, length = 40)
   private String email;
 
-  @Column(name = "is_enabled", nullable = false)
-  private boolean isEnabled;
+  @Column(name = "enabled", nullable = false)
+  private boolean enabled;
 
   private LocalDateTime createdAt;
 
@@ -58,7 +58,7 @@ public abstract class Client implements Serializable {
   public void prePersist() {
     this.createdAt = LocalDateTime.now();
     this.updatedAt = LocalDateTime.now();
-    this.isEnabled = true;
+    this.enabled = true;
   }
 
   @PreUpdate

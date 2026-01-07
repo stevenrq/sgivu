@@ -73,16 +73,16 @@ public interface ClientService<T extends Client> {
    * Cambia el estado habilitado para autorizar su uso en nuevos procesos.
    *
    * @param id identificador
-   * @param isEnabled estado deseado
+   * @param enabled estado deseado
    * @return true si se actualizó
    */
-  boolean changeStatus(Long id, boolean isEnabled);
+  boolean changeStatus(Long id, boolean enabled);
 
   /**
    * Cuenta clientes por estado operativo.
    *
-   * @param isEnabled estado
+   * @param enabled estado
    * @return número de clientes
    */
-  long countByIsEnabled(boolean isEnabled);
+  long countByEnabled(boolean enabled);
 }

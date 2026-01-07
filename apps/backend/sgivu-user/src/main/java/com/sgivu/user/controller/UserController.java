@@ -200,17 +200,17 @@ public class UserController {
    * transaccionales.
    *
    * @param id identificador del usuario.
-   * @param isEnabled estado deseado.
+   * @param enabled estado deseado.
    * @return mapa sencillo con el estado actualizado.
    */
   @PreAuthorize("hasAuthority('user:update')")
   @PatchMapping("/{id}/status")
   public ResponseEntity<Map<String, Boolean>> updateStatus(
-      @PathVariable Long id, @RequestBody boolean isEnabled) {
-    boolean isUpdated = userService.changeStatus(id, isEnabled);
+      @PathVariable Long id, @RequestBody boolean enabled) {
+    boolean isUpdated = userService.changeStatus(id, enabled);
 
     if (isUpdated) {
-      return ResponseEntity.ok(Collections.singletonMap("User status: ", isEnabled));
+      return ResponseEntity.ok(Collections.singletonMap("User status: ", enabled));
     }
     return ResponseEntity.notFound().build();
   }

@@ -40,10 +40,10 @@ public interface UserService extends PersonService<User> {
    * Cambia el estado de un usuario para habilitar/bloquear acceso al resto de microservicios.
    *
    * @param id identificador del usuario.
-   * @param isEnabled nuevo estado objetivo.
+   * @param enabled nuevo estado objetivo.
    * @return {@code true} si el estado se cambió, {@code false} si el usuario no existe.
    */
-  boolean changeStatus(Long id, boolean isEnabled);
+  boolean changeStatus(Long id, boolean enabled);
 
   /**
    * @return cantidad de usuarios activos (habilitados) en el sistema.
