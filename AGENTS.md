@@ -43,6 +43,7 @@ Guía breve para mantener la documentación del sistema SGIVU sincronizada con l
 
 ## Seguridad y Configuración
 
+- **Arquitectura BFF:** `sgivu-gateway` funciona como un Backend For Frontend para la aplicación Angular, encargándose de almacenar y servir los tokens de acceso (`access_token`) y de refresco (`refresh_token`) emitidos por `sgivu-auth`.
 - Usa `infra/compose/sgivu-docker-compose/.env.example` como base; nunca publiques credenciales ni endpoints internos sensibles.
 - Para pruebas locales, mapea `sgivu-auth` en `/etc/hosts` en lugar de hardcodear URLs; en remoto, restringe el puerto 9000 a tu IP en el Security Group de EC2.
 - Al usar el perfil `native` de `sgivu-config` en Docker, asegúrate de tener montado el volumen del repositorio de configuración en `/config-repo` (ver `docker-compose.dev.yml`).

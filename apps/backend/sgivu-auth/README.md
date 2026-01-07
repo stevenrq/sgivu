@@ -55,6 +55,7 @@ GET  /actuator/health
 
 ## Seguridad
 
+- **Integración con BFF:** Emite tokens (`access_token`, `refresh_token`) destinados al cliente confidencial del gateway. `sgivu-gateway` actúa como BFF encargado de almacenar y servir estos tokens a la aplicación Angular.
 - OAuth 2.1 Authorization Code y Client Credentials con Spring Authorization Server.
 - Emite refresh tokens rotativos para el cliente confidencial del gateway (BFF).
 - Los clientes públicos (Angular) usan Authorization Code + PKCE sin refresh tokens.
