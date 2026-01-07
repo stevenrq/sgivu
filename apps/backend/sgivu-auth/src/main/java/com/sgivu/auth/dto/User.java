@@ -17,7 +17,7 @@ public class User {
   private Long id;
   private String username;
   private String password;
-  private boolean isEnabled;
+  private boolean enabled;
   private boolean accountNonExpired;
   private boolean accountNonLocked;
   private boolean credentialsNonExpired;

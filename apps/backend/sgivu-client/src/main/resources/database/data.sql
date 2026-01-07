@@ -53,7 +53,7 @@ VALUES ('Cra 7', '45-12', 'Montería'),
        ('Carrera 22', '14-88', 'Medellín');
 
 
-INSERT INTO clients (address_id, phone_number, email, is_enabled)
+INSERT INTO clients (address_id, phone_number, email, enabled)
 VALUES
 -- Personas (1-25)
 (1, 3004567890, 'juan.perez@example.com', true),

@@ -1,3 +1,11 @@
+DROP TABLE IF EXISTS addresses CASCADE;
+
+DROP TABLE IF EXISTS clients CASCADE;
+
+DROP TABLE IF EXISTS persons CASCADE;
+
+DROP TABLE IF EXISTS companies CASCADE;
+
 CREATE TABLE addresses
 (
     id         BIGSERIAL PRIMARY KEY,
@@ -20,7 +28,7 @@ CREATE TABLE clients
     email        VARCHAR(40)                                        NOT NULL UNIQUE,
     created_at   TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at   TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    is_enabled   BOOLEAN                  DEFAULT TRUE              NOT NULL
+    enabled      BOOLEAN                  DEFAULT TRUE              NOT NULL
 );
 
 ALTER TABLE clients

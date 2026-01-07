@@ -15,5 +15,5 @@ public abstract class ClientResponse {
   private Address address;
   private Long phoneNumber;
   private String email;
-  private boolean isEnabled;
+  private boolean enabled;
 }

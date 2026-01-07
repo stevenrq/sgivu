@@ -25,7 +25,7 @@ public class UserResponse {
   private String email;
   private String username;
   private String password;
-  private boolean isEnabled;
+  private boolean enabled;
   private boolean accountNonExpired;
   private boolean accountNonLocked;
   private boolean credentialsNonExpired;
