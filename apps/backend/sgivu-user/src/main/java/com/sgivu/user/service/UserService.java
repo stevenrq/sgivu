@@ -15,23 +15,7 @@ import org.springframework.data.domain.Pageable;
  * controladores expongan flujos consistentes con los contratos del Authorization Server y el
  * inventario de roles/permisos compartido entre microservicios.
  */
-public interface UserService {
-
-  /**
-   * Persiste un nuevo usuario aplicando las reglas de roles y codificación de credenciales.
-   *
-   * @param user entidad proveniente de la API, incluyendo roles solicitados.
-   * @return usuario almacenado con roles normalizados y password cifrada.
-   */
-  User save(User user);
-
-  /**
-   * Recupera un usuario por identificador para escenarios de autoedición y administración.
-   *
-   * @param id identificador único.
-   * @return usuario si existe, de lo contrario vacío.
-   */
-  Optional<User> findById(Long id);
+public interface UserService extends PersonService<User> {
 
   /**
    * Consulta por username, usado por el Authorization Server para construir el principal.
@@ -41,31 +25,15 @@ public interface UserService {
    */
   Optional<User> findByUsername(String username);
 
-  /** @return todos los usuarios activos e inactivos (uso administrativo). */
-  List<User> findAll();
-
   /**
-   * Variante paginada para consumo en paneles y listados.
+   * Actualiza datos específicos de un usuario.
    *
-   * @param pageable configuraciones de página/orden.
-   * @return página de usuarios.
-   */
-  Page<User> findAll(Pageable pageable);
-
-  /**
-   * Actualiza datos de un usuario respetando validaciones y roles solicitados.
-   *
-   * @param id identificador destino.
-   * @param userUpdateRequest DTO con cambios permitidos.
-   * @return usuario actualizado o vacío si no existe.
+   * @param id identificador
+   * @param userUpdateRequest datos entrantes
+   * @return usuario actualizado si existe
    */
   Optional<User> update(Long id, UserUpdateRequest userUpdateRequest);
 
-  /**
-   * Elimina un usuario de forma permanente (suele usarse para cuentas de prueba o limpieza).
-   *
-   * @param id identificador destino.
-   */
   void deleteById(Long id);
 
   /**
@@ -77,16 +45,10 @@ public interface UserService {
    */
   boolean changeStatus(Long id, boolean isEnabled);
 
-  /** @return cantidad de usuarios activos (habilitados) en el sistema. */
-  long countActiveUsers();
-
   /**
-   * Búsqueda liviana para autocompletados por nombre o apellido.
-   *
-   * @param name fragmento a buscar.
-   * @return coincidencias parciales.
+   * @return cantidad de usuarios activos (habilitados) en el sistema.
    */
-  List<User> findByFirstNameOrLastName(String name);
+  long countActiveUsers();
 
   /**
    * Búsqueda multi-criterio sin paginar.
