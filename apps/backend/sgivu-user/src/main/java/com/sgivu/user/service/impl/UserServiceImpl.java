@@ -26,7 +26,8 @@ import org.springframework.transaction.annotation.Transactional;
  * inventario de usuarios (altas/bajas, bloqueos y búsquedas multi-criterio).
  */
 @Service
-public class UserServiceImpl implements UserService {
+public class UserServiceImpl extends AbstractPersonServiceImpl<User, UserRepository>
+    implements UserService {
 
   private final UserRepository userRepository;
   private final RoleRepository roleRepository;
@@ -36,6 +37,7 @@ public class UserServiceImpl implements UserService {
       UserRepository userRepository,
       RoleRepository roleRepository,
       PasswordEncoder passwordEncoder) {
+    super(userRepository);
     this.userRepository = userRepository;
     this.roleRepository = roleRepository;
     this.passwordEncoder = passwordEncoder;
@@ -79,8 +81,6 @@ public class UserServiceImpl implements UserService {
     return userRepository.findAll(pageable);
   }
 
-  /** {@inheritDoc} */
-  @Override
   @Transactional
   public Optional<User> update(Long id, UserUpdateRequest userUpdateRequest) {
     Optional<User> userOptional = userRepository.findById(id);
@@ -112,15 +112,8 @@ public class UserServiceImpl implements UserService {
     userRepository.deleteById(id);
   }
 
-  /**
-   * Activa o desactiva un usuario propagando el bloqueo hacia el resto de microservicios a través
-   * de Spring Security.
-   *
-   * @param id identificador de usuario.
-   * @param isEnabled estado objetivo (true = habilitado, false = bloqueado).
-   * @return {@code true} si se actualizó, {@code false} cuando el usuario no existe.
-   */
   @Override
+  @Transactional
   public boolean changeStatus(Long id, boolean isEnabled) {
     Optional<User> userOptional = userRepository.findById(id);
 
@@ -165,7 +158,6 @@ public class UserServiceImpl implements UserService {
    * @param pageable configuración de paginación
    * @return página de usuarios
    */
-  @Override
   @Transactional(readOnly = true)
   public Page<User> search(UserFilterCriteria criteria, Pageable pageable) {
     return userRepository.findAll(UserSpecifications.withFilters(criteria), pageable);
