@@ -152,16 +152,16 @@ public class PersonController {
    * de riesgo y auditoría.
    *
    * @param id identificador de la persona
-   * @param isEnabled bandera deseada
+   * @param enabled bandera deseada
    * @return mapa con el estado aplicado o 404 si no existe
    */
   @PatchMapping("/{id}/status")
   @PreAuthorize("hasAuthority('person:update')")
   public ResponseEntity<Map<String, Boolean>> changeStatus(
-      @PathVariable Long id, @RequestBody boolean isEnabled) {
-    boolean isUpdated = personService.changeStatus(id, isEnabled);
+      @PathVariable Long id, @RequestBody boolean enabled) {
+    boolean isUpdated = personService.changeStatus(id, enabled);
     if (isUpdated) {
-      return ResponseEntity.ok(Collections.singletonMap("status", isEnabled));
+      return ResponseEntity.ok(Collections.singletonMap("status", enabled));
     }
     return ResponseEntity.notFound().build();
   }
@@ -176,7 +176,7 @@ public class PersonController {
   @PreAuthorize("hasAuthority('person:read')")
   public ResponseEntity<Map<String, Long>> getPersonCounts() {
     long totalPersons = personService.findAll().size();
-    long activePersons = personService.countByIsEnabled(true);
+    long activePersons = personService.countByEnabled(true);
     long inactivePersons = totalPersons - activePersons;
 
     Map<String, Long> counts = new HashMap<>(Map.of("totalPersons", totalPersons));

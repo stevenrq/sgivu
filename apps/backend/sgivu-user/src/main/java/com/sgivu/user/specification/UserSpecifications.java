@@ -55,7 +55,7 @@ public final class UserSpecifications {
     if (criteria.getEnabled() != null) {
       specification =
           specification.and(
-              (root, query, cb) -> cb.equal(root.get("isEnabled"), criteria.getEnabled()));
+              (root, query, cb) -> cb.equal(root.get("enabled"), criteria.getEnabled()));
     }
 
     if (StringUtils.hasText(criteria.getRole())) {

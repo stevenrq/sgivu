@@ -114,13 +114,13 @@ public class UserServiceImpl extends AbstractPersonServiceImpl<User, UserReposit
 
   @Override
   @Transactional
-  public boolean changeStatus(Long id, boolean isEnabled) {
+  public boolean changeStatus(Long id, boolean enabled) {
     Optional<User> userOptional = userRepository.findById(id);
 
     if (userOptional.isPresent()) {
       User user = userOptional.orElseThrow();
 
-      user.setEnabled(isEnabled);
+      user.setEnabled(enabled);
       userRepository.save(user);
       return true;
     }
@@ -130,7 +130,7 @@ public class UserServiceImpl extends AbstractPersonServiceImpl<User, UserReposit
   /** {@inheritDoc} */
   @Override
   public long countActiveUsers() {
-    return userRepository.countByIsEnabled(true);
+    return userRepository.countByEnabled(true);
   }
 
   /** {@inheritDoc} */

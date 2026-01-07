@@ -17,5 +17,5 @@ public class Client {
   private Address address;
   private Long phoneNumber;
   private String email;
-  private boolean isEnabled;
+  private boolean enabled;
 }

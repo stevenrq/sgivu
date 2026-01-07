@@ -26,7 +26,7 @@ VALUES (1003395547, 'Steven', 'Ricardo Quiñones', 3207108160, 'stevenrq8@gmail.
        (1112223311, 'Daniel', 'Flores', 3001234511, 'daniel.flores@example.com', NOW(), NOW(), 11);
 
 
-INSERT INTO users (person_id, username, password, is_enabled, account_non_expired, account_non_locked,
+INSERT INTO users (person_id, username, password, enabled, account_non_expired, account_non_locked,
                    credentials_non_expired)
 VALUES (1, 'steven', '$2a$12$IDd2OgT.udehJK9550mpaO9YYcjU8b/Vw2QPhwAWcVFMZjej7gwq2', true, true, true, true),
        (2, 'janesmith', '$2a$12$dflehQK6T6867eN73Fv0m.bvpgNgJy2v88s9L.6QAd.skoDCxdP/e', true, true, true, true),
