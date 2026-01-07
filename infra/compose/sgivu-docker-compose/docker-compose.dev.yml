@@ -3,7 +3,7 @@ services:
     container_name: sgivu-mysql
     image: mysql:8.0
     ports:
-      - "3307:3306" # 3307 expuesto para el host, 3306 para el contenedor
+      - "3307:3306"
     restart: always
     env_file: .env.dev
     networks:
@@ -15,7 +15,7 @@ services:
     container_name: sgivu-postgres
     image: postgres:17.6
     ports:
-      - "5433:5432" # 5433 expuesto para el host, 5432 para el contenedor
+      - "5433:5432"
     restart: always
     env_file: .env.dev
     networks:
@@ -26,8 +26,11 @@ services:
   sgivu-redis:
     container_name: sgivu-redis
     image: redis:7.4
+    command: >
+      sh -c "redis-server --requirepass \"$REDIS_PASSWORD\""
+    env_file: .env.dev
     ports:
-      - "6380:6379" # 6380 expuesto para el host, 6379 para el contenedor
+      - "6380:6379"
     restart: always
     networks:
       - sgivu-network
