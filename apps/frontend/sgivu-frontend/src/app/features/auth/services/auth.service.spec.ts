@@ -86,18 +86,18 @@ describe('AuthService', () => {
   });
 
   it('inicia el flujo de login guardando la ruta de retorno', () => {
-    const assignSpy = spyOn(window.location, 'assign');
+    const redirectSpy = spyOn(service as any, 'redirectTo');
 
     service.startLoginFlow('/secure');
 
     expect(sessionStorage.getItem('postLoginRedirectUrl')).toBe('/secure');
-    expect(assignSpy).toHaveBeenCalledWith(
+    expect(redirectSpy).toHaveBeenCalledWith(
       `${environment.apiUrl}/oauth2/authorization/sgivu-gateway`,
     );
   });
 
   it('limpia el estado y redirige al logout del gateway', () => {
-    const assignSpy = spyOn(window.location, 'assign');
+    const redirectSpy = spyOn(service as any, 'redirectTo');
     serviceState.isAuthenticatedSubject$.next(true);
     serviceState.userSubject$.next({
       id: 1,
@@ -122,7 +122,7 @@ describe('AuthService', () => {
     expect(serviceState.isAuthenticatedSubject$.getValue()).toBeFalse();
     expect(serviceState.userSubject$.getValue()).toBeNull();
     expect(sessionStorage.getItem('postLoginRedirectUrl')).toBeNull();
-    expect(assignSpy).toHaveBeenCalledWith(`${environment.apiUrl}/logout`);
+    expect(redirectSpy).toHaveBeenCalledWith(`${environment.apiUrl}/logout`);
   });
 
   it('enforceAuthentication dispara login cuando no está autenticado', (done) => {
