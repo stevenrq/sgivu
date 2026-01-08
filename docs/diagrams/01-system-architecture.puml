@@ -35,6 +35,12 @@ gateway --> redis
 
 ms --> db
 
+note right of ms
+  Cada microservicio
+  tiene su propia
+  base de datos.
+end note
+
 config_repo --> config
 gateway ..> config
 ms ..> config
