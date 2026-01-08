@@ -113,7 +113,7 @@ export class AuthService {
    */
   public startLoginFlow(redirectUrl = '/dashboard'): void {
     sessionStorage.setItem('postLoginRedirectUrl', redirectUrl);
-    window.location.assign(`${this.apiUrl}/oauth2/authorization/sgivu-gateway`);
+    this.redirectTo(`${this.apiUrl}/oauth2/authorization/sgivu-gateway`);
   }
 
   /**
@@ -124,7 +124,7 @@ export class AuthService {
     this.sessionSubject$.next(null);
     this.userSubject$.next(null);
     sessionStorage.removeItem('postLoginRedirectUrl');
-    window.location.assign(`${this.apiUrl}/logout`);
+    this.redirectTo(`${this.apiUrl}/logout`);
   }
 
   /**
@@ -168,6 +168,10 @@ export class AuthService {
 
   public getRolesAndPermissions(): Set<string> {
     return new Set(this.sessionSubject$.value?.rolesAndPermissions ?? []);
+  }
+
+  private redirectTo(url: string): void {
+    window.location.assign(url);
   }
 
   /**
