@@ -53,6 +53,9 @@ import org.springframework.security.web.authentication.LoginUrlAuthenticationEnt
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationFailureHandler;
 import org.springframework.security.web.session.HttpSessionEventPublisher;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
+import org.springframework.session.FindByIndexNameSessionRepository;
+import org.springframework.session.Session;
+import org.springframework.session.security.SpringSessionBackedSessionRegistry;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 import org.springframework.web.cors.CorsConfiguration;
@@ -123,7 +126,8 @@ public class SecurityConfig {
 
   @Bean
   @Order(2)
-  SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http) throws Exception {
+  SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http, SessionRegistry sessionRegistry)
+      throws Exception {
     http.authorizeHttpRequests(
             authorize ->
                 authorize
@@ -143,8 +147,7 @@ public class SecurityConfig {
                     .permitAll()
                     .defaultSuccessUrl(LOGIN_PATH, true)
                     .failureHandler(customAuthenticationFailureHandler()))
-        .sessionManagement(
-            session -> session.maximumSessions(5).sessionRegistry(sessionRegistry()));
+        .sessionManagement(session -> session.maximumSessions(5).sessionRegistry(sessionRegistry));
     return http.cors(Customizer.withDefaults()).build();
   }
 
@@ -250,8 +253,9 @@ public class SecurityConfig {
   }
 
   @Bean
-  SessionRegistry sessionRegistry() {
-    return new CustomSessionRegistry();
+  SessionRegistry sessionRegistry(
+      FindByIndexNameSessionRepository<? extends Session> sessionRepository) {
+    return new SpringSessionBackedSessionRegistry<>(sessionRepository);
   }
 
   @Bean
