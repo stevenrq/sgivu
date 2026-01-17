@@ -3,7 +3,7 @@ services:
     container_name: sgivu-mysql
     image: mysql:8.0
     ports:
-      - "3307:3306"
+      - "3306:3306"
     restart: always
     env_file: .env.dev
     networks:
@@ -15,7 +15,7 @@ services:
     container_name: sgivu-postgres
     image: postgres:17.6
     ports:
-      - "5433:5432"
+      - "5432:5432"
     restart: always
     env_file: .env.dev
     networks:
@@ -30,7 +30,7 @@ services:
       sh -c "redis-server --requirepass \"$REDIS_PASSWORD\""
     env_file: .env.dev
     ports:
-      - "6380:6379"
+      - "6379:6379"
     restart: always
     networks:
       - sgivu-network
@@ -48,10 +48,10 @@ services:
     volumes:
       - ../../../../sgivu-config-repo:/config-repo
     environment:
-      - SPRING_PROFILES_ACTIVE=git # Cambiar a native para desarrollo local
-      - SPRING_CLOUD_CONFIG_SERVER_GIT_URI=https://github.com/stevenrq/sgivu-config-repo.git
-      - SPRING_CLOUD_CONFIG_SERVER_GIT_DEFAULT_LABEL=develop
-      - SPRING_CLOUD_CONFIG_SERVER_NATIVE_SEARCH_LOCATIONS=file:/config-repo
+      - SPRING_PROFILES_ACTIVE=native # Utilice el perfil 'nativo' para leer desde el sistema de archivos local o 'git' para el repositorio de Git
+      - SPRING_CLOUD_CONFIG_SERVER_GIT_URI=https://github.com/stevenrq/sgivu-config-repo.git # URL del repositorio de Git
+      - SPRING_CLOUD_CONFIG_SERVER_GIT_DEFAULT_LABEL=develop # Rama a utilizar desde el repositorio Git
+      - SPRING_CLOUD_CONFIG_SERVER_NATIVE_SEARCH_LOCATIONS=file:/config-repo # Ruta del sistema de archivos local para el perfil 'nativo'
 
   sgivu-discovery:
     container_name: sgivu-discovery
@@ -85,6 +85,7 @@ services:
       - sgivu-network
     env_file: .env.dev
     depends_on:
+      - sgivu-postgres
       - sgivu-config
       - sgivu-discovery
 
@@ -98,6 +99,7 @@ services:
       - sgivu-network
     env_file: .env.dev
     depends_on:
+      - sgivu-postgres
       - sgivu-config
       - sgivu-discovery
       - sgivu-auth
@@ -112,6 +114,7 @@ services:
       - sgivu-network
     env_file: .env.dev
     depends_on:
+      - sgivu-postgres
       - sgivu-config
       - sgivu-discovery
       - sgivu-auth
@@ -126,6 +129,7 @@ services:
       - sgivu-network
     env_file: .env.dev
     depends_on:
+      - sgivu-postgres
       - sgivu-config
       - sgivu-discovery
       - sgivu-auth
@@ -140,6 +144,7 @@ services:
       - sgivu-network
     env_file: .env.dev
     depends_on:
+      - sgivu-postgres
       - sgivu-config
       - sgivu-discovery
       - sgivu-auth
@@ -154,7 +159,13 @@ services:
       - sgivu-network
     env_file: .env.dev
     depends_on:
+      - sgivu-postgres
       - sgivu-auth
+      - sgivu-client
+      - sgivu-gateway
+      - sgivu-user
+      - sgivu-vehicle
+      - sgivu-purchase-sale
 
   sgivu-gateway:
     container_name: sgivu-gateway
