@@ -2,6 +2,7 @@
 
 ## Estructura del Proyecto y Módulos
 
+- `src/main/java/com/sgivu/gateway/config/RedisSessionConfig.java`: configuración de cookies de sesión para Redis (`SESSION`, `SameSite=Lax`).
 - `src/main/java/com/sgivu/gateway`: configuración (rutas y circuit breakers), filtros globales (trazabilidad Zipkin, encabezados de seguridad), seguridad y controladores de fallback.
 - `src/main/resources/application.yml`: bootstrap mínimo; el resto de propiedades proviene del Config Server.
 - `src/test/java/com/sgivu/gateway`: pruebas de filtros, controladores y arranque de contexto.
@@ -44,6 +45,8 @@
 ## Seguridad y Configuración
 
 - **Gestión de Tokens (BFF):** El gateway implementa el patrón BFF para la aplicación Angular, siendo responsable de almacenar y servir los tokens (`access_token` y `refresh_token`) emitidos por `sgivu-auth`.
+- **Sesiones Redis:** Las sesiones OAuth2 (tokens, state, PKCE) se persisten en Redis con cookie `SESSION` (diferente de `AUTH_SESSION` del Auth Server).
+- **Cookies detrás de Nginx:** La configuración en `RedisSessionConfig.java` establece `SameSite=Lax` y `HttpOnly=true` para compatibilidad con el reverse proxy y flujos OAuth2.
 - No versiones secretos; usa variables de entorno o perfiles remotos del Config Server.
 - Verifica que las URLs de `sgivu-auth`, `sgivu-config` y `sgivu-discovery` correspondan al entorno antes de desplegar; revisa los encabezados propagados (`X-User-ID`, `X-Trace-Id`) en logs para trazabilidad.
 

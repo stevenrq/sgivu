@@ -1,99 +1,122 @@
-# Configuración de Acceso a sgivu-auth en Entornos de Desarrollo
+# Configuración de Acceso a sgivu-auth
 
-Este documento consolida las guías para configurar el acceso al servicio sgivu-auth (Authorization Server) desde herramientas externas a la red de Docker, cubriendo tanto un entorno de desarrollo local como uno remoto desplegado en AWS EC2.
+Este documento describe cómo acceder al servicio `sgivu-auth` (Authorization Server) según el
+entorno de despliegue.
 
-## 1. Contexto General y Problema Común
+## Resumen de Entornos
 
-El proyecto utiliza microservicios basados en Spring Cloud, donde sgivu-auth actúa como Authorization Server. Este servicio se ejecuta en un contenedor de Docker y expone el puerto 9000.
+| Entorno | ¿Requiere `/etc/hosts`? | URL de acceso |
+|---------|-------------------------|---------------|
+| **Desarrollo local** | ✅ Sí | `http://sgivu-auth:9000` |
+| **Producción (EC2 + Nginx)** | ❌ No | `http://<ec2-hostname>` (puerto 80) |
 
-Dentro de la red interna de Docker, los microservicios se comunican entre sí utilizando el nombre del contenedor como hostname:
+---
 
-<http://sgivu-auth:9000>
+## 1. Desarrollo Local (docker-compose.dev.yml)
 
-El problema principal es que las herramientas externas a esta red de Docker (como Postman, un frontend en Angular, o cualquier cliente en la máquina del desarrollador) no pueden resolver el nombre de host sgivu-auth, ya que no es un dominio registrado en un DNS público. Esto impide acceder a endpoints críticos para el flujo de autenticación, como:
+En desarrollo local **no se usa Nginx**. Los puertos de los servicios se exponen directamente:
 
-<http://sgivu-auth:9000/.well-known/openid-configuration>
+- `sgivu-auth` → puerto 9000
+- `sgivu-gateway` → puerto 8080
 
-## 2. Soluciones según el Entorno de Desarrollo
+### Configuración requerida
 
-La solución consiste en mapear el hostname sgivu-auth a la dirección IP correcta editando el archivo /etc/hosts en la máquina del desarrollador. La IP a utilizar dependerá de dónde se esté ejecutando el contenedor.
+Editar `/etc/hosts` para mapear el hostname del contenedor a localhost:
 
-### Escenario A: Entorno de Desarrollo Local
+```bash
+sudo nano /etc/hosts
+```
 
-En este escenario, el contenedor de sgivu-auth se ejecuta en la misma máquina local que las herramientas de desarrollo.
-
-Solución Implementada
-
-Se debe modificar el archivo /etc/hosts de la máquina local (host) para que el nombre sgivu-auth apunte a localhost.
-
-Editar el archivo /etc/hosts:
-
-En macOS/Linux: sudo nano /etc/hosts
-
-En Windows: C:\Windows\System32\drivers\etc\hosts (ejecutar como administrador)
-
-Agregar la siguiente línea:
+Agregar:
 
 ```text
 127.0.0.1 sgivu-auth
+127.0.0.1 sgivu-gateway
 ```
 
-127.0.0.1: Es la dirección de localhost, es decir, la propia máquina.
+### Verificación
 
-sgivu-auth: Es el alias que ahora resolverá a 127.0.0.1.
-
-Cualquier solicitud a <http://sgivu-auth:9000> desde la máquina host será redirigida a 127.0.0.1:9000, que es donde Docker expone el puerto del contenedor.
-
-### Escenario B: Entorno de Desarrollo Remoto (AWS EC2)
-
-En este escenario, los contenedores están desplegados en una instancia de AWS EC2, y se necesita acceso desde una máquina local externa.
-
-Solución Implementada
-
-La solución requiere dos pasos: mapear el hostname a la IP pública de EC2 y configurar el firewall de AWS (Security Group) para permitir el acceso.
-
-Editar el archivo /etc/hosts (en la máquina local):
-Agrega una línea que mapee el hostname sgivu-auth a la IP pública de tu instancia EC2.
-
-```text
-<EC2_PUBLIC_IP> sgivu-auth
-```
-
-Ejemplo:
-
-```text
-3.90.210.123 sgivu-auth
-```
-
-Configurar el Security Group (SG) en AWS EC2:
-Se debe permitir el tráfico entrante al puerto 9000 desde tu IP pública local para mantener la seguridad.
-
-Tipo: Custom TCP
-
-Protocolo: TCP
-
-Rango de puertos: 9000
-
-Origen: My IP (o introduce tu IP pública seguida de /32, ej: 190.123.45.67/32)
-
-¡Advertencia de Seguridad! Evita configurar el origen como 0.0.0.0/0 (Anywhere), ya que expondría el servicio a todo internet. Limita siempre el acceso a IPs específicas.
-
-## 3. Verificación del Servicio
-
-Una vez aplicada la configuración para cualquiera de los dos escenarios, puedes verificar el acceso desde tu máquina local ejecutando el siguiente comando en la terminal:
-
-````bash
+```bash
 curl http://sgivu-auth:9000/.well-known/openid-configuration
-````
+```
 
-El servicio debería responder con la configuración OIDC completa en formato JSON, confirmando que la conexión fue exitosa.
+Respuesta esperada:
 
-## 4. Conclusiones y Recomendaciones Futuras
+```json
+{
+    "issuer": "http://sgivu-auth:9000",
+    "authorization_endpoint": "http://sgivu-auth:9000/oauth2/authorize",
+    ...
+}
+```
 
-Coherencia: Esta técnica permite que tanto los microservicios internos como las herramientas externas utilicen la misma URL (<http://sgivu-auth:9000>), simplificando la configuración y las pruebas.
+### Por qué es necesario
 
-Uso en Desarrollo: La modificación del archivo /etc/hosts es una solución práctica y efectiva exclusivamente para entornos de desarrollo.
+- El navegador y el frontend Angular necesitan resolver `sgivu-auth` para acceder al Authorization
+  Server.
+- El `issuer` configurado en Spring Authorization Server usa `sgivu-auth:9000`, y debe coincidir
+  con la URL que usa el navegador para evitar errores de validación de tokens.
 
-Recomendación para Producción: En un entorno de producción, la resolución de nombres debe gestionarse a través de un DNS con un dominio público (ej. auth.sgivu.com). El servicio debe exponerse de forma segura a través de un proxy inverso (Nginx, Traefik) o un API Gateway, utilizando siempre HTTPS con certificados SSL/TLS válidos.
+---
 
-Buenas Prácticas: Se recomienda mantener configuraciones separadas para los diferentes entornos (desarrollo, producción) utilizando herramientas como Spring Cloud Config para evitar "hardcodear" URLs o valores sensibles en el código.
+## 2. Producción (EC2 + Nginx)
+
+En producción se usa **Nginx como reverse proxy** en el puerto 80. Todo el tráfico pasa por el
+hostname público de EC2.
+
+### Arquitectura
+
+```
+Navegador → Nginx (puerto 80) → sgivu-auth (puerto 9000 interno)
+                              → sgivu-gateway (puerto 8080 interno)
+```
+
+### Configuración
+
+**NO se requiere modificar `/etc/hosts`** en la máquina del desarrollador.
+
+El acceso se realiza directamente usando el hostname público de EC2:
+
+```bash
+curl http://ec2-XX-XX-XX-XX.compute-1.amazonaws.com/.well-known/openid-configuration
+```
+
+Respuesta esperada:
+
+```json
+{
+    "issuer": "http://ec2-XX-XX-XX-XX.compute-1.amazonaws.com",
+    "authorization_endpoint": "http://ec2-XX-XX-XX-XX.compute-1.amazonaws.com/oauth2/authorize",
+    ...
+}
+```
+
+### Por qué funciona sin /etc/hosts
+
+- Nginx rutea las peticiones OAuth2 (`/oauth2/*`, `/login`, `/.well-known/*`) al contenedor
+  `sgivu-auth:9000` internamente.
+- El `ISSUER_URL` en `.env` está configurado con el hostname público de EC2.
+- Los contenedores resuelven el hostname de EC2 via `extra_hosts` en `docker-compose.yml`.
+
+---
+
+## 3. Configuración del Security Group (AWS)
+
+Para producción, solo es necesario exponer el **puerto 80** (Nginx) en el Security Group:
+
+| Tipo | Protocolo | Puerto | Origen |
+|------|-----------|--------|--------|
+| HTTP | TCP | 80 | 0.0.0.0/0 (o tu IP) |
+
+**No es necesario** exponer el puerto 9000 externamente; Nginx maneja el ruteo interno.
+
+---
+
+## 4. Resumen de Cambios entre Entornos
+
+| Aspecto | Desarrollo Local | Producción (Nginx) |
+|---------|------------------|-------------------|
+| `/etc/hosts` | `127.0.0.1 sgivu-auth` | No requerido |
+| URL del issuer | `http://sgivu-auth:9000` | `http://<ec2-hostname>` |
+| Puerto expuesto | 9000 (directo) | 80 (Nginx) |
+| Archivo compose | `docker-compose.dev.yml` | `docker-compose.yml` |
