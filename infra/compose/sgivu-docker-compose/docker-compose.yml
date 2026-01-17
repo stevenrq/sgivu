@@ -46,7 +46,7 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=git
       - SPRING_CLOUD_CONFIG_SERVER_GIT_URI=https://github.com/stevenrq/sgivu-config-repo.git
-      - SPRING_CLOUD_CONFIG_SERVER_GIT_DEFAULT_LABEL=feat/update-jdbc-session
+      - SPRING_CLOUD_CONFIG_SERVER_GIT_DEFAULT_LABEL=main
       - SPRING_CLOUD_CONFIG_SERVER_NATIVE_SEARCH_LOCATIONS=file:/config-repo
 
   sgivu-discovery:
@@ -92,6 +92,8 @@ services:
     networks:
       - sgivu-network
     env_file: .env
+    extra_hosts:
+      - "ec2-98-86-100-220.compute-1.amazonaws.com:host-gateway"
     depends_on:
       - sgivu-postgres
       - sgivu-config
@@ -105,6 +107,8 @@ services:
     networks:
       - sgivu-network
     env_file: .env
+    extra_hosts:
+      - "ec2-98-86-100-220.compute-1.amazonaws.com:host-gateway"
     depends_on:
       - sgivu-postgres
       - sgivu-config
@@ -118,6 +122,8 @@ services:
     networks:
       - sgivu-network
     env_file: .env
+    extra_hosts:
+      - "ec2-98-86-100-220.compute-1.amazonaws.com:host-gateway"
     depends_on:
       - sgivu-postgres
       - sgivu-config
@@ -131,6 +137,8 @@ services:
     networks:
       - sgivu-network
     env_file: .env
+    extra_hosts:
+      - "ec2-98-86-100-220.compute-1.amazonaws.com:host-gateway"
     depends_on:
       - sgivu-postgres
       - sgivu-config
@@ -144,6 +152,8 @@ services:
     networks:
       - sgivu-network
     env_file: .env
+    extra_hosts:
+      - "ec2-98-86-100-220.compute-1.amazonaws.com:host-gateway"
     depends_on:
       - sgivu-postgres
       - sgivu-auth
@@ -162,6 +172,9 @@ services:
     networks:
       - sgivu-network
     env_file: .env
+    # Resolver hostname EC2 al host para acceder a Nginx (que rutea a auth:9000)
+    extra_hosts:
+      - "ec2-98-86-100-220.compute-1.amazonaws.com:host-gateway"
     depends_on:
       - sgivu-config
       - sgivu-discovery

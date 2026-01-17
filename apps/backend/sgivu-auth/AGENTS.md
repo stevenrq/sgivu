@@ -2,6 +2,7 @@
 
 ## Estructura del Proyecto y Módulos
 
+- `src/main/java/com/sgivu/auth/config/SessionConfig.java`: configuración de cookies para Spring Session JDBC (`AUTH_SESSION`, `SameSite=Lax`).
 - `src/main/java/com/sgivu/auth/...`: código Spring Boot (config, controladores, seguridad, servicios, repositorios, DTOs, entidades).
 - `src/main/resources`: configuración y assets; crea `application-local.yml` para secretos/DB locales, sin versionar.
 - `src/test/java/com/sgivu/auth`: pruebas JUnit/Spring Boot reflejando los paquetes principales.
@@ -39,6 +40,8 @@
 ## Seguridad y Configuración
 
 - **Soporte BFF:** El servicio emite tokens de acceso y refresco para ser gestionados por `sgivu-gateway` (BFF), que es el encargado de almacenarlos y servirlos al frontend Angular.
+- **Sesiones JDBC:** Las sesiones del formulario de login se persisten en PostgreSQL (`SPRING_SESSION`) con cookie `AUTH_SESSION` (diferente de `SESSION` del Gateway para evitar conflictos).
+- **Cookies detrás de Nginx:** La configuración en `SessionConfig.java` establece `SameSite=Lax` y `HttpOnly=true` para compatibilidad con el reverse proxy.
 - Externaliza valores sensibles (`SERVICE_INTERNAL_SECRET_KEY`, contraseñas de keystore, credenciales DB) vía variables de entorno o Config Server; nunca los hardcodes.
 - Para local, crea `src/main/resources/application-local.yml` con placeholders de DB/issuer y actívalo con `-Dspring.profiles.active=local` o `dev`.
 - Los keystores deben proveerse en runtime mediante montajes seguros o secret managers, no en Git.
