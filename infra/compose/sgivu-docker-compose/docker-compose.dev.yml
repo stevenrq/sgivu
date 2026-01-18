@@ -1,7 +1,7 @@
 services:
   sgivu-mysql:
     container_name: sgivu-mysql
-    image: mysql:8.0
+    image: mysql:8
     ports:
       - "3306:3306"
     restart: always
@@ -13,7 +13,7 @@ services:
 
   sgivu-postgres:
     container_name: sgivu-postgres
-    image: postgres:17.6
+    image: postgres:16
     ports:
       - "5432:5432"
     restart: always
@@ -25,7 +25,7 @@ services:
 
   sgivu-redis:
     container_name: sgivu-redis
-    image: redis:7.4
+    image: redis:7
     command: >
       sh -c "redis-server --requirepass \"$REDIS_PASSWORD\""
     env_file: .env.dev
