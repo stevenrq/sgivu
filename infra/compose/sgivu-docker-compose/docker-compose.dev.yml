@@ -1,7 +1,8 @@
 services:
   sgivu-mysql:
     container_name: sgivu-mysql
-    image: mysql:8.0
+    image: mysql:8
+    command: --mysql-native-password=ON
     ports:
       - "3306:3306"
     restart: always
@@ -13,7 +14,7 @@ services:
 
   sgivu-postgres:
     container_name: sgivu-postgres
-    image: postgres:17.6
+    image: postgres:16
     ports:
       - "5432:5432"
     restart: always
@@ -25,7 +26,7 @@ services:
 
   sgivu-redis:
     container_name: sgivu-redis
-    image: redis:7.4
+    image: redis:7
     command: >
       sh -c "redis-server --requirepass \"$REDIS_PASSWORD\""
     env_file: .env.dev
@@ -49,8 +50,6 @@ services:
       - ../../../../sgivu-config-repo:/config-repo
     environment:
       - SPRING_PROFILES_ACTIVE=native # Utilice el perfil 'nativo' para leer desde el sistema de archivos local o 'git' para el repositorio de Git
-      - SPRING_CLOUD_CONFIG_SERVER_GIT_URI=https://github.com/stevenrq/sgivu-config-repo.git # URL del repositorio de Git
-      - SPRING_CLOUD_CONFIG_SERVER_GIT_DEFAULT_LABEL=develop # Rama a utilizar desde el repositorio Git
       - SPRING_CLOUD_CONFIG_SERVER_NATIVE_SEARCH_LOCATIONS=file:/config-repo # Ruta del sistema de archivos local para el perfil 'nativo'
 
   sgivu-discovery:

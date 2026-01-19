@@ -2,6 +2,7 @@ services:
   sgivu-mysql:
     container_name: sgivu-mysql
     image: mysql:8
+    command: --mysql-native-password=ON
     ports:
       - "3306:3306"
     restart: always

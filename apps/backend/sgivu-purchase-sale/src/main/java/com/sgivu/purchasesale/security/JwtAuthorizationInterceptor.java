@@ -42,7 +42,7 @@ public class JwtAuthorizationInterceptor implements ClientHttpRequestInterceptor
 
     if (tokenValue != null && !tokenValue.isBlank()) {
       HttpHeaders headers = request.getHeaders();
-      if (!headers.containsKey(HttpHeaders.AUTHORIZATION)) {
+      if (headers.get(HttpHeaders.AUTHORIZATION) == null) {
         headers.setBearerAuth(tokenValue);
       }
     }

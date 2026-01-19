@@ -4,12 +4,14 @@ import com.sgivu.auth.client.UserClient;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.timelimiter.TimeLimiterConfig;
 import java.time.Duration;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.circuitbreaker.resilience4j.Resilience4JCircuitBreakerFactory;
 import org.springframework.cloud.client.circuitbreaker.Customizer;
 import org.springframework.cloud.client.loadbalancer.LoadBalanced;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.client.RestClient;
@@ -37,8 +39,23 @@ public class AppConfig {
     return new BCryptPasswordEncoder();
   }
 
+  /**
+   * RestClient.Builder con balanceo de carga para llamadas entre microservicios. Este builder
+   * resuelve nombres de servicio (ej. sgivu-user) via Eureka/LoadBalancer.
+   */
   @Bean
   @LoadBalanced
+  RestClient.Builder loadBalancedRestClientBuilder() {
+    return RestClient.builder();
+  }
+
+  /**
+   * RestClient.Builder sin balanceo de carga para conexiones directas (infraestructura). Marcado
+   * como @Primary para que Eureka lo use por defecto, evitando el problema circular donde Eureka
+   * client necesita LoadBalancer, pero LoadBalancer necesita Eureka para resolver servicios.
+   */
+  @Bean
+  @Primary
   RestClient.Builder restClientBuilder() {
     return RestClient.builder();
   }
@@ -48,7 +65,8 @@ public class AppConfig {
    * necesaria para llamadas de servicio a servicio.
    */
   @Bean
-  UserClient userClient(RestClient.Builder restClientBuilder) {
+  UserClient userClient(
+      @Qualifier("loadBalancedRestClientBuilder") RestClient.Builder restClientBuilder) {
     RestClient restClient =
         restClientBuilder
             .baseUrl(servicesProperties.getMap().get("sgivu-user").getUrl())

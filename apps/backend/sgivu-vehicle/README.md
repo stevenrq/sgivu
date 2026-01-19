@@ -2,14 +2,15 @@
 
 ## Descripción
 
-Microservicio que centraliza el inventario de vehículos (autos y motocicletas) con operaciones CRUD, búsqueda y métricas rápidas.
+Microservicio que centraliza el inventario de vehículos (autos y motocicletas) con operaciones CRUD, búsqueda y métricas
+rápidas.
 
 ## Arquitectura y Rol
 
 - Microservicio Spring Boot / Spring Cloud orientado a catálogo vehicular.
 - Interactúa con `sgivu-config`, `sgivu-discovery`, `sgivu-gateway`, `sgivu-auth`.
 - Controladores REST `/v1/cars` y `/v1/motorcycles`; registro en Eureka; config desde Config Server.
-- Persistencia JOINED en PostgreSQL (vehicles/cars/motorcycles) con seeds opcionales (`schema.sql`, `data.sql`).
+- Persistencia JOINED en PostgreSQL (vehicles/cars/motorcycles) con seeds opcionales (`schema.sql`).
 
 ## Tecnologías
 
@@ -21,7 +22,8 @@ Microservicio que centraliza el inventario de vehículos (autos y motocicletas) 
 
 ## Configuración
 
-- Variables clave: `SPRING_CONFIG_IMPORT`, `SPRING_PROFILES_ACTIVE`, `services.map.sgivu-auth.url`, datasource, `EUREKA_CLIENT_SERVICEURL_DEFAULTZONE`.
+- Variables clave: `SPRING_CONFIG_IMPORT`, `SPRING_PROFILES_ACTIVE`, `services.map.sgivu-auth.url`, datasource,
+  `EUREKA_CLIENT_SERVICEURL_DEFAULTZONE`.
 - `application-local.yml` recomendado para desarrollo; controla `spring.sql.init.mode` si deseas aplicar seeds.
 
 ## Ejecución Local
@@ -30,7 +32,8 @@ Microservicio que centraliza el inventario de vehículos (autos y motocicletas) 
 SPRING_PROFILES_ACTIVE=dev ./mvnw spring-boot:run
 ```
 
-Requiere Config Server, Discovery, Auth y PostgreSQL (`database/schema.sql`/`data.sql` opcional). Acceso en `http://localhost:8083` o vía gateway.
+Requiere Config Server, Discovery, Auth y PostgreSQL (`database/schema.sql`). Acceso en `http://localhost:8083` o vía
+gateway.
 
 ## Endpoints Principales
 
@@ -101,7 +104,8 @@ docker build -t sgivu-vehicle .
 ## Despliegue
 
 - Publica imagen en ECR; despliega en ECS/EKS/EC2 con conectividad privada a Config, Discovery y Auth.
-- Inyecta `SPRING_CONFIG_IMPORT`, `SPRING_DATASOURCE_*`, `EUREKA_CLIENT_SERVICEURL_DEFAULTZONE`, `SERVICES_MAP_SGIVU_AUTH_URL` vía Secrets Manager/Parameter Store o Config Server.
+- Inyecta `SPRING_CONFIG_IMPORT`, `SPRING_DATASOURCE_*`, `EUREKA_CLIENT_SERVICEURL_DEFAULTZONE`,
+  `SERVICES_MAP_SGIVU_AUTH_URL` vía Secrets Manager/Parameter Store o Config Server.
 - Exponer solo vía gateway detrás de ALB/NLB.
 
 ## Monitoreo
