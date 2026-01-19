@@ -5,10 +5,12 @@ import com.sgivu.purchasesale.client.UserServiceClient;
 import com.sgivu.purchasesale.client.VehicleServiceClient;
 import com.sgivu.purchasesale.security.JwtAuthorizationInterceptor;
 import java.util.Objects;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.client.loadbalancer.LoadBalanced;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.lang.NonNull;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
@@ -24,28 +26,41 @@ import org.springframework.web.service.invoker.HttpServiceProxyFactory;
 public class AppConfig {
 
   private static final String INTERNAL_SERVICE_KEY_HEADER = "X-Internal-Service-Key";
+  private final ServicesProperties servicesProperties;
 
   @Value("${service.internal.secret-key}")
   private String internalServiceKey;
-
-  private final ServicesProperties servicesProperties;
 
   public AppConfig(ServicesProperties servicesProperties) {
     this.servicesProperties = servicesProperties;
   }
 
   /**
-   * Builder común para RestClient con load balancer y propagación de JWT. Permite que las llamadas
+   * Builder para RestClient con load balancer y propagación de JWT. Permite que las llamadas
    * salientes honren la identidad del usuario autenticado y pasen por el Discovery Client de Spring
-   * Cloud.
+   * Cloud. Se inyecta explícitamente con @Qualifier en clientes de servicios de negocio.
    *
    * @param jwtAuthorizationInterceptor interceptor que copia el JWT vigente
    * @return builder preconfigurado listo para clonar
    */
-  @Bean
+  @Bean("loadBalancedRestClientBuilder")
   @LoadBalanced
-  RestClient.Builder restClientBuilder(JwtAuthorizationInterceptor jwtAuthorizationInterceptor) {
+  RestClient.Builder loadBalancedRestClientBuilder(
+      JwtAuthorizationInterceptor jwtAuthorizationInterceptor) {
     return RestClient.builder().requestInterceptors(list -> list.add(jwtAuthorizationInterceptor));
+  }
+
+  /**
+   * Builder para RestClient sin balanceo de carga. Marcado como @Primary para que Eureka y otros
+   * componentes de infraestructura lo usen por defecto, evitando la circularidad donde Eureka
+   * necesita LoadBalancer pero LoadBalancer necesita Eureka ya inicializado.
+   *
+   * @return builder sin balanceo de carga
+   */
+  @Bean
+  @Primary
+  RestClient.Builder restClientBuilder() {
+    return RestClient.builder();
   }
 
   /**
@@ -56,7 +71,8 @@ public class AppConfig {
    * @return cliente declarativo de clientes
    */
   @Bean
-  ClientServiceClient clientServiceClient(RestClient.Builder restClientBuilder) {
+  ClientServiceClient clientServiceClient(
+      @Qualifier("loadBalancedRestClientBuilder") RestClient.Builder restClientBuilder) {
     RestClient restClient =
         restClientBuilder
             .clone()
@@ -76,7 +92,8 @@ public class AppConfig {
    * @return cliente declarativo de usuarios
    */
   @Bean
-  UserServiceClient userServiceClient(RestClient.Builder restClientBuilder) {
+  UserServiceClient userServiceClient(
+      @Qualifier("loadBalancedRestClientBuilder") RestClient.Builder restClientBuilder) {
     RestClient restClient =
         restClientBuilder
             .clone()
@@ -96,7 +113,8 @@ public class AppConfig {
    * @return cliente declarativo de vehículos
    */
   @Bean
-  VehicleServiceClient vehicleServiceClient(RestClient.Builder restClientBuilder) {
+  VehicleServiceClient vehicleServiceClient(
+      @Qualifier("loadBalancedRestClientBuilder") RestClient.Builder restClientBuilder) {
     RestClient restClient =
         restClientBuilder
             .clone()
