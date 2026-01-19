@@ -10,15 +10,14 @@ import org.springframework.security.web.access.intercept.RequestAuthorizationCon
 import org.springframework.stereotype.Component;
 
 /**
- * AuthorizationManager que permite llamadas servicio-servicio mediante la clave interna {@code
- * X-Internal-Service-Key}, evitando exigir JWT en integraciones de backoffice.
+ * AuthorizationManager para comunicación interna entre microservicios. Implementa el método
+ * authorize con el wildcard genérico requerido.
  */
 @Component
 public class InternalServiceAuthorizationManager
     implements AuthorizationManager<RequestAuthorizationContext> {
 
   private static final String INTERNAL_KEY_HEADER = "X-Internal-Service-Key";
-
   private final String internalServiceKey;
 
   public InternalServiceAuthorizationManager(
@@ -27,12 +26,14 @@ public class InternalServiceAuthorizationManager
   }
 
   @Override
-  public AuthorizationDecision check(
-      Supplier<Authentication> authentication, RequestAuthorizationContext context) {
+  public AuthorizationDecision authorize(
+      Supplier<? extends Authentication> authentication, RequestAuthorizationContext context) {
+
     HttpServletRequest request = context.getRequest();
     String providedKey = request.getHeader(INTERNAL_KEY_HEADER);
 
-    boolean isKeyValid = internalServiceKey.equals(providedKey);
+    // Validación de seguridad para el canal interno
+    boolean isKeyValid = internalServiceKey != null && internalServiceKey.equals(providedKey);
 
     return new AuthorizationDecision(isKeyValid);
   }
