@@ -5,7 +5,7 @@
 - `src/main/java/com/sgivu/purchasesale/**`: controladores, servicios, clientes externos, mapeadores (MapStruct),
   entidades, repositorios y configuración de seguridad; `PurchaseSaleApplication.java` es el punto de entrada.
 - `src/main/resources/application.yaml`: configuración base; sobrescribe con `application-local.yml` o variables de
-  entorno. SQL en `src/main/resources/database/` (`schema.sql`, `data.sql`).
+  entorno. SQL en `src/main/resources/database/` (`schema.sql`).
 - `src/test/java/com/sgivu/purchasesale/**`: pruebas con JUnit 5, Mockito y AssertJ; fixtures cerca del código bajo
   prueba.
 - Herramientas: `Dockerfile` para la imagen, `build-image.bash` para automatizar build/push y `README.md` como guía

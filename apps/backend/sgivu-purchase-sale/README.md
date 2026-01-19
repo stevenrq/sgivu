@@ -2,12 +2,14 @@
 
 ## Descripción
 
-Microservicio que centraliza contratos de compra y venta de vehículos, validando clientes, usuarios y vehículos para registrar transacciones consistentes.
+Microservicio que centraliza contratos de compra y venta de vehículos, validando clientes, usuarios y vehículos para
+registrar transacciones consistentes.
 
 ## Arquitectura y Rol
 
 - Microservicio Spring Boot / Spring Cloud enfocado en ciclo de contratos.
-- Interactúa con `sgivu-config`, `sgivu-discovery`, `sgivu-gateway`, `sgivu-auth`, `sgivu-client`, `sgivu-user`, `sgivu-vehicle`.
+- Interactúa con `sgivu-config`, `sgivu-discovery`, `sgivu-gateway`, `sgivu-auth`, `sgivu-client`, `sgivu-user`,
+  `sgivu-vehicle`.
 - Valida referencias externas vía RestClient y claves internas; persiste contratos en PostgreSQL (`purchase_sales`).
 - Expuesto vía Eureka y protegido en gateway; soporta paginación y filtros por actor.
 
@@ -15,14 +17,16 @@ Microservicio que centraliza contratos de compra y venta de vehículos, validand
 
 - Lenguaje: Java 21
 - Framework: Spring Boot 3.5.8, Spring Cloud 2025.0.0
-- Seguridad: OAuth 2.1 Resource Server, JWT (`rolesAndPermissions`), `@PreAuthorize`, `InternalServiceAuthorizationManager`
-- Persistencia: Spring Data JPA, PostgreSQL (`schema.sql`, `data.sql`)
+- Seguridad: OAuth 2.1 Resource Server, JWT (`rolesAndPermissions`), `@PreAuthorize`,
+  `InternalServiceAuthorizationManager`
+- Persistencia: Spring Data JPA, PostgreSQL (`schema.sql`)
 - Integración: Rest Client + `HttpServiceProxyFactory`, MapStruct, Jakarta Validation
 - Infraestructura: Docker, Actuator, Eureka, Config Client
 
 ## Configuración
 
-- Variables clave: `SPRING_CONFIG_IMPORT`, `SPRING_PROFILES_ACTIVE`, `SERVICE_INTERNAL_SECRET_KEY`, `services.map.*` (auth, client, user, vehicle), datasource, `EUREKA_CLIENT_SERVICEURL_DEFAULTZONE`.
+- Variables clave: `SPRING_CONFIG_IMPORT`, `SPRING_PROFILES_ACTIVE`, `SERVICE_INTERNAL_SECRET_KEY`, `services.map.*` (
+  auth, client, user, vehicle), datasource, `EUREKA_CLIENT_SERVICEURL_DEFAULTZONE`.
 - `application-local.yml` recomendado para desarrollo; `management.tracing.enabled` opcional para Zipkin.
 
 ## Ejecución Local
@@ -31,7 +35,8 @@ Microservicio que centraliza contratos de compra y venta de vehículos, validand
 SPRING_PROFILES_ACTIVE=dev ./mvnw spring-boot:run
 ```
 
-Requiere Config, Discovery, Auth, Client, User, Vehicle y PostgreSQL (`schema.sql` y opcional `data.sql`). Acceso en `http://localhost:8084` o vía gateway (page size 10).
+Requiere Config, Discovery, Auth, Client, User, Vehicle y PostgreSQL (`schema.sql`). Acceso en `http://localhost:8084` o
+vía gateway (page size 10).
 
 ## Endpoints Principales
 
@@ -64,7 +69,8 @@ GET    /actuator/health|info
 
 ## Dependencias
 
-- `sgivu-config`, `sgivu-discovery`, `sgivu-gateway`, `sgivu-auth`, `sgivu-client`, `sgivu-user`, `sgivu-vehicle`, PostgreSQL.
+- `sgivu-config`, `sgivu-discovery`, `sgivu-gateway`, `sgivu-auth`, `sgivu-client`, `sgivu-user`, `sgivu-vehicle`,
+  PostgreSQL.
 
 ## Dockerización
 
@@ -98,7 +104,8 @@ docker build -t sgivu-purchase-sale .
 ## Despliegue
 
 - Publica imagen en ECR y despliega en ECS/Fargate, EKS o EC2 detrás de gateway.
-- Usa RDS PostgreSQL con `schema.sql` aplicado; gestiona secretos (`SERVICE_INTERNAL_SECRET_KEY`, `SPRING_DATASOURCE_*`, URLs internas) con Secrets Manager/Parameter Store.
+- Usa RDS PostgreSQL con `schema.sql` aplicado; gestiona secretos (`SERVICE_INTERNAL_SECRET_KEY`, `SPRING_DATASOURCE_*`,
+  URLs internas) con Secrets Manager/Parameter Store.
 - Configura Auto Scaling y health checks a `/actuator/health`; métricas a CloudWatch/Prometheus según clúster.
 
 ## Monitoreo
@@ -109,8 +116,9 @@ docker build -t sgivu-purchase-sale .
 ## Troubleshooting
 
 - 401/403: valida issuer de `sgivu-auth` y permisos del JWT.
-- Fallas al validar referencias: revisa URLs en `services.map` y disponibilidad de servicios; usa `X-Internal-Service-Key` correcto.
-- Paginación vacía: revisa filtros y datos en BD (`database/data.sql`).
+- Fallas al validar referencias: revisa URLs en `services.map` y disponibilidad de servicios; usa
+  `X-Internal-Service-Key` correcto.
+- Paginación vacía: revisa filtros y datos en BD.
 - No registra en Eureka: confirma `EUREKA_CLIENT_SERVICEURL_DEFAULTZONE` y estado de discovery.
 
 ## Buenas Prácticas y Convenciones

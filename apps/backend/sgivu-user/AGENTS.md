@@ -4,7 +4,7 @@
 
 - Código en `src/main/java/com/sgivu/user` organizado por responsabilidad: `controller`, `service` y `service/impl`,
   `repository`, `mapper` (MapStruct), `security`, `dto`, `entity`, `validation` y `exception`.
-- SQL comunes en `src/main/resources/database/{schema.sql,data.sql}`; configuración base en
+- SQL comunes en `src/main/resources/database/{schema.sql}`; configuración base en
   `src/main/resources/application.yml`.
 - Pruebas en `src/test/java/com/sgivu/user` con utilidades compartidas en `ServiceTestDataProvider`.
 - Diagramas en `../../../docs/diagrams/...`; activos Docker: `Dockerfile` y `build-image.bash`.

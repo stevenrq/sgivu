@@ -4,7 +4,7 @@
 
 - `src/main/java/com/sgivu/client`: controladores REST, DTOs, mappers (MapStruct), servicios/impl, repositorios,
   utilidades de seguridad/config/specification/exception.
-- `src/main/resources`: `application.yml` y activos de base de datos (`database/schema.sql`, `data.sql`) para bootstrap
+- `src/main/resources`: `application.yml` y activos de base de datos (`database/schema.sql`) para bootstrap
   local.
 - `src/test/java`: suites con JUnit 5 + Mockito + AssertJ; refleja la misma jerarquía de paquetes.
 - `../../../docs/diagrams`: diagramas PlantUML (contexto, componentes, modelo de datos).
