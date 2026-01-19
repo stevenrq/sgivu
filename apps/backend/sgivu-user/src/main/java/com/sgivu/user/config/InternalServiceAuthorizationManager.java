@@ -10,19 +10,14 @@ import org.springframework.security.web.access.intercept.RequestAuthorizationCon
 import org.springframework.stereotype.Component;
 
 /**
- * AuthorizationManager dedicado a peticiones entre microservicios SGIVU.
- *
- * <p>Valida que las llamadas porten la cabecera {@code X-Internal-Service-Key} con la clave
- * compartida configurada. Se usa para exponer endpoints solo al Authorization Server o al API
- * Gateway cuando requiere enriquecer tokens o sincronizar inventario de usuarios sin pasar por el
- * canal público OAuth2.
+ * AuthorizationManager para comunicación interna entre microservicios. Implementa el método
+ * authorize con el wildcard genérico requerido.
  */
 @Component
 public class InternalServiceAuthorizationManager
     implements AuthorizationManager<RequestAuthorizationContext> {
 
   private static final String INTERNAL_KEY_HEADER = "X-Internal-Service-Key";
-
   private final String internalServiceKey;
 
   public InternalServiceAuthorizationManager(
@@ -30,21 +25,15 @@ public class InternalServiceAuthorizationManager
     this.internalServiceKey = internalServiceKey;
   }
 
-  /**
-   * Verifica que la petición incluya la cabecera interna con la clave compartida.
-   *
-   * @param authentication autenticación actual (no se usa para la validación).
-   * @param context contexto de autorización con el {@link HttpServletRequest}.
-   * @return decisión afirmativa solo cuando la clave coincide.
-   */
   @Override
-  public AuthorizationDecision check(
-      Supplier<Authentication> authentication, RequestAuthorizationContext context) {
+  public AuthorizationDecision authorize(
+      Supplier<? extends Authentication> authentication, RequestAuthorizationContext context) {
+
     HttpServletRequest request = context.getRequest();
     String providedKey = request.getHeader(INTERNAL_KEY_HEADER);
 
-    // El secreto evita depender únicamente del JWT cuando el flujo es estrictamente interno.
-    boolean isKeyValid = internalServiceKey.equals(providedKey);
+    // Validación de seguridad para el canal interno
+    boolean isKeyValid = internalServiceKey != null && internalServiceKey.equals(providedKey);
 
     return new AuthorizationDecision(isKeyValid);
   }

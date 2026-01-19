@@ -2,7 +2,8 @@
 
 ## Descripción
 
-Microservicio para administrar el ciclo de vida de usuarios: creación, lectura, actualización, desactivación y asignación de roles/permisos. Expone APIs REST para el gateway y otros servicios internos.
+Microservicio para administrar el ciclo de vida de usuarios: creación, lectura, actualización, desactivación y
+asignación de roles/permisos. Expone APIs REST para el gateway y otros servicios internos.
 
 ## Arquitectura y Rol
 
@@ -16,13 +17,14 @@ Microservicio para administrar el ciclo de vida de usuarios: creación, lectura,
 - Lenguaje: Java 21 (Amazon Corretto)
 - Framework: Spring Boot 3.5.8, Spring Cloud 2025.0.0
 - Seguridad: OAuth 2.1 Resource Server, JWT, autorización granular por roles/permisos
-- Persistencia: Spring Data JPA, PostgreSQL, scripts `schema.sql`/`data.sql`
+- Persistencia: Spring Data JPA, PostgreSQL, scripts `schema.sql`
 - Observabilidad: Actuator, Micrometer Tracing + Zipkin
 - Utilitarios: MapStruct, Lombok, Validation API
 
 ## Configuración
 
-- Variables clave: `SPRING_CONFIG_IMPORT`, `SPRING_PROFILES_ACTIVE`, `SERVICE_INTERNAL_SECRET_KEY`, `services.sgivu-auth.url`, propiedades de datasource.
+- Variables clave: `SPRING_CONFIG_IMPORT`, `SPRING_PROFILES_ACTIVE`, `SERVICE_INTERNAL_SECRET_KEY`,
+  `services.sgivu-auth.url`, propiedades de datasource.
 - `application-local.yml` recomendado para desarrollo si no se usa Config Server.
 
 ## Ejecución Local
@@ -32,7 +34,8 @@ Microservicio para administrar el ciclo de vida de usuarios: creación, lectura,
 SPRING_PROFILES_ACTIVE=dev ./mvnw spring-boot:run
 ```
 
-Requiere Config Server, Eureka, PostgreSQL y opcionalmente Zipkin. Endpoints accesibles vía gateway en `http://localhost:8080`.
+Requiere Config Server, Eureka, PostgreSQL y opcionalmente Zipkin. Endpoints accesibles vía gateway en
+`http://localhost:8080`.
 
 ## Endpoints Principales
 
@@ -98,8 +101,9 @@ docker build -t sgivu-user .
 ## Despliegue
 
 - En EC2 o ECS/Fargate con Auto Scaling apuntando al gateway.
-- RDS PostgreSQL con `schema.sql` y `data.sql` aplicados desde pipeline/migraciones.
-- Variables requeridas: `SPRING_CONFIG_IMPORT`, `SERVICE_INTERNAL_SECRET_KEY`, `SPRING_DATASOURCE_*`, `SERVICES_SGIVU-AUTH_URL`, `EUREKA_CLIENT_SERVICEURL_DEFAULTZONE`, `ZIPKIN_BASE_URL`.
+- RDS PostgreSQL con `schema.sql` aplicados desde pipeline/migraciones.
+- Variables requeridas: `SPRING_CONFIG_IMPORT`, `SERVICE_INTERNAL_SECRET_KEY`, `SPRING_DATASOURCE_*`,
+  `SERVICES_SGIVU-AUTH_URL`, `EUREKA_CLIENT_SERVICEURL_DEFAULTZONE`, `ZIPKIN_BASE_URL`.
 
 ## Monitoreo
 
