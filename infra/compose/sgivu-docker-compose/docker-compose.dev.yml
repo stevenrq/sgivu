@@ -50,8 +50,6 @@ services:
       - ../../../../sgivu-config-repo:/config-repo
     environment:
       - SPRING_PROFILES_ACTIVE=native # Utilice el perfil 'nativo' para leer desde el sistema de archivos local o 'git' para el repositorio de Git
-      - SPRING_CLOUD_CONFIG_SERVER_GIT_URI=https://github.com/stevenrq/sgivu-config-repo.git # URL del repositorio de Git
-      - SPRING_CLOUD_CONFIG_SERVER_GIT_DEFAULT_LABEL=develop # Rama a utilizar desde el repositorio Git
       - SPRING_CLOUD_CONFIG_SERVER_NATIVE_SEARCH_LOCATIONS=file:/config-repo # Ruta del sistema de archivos local para el perfil 'nativo'
 
   sgivu-discovery:
