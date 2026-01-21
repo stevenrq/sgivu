@@ -10,12 +10,6 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Permiso granular que habilita acciones específicas (p. ej. {@code user:create},
- * {@code contract:approve}).
- *
- * <p>Se asocia a roles para controlar flujos distribuidos entre microservicios.
- */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -45,14 +39,12 @@ public class Permission implements Serializable {
 
   private LocalDateTime updatedAt;
 
-  /** Establece marcas de creación y actualización al insertar el permiso. */
   @PrePersist
   public void prePersist() {
     this.createdAt = LocalDateTime.now();
     this.updatedAt = LocalDateTime.now();
   }
 
-  /** Refresca la fecha de actualización antes de guardar cambios. */
   @PreUpdate
   public void preUpdate() {
     this.updatedAt = LocalDateTime.now();

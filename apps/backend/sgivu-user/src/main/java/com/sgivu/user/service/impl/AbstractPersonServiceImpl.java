@@ -9,14 +9,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Capa base que centraliza y actualiza datos personales para entidades que extienden de {@link
- * Person}, manteniendo consistencia transaccional y evitando duplicar reglas básicas entre
- * servicios concretos.
- *
- * @param <T> Entidad que extiende de {@link Person}
- * @param <R> Repositorio correspondiente a la entidad {@code T}
- */
 @Transactional(readOnly = true)
 public abstract class AbstractPersonServiceImpl<T extends Person, R extends PersonRepository<T>>
     implements PersonService<T> {

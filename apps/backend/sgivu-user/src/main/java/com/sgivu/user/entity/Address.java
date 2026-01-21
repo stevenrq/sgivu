@@ -8,9 +8,6 @@ import java.io.Serializable;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Dirección física asociada a una persona/usuario, necesaria para contratos y comprobantes.
- */
 @Data
 @NoArgsConstructor
 @Entity
