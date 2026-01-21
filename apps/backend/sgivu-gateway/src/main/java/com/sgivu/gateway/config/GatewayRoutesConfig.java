@@ -16,6 +16,7 @@ public class GatewayRoutesConfig {
 
   @Bean
   RouteLocator customRouteLocator(RouteLocatorBuilder builder) {
+    String userService = "lb://sgivu-user";
     return builder
         .routes()
         .route(
@@ -30,6 +31,21 @@ public class GatewayRoutesConfig {
                                         .setFallbackUri("forward:/fallback/auth")))
                     .uri("lb://sgivu-auth"))
         .route(
+            "sgivu-user-swagger-root",
+            r -> r.path("/swagger-ui.html", "/swagger-ui/**", "/webjars/**").uri(userService))
+        .route(
+            "sgivu-user-docs",
+            r ->
+                r.path(
+                        "/docs/user/swagger-ui.html",
+                        "/docs/user/swagger-ui/**",
+                        "/docs/user/v3/api-docs/**",
+                        "/docs/user/webjars/**")
+                    .filters(f -> f.rewritePath("/docs/user/(?<segment>.*)", "/${segment}"))
+                    .uri(userService))
+        .route(
+            "sgivu-user-api-docs", r -> r.path("/v3/api-docs/**", "/v3/api-docs").uri(userService))
+        .route(
             "sgivu-user",
             r ->
                 r.path("/v1/users/**", "/v1/roles/**", "/v1/permissions/**")
@@ -40,7 +56,7 @@ public class GatewayRoutesConfig {
                                     c ->
                                         c.setName("userServiceCircuitBreaker")
                                             .setFallbackUri("forward:/fallback/user")))
-                    .uri("lb://sgivu-user"))
+                    .uri(userService))
         .route(
             "sgivu-client",
             r ->
