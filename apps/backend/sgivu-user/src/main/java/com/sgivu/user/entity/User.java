@@ -16,12 +16,6 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
-/**
- * Representa una cuenta de usuario dentro del ecosistema SGIVU.
- *
- * <p>Extiende {@link Person} para reutilizar datos civiles y añade atributos de seguridad (estado,
- * credenciales y roles) consumidos por el Authorization Server y el API Gateway.
- */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -39,12 +33,6 @@ public class User extends Person {
   @Column(nullable = false, unique = true, length = 20)
   private String username;
 
-  /**
-   * La longitud de 60 se utiliza porque BCrypt generará una cadena de longitud 60. Se valida para
-   * longitud mínima, fuerza y no estar en blanco en la creación.
-   *
-   * <p>La longitud debe manejarse correctamente en el frontend.
-   */
   @Size(min = 6, max = 60, groups = Create.class)
   @PasswordStrength(groups = Create.class)
   @NotBlank(groups = Create.class)
@@ -81,10 +69,6 @@ public class User extends Person {
       inverseJoinColumns = @JoinColumn(name = "role_id"))
   private Set<Role> roles = new HashSet<>();
 
-  /**
-   * Establece los flags de seguridad en {@code true} al momento de crear el usuario para que pueda
-   * autenticarse inmediatamente.
-   */
   public void prePersistUser() {
     this.enabled = true;
     this.accountNonExpired = true;
@@ -92,11 +76,6 @@ public class User extends Person {
     this.credentialsNonExpired = true;
   }
 
-  /**
-   * Calcula la lista completa de autoridades del usuario (roles y permisos).
-   *
-   * @return conjunto de nombres de roles/permisos utilizados para poblar claims JWT.
-   */
   public Set<String> getRolesAndPermissions() {
     return RolePermissionUtils.getRolesAndPermissions(this.roles);
   }

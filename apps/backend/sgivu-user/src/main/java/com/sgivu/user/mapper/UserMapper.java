@@ -5,12 +5,6 @@ import com.sgivu.user.entity.User;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
-/**
- * Traduce entidades {@link User} a {@link UserResponse} evitando exponer detalles internos de JPA.
- *
- * <p>El mapeo explícito facilita auditar qué campos son devueltos al Authorization Server y a los
- * paneles de administración.
- */
 @Mapper(componentModel = "spring")
 public interface UserMapper {
 
@@ -28,12 +22,5 @@ public interface UserMapper {
   @Mapping(source = "accountNonLocked", target = "accountNonLocked")
   @Mapping(source = "credentialsNonExpired", target = "credentialsNonExpired")
   @Mapping(source = "roles", target = "roles")
-  /**
-   * Proyección hacia {@link UserResponse} para evitar exponer proxies y garantizar consistencia de
-   * campos retornados a otros servicios.
-   *
-   * @param user entidad de base de datos.
-   * @return DTO listo para serializar.
-   */
   UserResponse toUserResponse(User user);
 }

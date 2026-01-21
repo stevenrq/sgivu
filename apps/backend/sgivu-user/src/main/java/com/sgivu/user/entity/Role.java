@@ -14,12 +14,6 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
-/**
- * Rol funcional dentro de SGIVU (ej. ADMIN, ANALISTA, VENTAS).
- *
- * <p>Define un conjunto de permisos y se utiliza para autorizar operaciones transaccionales en
- * ventas de vehículos usados, contratos y predicciones de demanda.
- */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -62,24 +56,17 @@ public class Role implements Serializable {
       inverseJoinColumns = @JoinColumn(name = "permission_id"))
   private Set<Permission> permissions = new HashSet<>();
 
-  /** Define marcas de tiempo iniciales al crear un rol. */
   @PrePersist
   public void prePersist() {
     this.createdAt = LocalDateTime.now();
     this.updatedAt = LocalDateTime.now();
   }
 
-  /** Actualiza la fecha de modificación antes de persistir cambios. */
   @PreUpdate
   public void preUpdate() {
     this.updatedAt = LocalDateTime.now();
   }
 
-  /**
-   * Agrega permisos al conjunto existente evitando duplicados gracias a la estructura {@link Set}.
-   *
-   * @param permissions colección de permisos a anexar.
-   */
   public void addPermissions(Set<Permission> permissions) {
     this.getPermissions().addAll(permissions);
   }
