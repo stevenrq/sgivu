@@ -1,11 +1,9 @@
 package com.sgivu.auth.controller;
 
+import com.sgivu.auth.controller.api.CredentialsValidationApi;
 import com.sgivu.auth.dto.CredentialsValidationRequest;
 import com.sgivu.auth.dto.CredentialsValidationResponse;
 import com.sgivu.auth.service.CredentialsValidationService;
-import org.springframework.http.MediaType;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -14,7 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
  * formulario completo.
  */
 @RestController
-public class CredentialsValidationController {
+public class CredentialsValidationController implements CredentialsValidationApi {
 
   private final CredentialsValidationService credentialsValidationService;
 
@@ -23,25 +21,8 @@ public class CredentialsValidationController {
     this.credentialsValidationService = credentialsValidationService;
   }
 
-  /**
-   * Valida las credenciales proporcionadas (username y password) en tiempo real.
-   *
-   * <p>Retorna un JSON con el resultado de la validación: - {valid: true} si las credenciales son
-   * válidas - {valid: false, reason: "invalid_credentials"} si la contraseña es incorrecta -
-   * {valid: false, reason: "disabled"} si la cuenta está deshabilitada - {valid: false, reason:
-   * "locked"} si la cuenta está bloqueada - {valid: false, reason: "expired"} si la cuenta ha
-   * expirado - {valid: false, reason: "credentials"} si las credenciales han expirado - {valid:
-   * false, reason: "service_unavailable"} si el servicio de usuarios no responde
-   *
-   * @param request DTO con username y password a validar.
-   * @return CredentialsValidationResponse con el resultado de la validación.
-   */
-  @PostMapping(
-      value = "/api/validate-credentials",
-      consumes = MediaType.APPLICATION_JSON_VALUE,
-      produces = MediaType.APPLICATION_JSON_VALUE)
-  public CredentialsValidationResponse validateCredentials(
-      @RequestBody CredentialsValidationRequest request) {
+  @Override
+  public CredentialsValidationResponse validateCredentials(CredentialsValidationRequest request) {
     return credentialsValidationService.validateCredentials(request.username(), request.password());
   }
 }
