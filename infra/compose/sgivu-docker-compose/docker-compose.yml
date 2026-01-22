@@ -47,7 +47,7 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=git
       - SPRING_CLOUD_CONFIG_SERVER_GIT_URI=https://github.com/stevenrq/sgivu-config-repo.git
-      - SPRING_CLOUD_CONFIG_SERVER_GIT_DEFAULT_LABEL=feature/auth-openapi
+      - SPRING_CLOUD_CONFIG_SERVER_GIT_DEFAULT_LABEL=main
       - SPRING_CLOUD_CONFIG_SERVER_NATIVE_SEARCH_LOCATIONS=file:/config-repo
 
   sgivu-discovery:
