@@ -165,7 +165,9 @@ public class SecurityConfig {
     CorsConfiguration config = new CorsConfiguration();
     config.addAllowedHeader("*");
     config.addAllowedMethod("*");
-    config.setAllowedOriginPatterns(List.of(angularClientProperties.getUrl()));
+    // Permitir Swagger UI servido por el gateway en localhost:8080 para pruebas locales
+    config.setAllowedOriginPatterns(
+        List.of(angularClientProperties.getUrl(), "http://localhost:8080"));
     config.setAllowCredentials(true);
     source.registerCorsConfiguration("/**", config);
     return source;
