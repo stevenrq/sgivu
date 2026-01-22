@@ -137,6 +137,9 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers("/api/validate-credentials")
                     .permitAll()
+                    .requestMatchers(
+                        "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/webjars/**")
+                    .permitAll()
                     .anyRequest()
                     .authenticated())
         .csrf(csrf -> csrf.ignoringRequestMatchers("/api/validate-credentials"))

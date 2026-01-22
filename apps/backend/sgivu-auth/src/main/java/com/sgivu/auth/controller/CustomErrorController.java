@@ -1,5 +1,6 @@
 package com.sgivu.auth.controller;
 
+import io.swagger.v3.oas.annotations.Hidden;
 import java.util.Map;
 import org.springframework.boot.web.error.ErrorAttributeOptions;
 import org.springframework.boot.webmvc.error.ErrorAttributes;
@@ -13,6 +14,7 @@ import org.springframework.web.context.request.WebRequest;
  * Reemplaza la página HTML de Spring Boot en {@code /error} por una respuesta JSON consistente
  * consumible por el portal Angular y otros microservicios.
  */
+@Hidden
 @RestController
 public class CustomErrorController implements ErrorController {
 

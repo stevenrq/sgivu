@@ -1,0 +1,297 @@
+# =============================================================================
+# SGIVU - Nginx Default Configuration (Reverse Proxy & BFF)
+# =============================================================================
+#
+# DESCRIPCIÓN:
+# Este archivo reemplaza la configuración por defecto de Nginx para servir
+# como punto de entrada único (Reverse Proxy) para el sistema SGIVU.
+#
+# ARQUITECTURA:
+# 1. Frontend (SPA Angular): Se sirve desde S3, pero enmascarado tras este dominio.
+# 2. Backend (Spring Boot): Se accede vía Reverse Proxy a los puertos locales.
+# 3. Autenticación (OAuth2): Gestionada por el Auth Server y Gateway.
+#
+# RUTAS PRINCIPALES:
+# - /                    Frontend (Proxy a S3)
+# - /api/ o /v1/         Spring Cloud Gateway (Port 8080)
+# - /oauth2/             Flujos de Login y Token (Port 9000 & 8080)
+# - /login               Formulario de Login del Auth Server (Port 9000)
+#
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# UPSTREAMS
+# -----------------------------------------------------------------------------
+# Definición de los servicios backend locales
+upstream gateway {
+    server 127.0.0.1:8080;
+    keepalive 32;
+}
+
+upstream auth {
+    server 127.0.0.1:9000;
+    keepalive 32;
+}
+
+# -----------------------------------------------------------------------------
+# SERVER BLOCK
+# -----------------------------------------------------------------------------
+server {
+    # Escucha en puerto 80 para IPv4 e IPv6 como servidor por defecto
+    listen 80 default_server;
+    listen [::]:80 default_server;
+
+    # Nombres de dominio aceptados
+    # IMPORTANTE: Si reinicias la EC2 sin Elastic IP, actualiza este DNS.
+    server_name ec2-98-86-100-220.compute-1.amazonaws.com _;
+
+    # Logs específicos para depuración de tráfico
+    access_log /var/log/nginx/sgivu-access.log;
+    error_log /var/log/nginx/sgivu-error.log;
+
+    # Configuración de tamaño de carga (útil para subida de imágenes de vehículos)
+    client_max_body_size 50M;
+
+    # Timeouts extendidos para evitar cortes en procesos largos de ML o DB
+    proxy_connect_timeout 60s;
+    proxy_send_timeout 60s;
+    proxy_read_timeout 60s;
+
+    # Headers globales para el proxy (Clean Code: DRY)
+    proxy_http_version 1.1;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Port $server_port;
+    # Nota: El header 'Host' se define específicamente en cada location según necesidad.
+
+    # =========================================================================
+    # 1. AUTH SERVER (Port 9000)
+    # =========================================================================
+    
+    # Formulario de Login y su POST (Maneja GET y POST)
+    location /login {
+        proxy_pass http://auth/login;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+    }
+   
+    # API del Auth Server (validación de credenciales, etc.)
+    location ^~ /api/ {
+        proxy_pass http://auth/api/;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+    }
+
+    # Recursos estáticos del Auth Server - USAR ^~ PARA PRIORIDAD SOBRE S3
+    location ^~ /js/ {
+        proxy_pass http://auth/js/;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+    }
+
+    location ^~ /css/ {
+        proxy_pass http://auth/css/;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+    }
+
+    location ^~ /assets/ {
+        proxy_pass http://auth/assets/;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+    }
+
+    location ^~ /images/ {
+        proxy_pass http://auth/images/;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+    }
+
+    # Favicon del Auth Server
+    location = /favicon.ico {
+        proxy_pass http://auth/favicon.ico;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+    }
+
+    # Endpoints OIDC y OAuth2 del Auth Server
+    location ~ ^/oauth2/(authorize|token|jwks|introspect|revoke) {
+        proxy_pass http://auth;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+    }
+
+    # Endpoint OIDC Logout del Auth Server
+    location ~ ^/connect/logout {
+        proxy_pass http://auth;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+    }
+
+    # OpenID Connect Discovery y UserInfo
+    location ~ ^/(\.well-known/openid-configuration|userinfo) {
+        proxy_pass http://auth;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+    }
+
+    # Actuator del Auth Server
+    location /auth/actuator/ {
+        proxy_pass http://auth/actuator/;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+    }
+
+    # =========================================================================
+    # 2. API GATEWAY (Port 8080)
+    # =========================================================================
+    
+    # Exponer OpenAPI UI y JSON del servicio sgivu-auth
+    location = /docs/auth {
+        return 302 /docs/auth/swagger-ui.html;
+    }
+    
+    location /docs/auth/ {
+        proxy_pass http://gateway/docs/auth/;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+        proxy_redirect / /docs/auth/;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Port $server_port;
+    }
+
+    # Exponer OpenAPI UI y JSON del servicio sgivu-user
+    location = /docs/user {
+        return 302 /docs/user/swagger-ui.html;
+    }
+
+    location /docs/user/ {
+        proxy_pass http://gateway/docs/user/;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+        # Reescribe los Location absolutos del upstream para que permanezcan bajo /docs/user/
+        proxy_redirect / /docs/user/;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Port $server_port;
+    }
+
+    # Proxy OpenAPI JSON requests to Gateway so Swagger UI under /docs/user works
+    location /v3/api-docs/ {
+        proxy_pass http://gateway/v3/api-docs/;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Port $server_port;
+    }
+
+    # Inicio del flujo OAuth2 (Cliente) y Callback
+    location ~ ^/(oauth2/authorization/|login/oauth2/code/) {
+        proxy_pass http://gateway;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+    }
+
+    # Estado de sesión BFF (usado por Angular SPA)
+    location = /auth/session {
+        proxy_pass http://gateway/auth/session;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+    }
+
+    # Gestión de sesión y Logout
+    location ~ ^/(logout|session) {
+        proxy_pass http://gateway;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+    }
+
+    # APIs de negocio (Vehículos, Inventario, Predicciones)
+    location /v1/ {
+        proxy_pass http://gateway/v1/;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+        
+        # Soporte para WebSockets (si se requiere a futuro)
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+
+    # Actuator del Gateway
+    location /gateway/actuator/ {
+        proxy_pass http://gateway/actuator/;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+    }
+
+    # =========================================================================
+    # 3. OBSERVABILIDAD & HERRAMIENTAS (Opcional/Debug)
+    # =========================================================================
+
+    # Eureka Dashboard
+    location /eureka/ {
+        proxy_pass http://127.0.0.1:8761/;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+    }
+
+    # Zipkin UI
+    location /zipkin/ {
+        proxy_pass http://127.0.0.1:9411/zipkin/;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+    }
+
+    # =========================================================================
+    # 4. FRONTEND (S3 BUCKET) - Fallback por defecto
+    # =========================================================================
+    
+    location / {
+        # Proxy directo al bucket configurado como sitio web estático
+        proxy_pass http://sgivu-frontend.s3-website-us-east-1.amazonaws.com/;
+        
+        # IMPORTANTE: S3 requiere que el Host coincida con el nombre del bucket
+        proxy_set_header Host sgivu-frontend.s3-website-us-east-1.amazonaws.com;
+        proxy_set_header Connection "";
+
+        # Optimización de caché para assets estáticos de Angular
+        location ~* \\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+            proxy_pass http://sgivu-frontend.s3-website-us-east-1.amazonaws.com;
+            proxy_set_header Host sgivu-frontend.s3-website-us-east-1.amazonaws.com;
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
+
+        # Manejo de rutas SPA (Single Page Application)
+        # Si la ruta no existe en S3 (ej. /vehiculos), devuelve index.html para que Angular enrute
+        proxy_intercept_errors on;
+        error_page 404 = /index.html;
+    }
+
+   # Los recursos de Swagger UI se envían a Gateway para que no caigan en S3
+    location /swagger-ui/ {
+        proxy_pass http://gateway/swagger-ui/;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Port $server_port;
+    }
+
+    location /webjars/ {
+        proxy_pass http://gateway/webjars/;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+	    proxy_set_header X-Real-IP $remote_addr;
+	    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+	    proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Port $server_port;
+    }
+}

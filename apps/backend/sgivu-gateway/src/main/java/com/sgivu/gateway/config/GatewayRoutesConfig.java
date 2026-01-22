@@ -17,8 +17,24 @@ public class GatewayRoutesConfig {
   @Bean
   RouteLocator customRouteLocator(RouteLocatorBuilder builder) {
     String userService = "lb://sgivu-user";
+    String authService = "lb://sgivu-auth";
+
     return builder
         .routes()
+        .route(
+            "sgivu-v3-swagger-config-auth",
+            r ->
+                r.path("/v3/api-docs/swagger-config")
+                    .and()
+                    .header("Referer", ".*/docs/auth/.*")
+                    .uri(authService))
+        .route(
+            "sgivu-v3-swagger-config-user",
+            r ->
+                r.path("/v3/api-docs/swagger-config")
+                    .and()
+                    .header("Referer", ".*/docs/user/.*")
+                    .uri(userService))
         .route(
             "sgivu-auth",
             r ->
@@ -29,7 +45,7 @@ public class GatewayRoutesConfig {
                                 c ->
                                     c.setName("authServiceCircuitBreaker")
                                         .setFallbackUri("forward:/fallback/auth")))
-                    .uri("lb://sgivu-auth"))
+                    .uri(authService))
         .route(
             "sgivu-user-swagger-root",
             r -> r.path("/swagger-ui.html", "/swagger-ui/**", "/webjars/**").uri(userService))
@@ -44,7 +60,15 @@ public class GatewayRoutesConfig {
                     .filters(f -> f.rewritePath("/docs/user/(?<segment>.*)", "/${segment}"))
                     .uri(userService))
         .route(
-            "sgivu-user-api-docs", r -> r.path("/v3/api-docs/**", "/v3/api-docs").uri(userService))
+            "sgivu-auth-docs",
+            r ->
+                r.path(
+                        "/docs/auth/swagger-ui.html",
+                        "/docs/auth/swagger-ui/**",
+                        "/docs/auth/v3/api-docs/**",
+                        "/docs/auth/webjars/**")
+                    .filters(f -> f.rewritePath("/docs/auth/(?<segment>.*)", "/${segment}"))
+                    .uri(authService))
         .route(
             "sgivu-user",
             r ->

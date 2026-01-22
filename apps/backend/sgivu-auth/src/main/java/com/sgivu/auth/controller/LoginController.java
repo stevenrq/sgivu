@@ -1,6 +1,7 @@
 package com.sgivu.auth.controller;
 
 import com.sgivu.auth.config.AngularClientProperties;
+import io.swagger.v3.oas.annotations.Hidden;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestParam;
  * Gestiona la pantalla de login y redirige al portal Angular cuando la sesión ya existe,
  * traduciendo códigos de error a mensajes consumibles por la UI.
  */
+@Hidden
 @Controller
 public class LoginController {
 
