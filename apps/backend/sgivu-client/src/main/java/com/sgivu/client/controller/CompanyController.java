@@ -1,5 +1,6 @@
 package com.sgivu.client.controller;
 
+import com.sgivu.client.controller.api.CompanyApi;
 import com.sgivu.client.dto.CompanyResponse;
 import com.sgivu.client.dto.CompanySearchCriteria;
 import com.sgivu.client.entity.Company;
@@ -21,7 +22,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -34,8 +34,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RefreshScope
 @RestController
-@RequestMapping("/v1/companies")
-public class CompanyController {
+public class CompanyController implements CompanyApi {
 
   private final CompanyService companyService;
   private final ClientMapper clientMapper;
@@ -134,8 +133,8 @@ public class CompanyController {
    *
    * @param id identificador de la empresa
    * @return 204 si se elimina, 404 si no existe
-   * <p>Mantener sincronía con contratos previos depende de la lógica de dominio de servicios
-   * superiores; este endpoint solo gestiona la entidad maestra.
+   *     <p>Mantener sincronía con contratos previos depende de la lógica de dominio de servicios
+   *     superiores; este endpoint solo gestiona la entidad maestra.
    */
   @DeleteMapping("/{id}")
   @PreAuthorize("hasAuthority('company:delete')")

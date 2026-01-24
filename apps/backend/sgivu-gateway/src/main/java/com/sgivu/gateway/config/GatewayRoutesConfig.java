@@ -5,36 +5,81 @@ import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * Define el enrutamiento del API Gateway hacia los microservicios SGIVU, aplicando circuit breakers
- * y fallbacks para mantener la continuidad de los flujos de autenticación, inventario de vehículos
- * usados y compra-venta. Las rutas usan discovery (`lb://`) para balancear entre instancias y
- * delegan la recuperación de errores a los endpoints de fallback.
- */
 @Configuration
 public class GatewayRoutesConfig {
+
+  private static final String API_DOCS_SWAGGER_CONFIG = "/v3/api-docs/swagger-config";
+  private static final String REFERER_HEADER = "Referer";
+  private static final String SEGMENT_REWRITE = "/${segment}";
 
   @Bean
   RouteLocator customRouteLocator(RouteLocatorBuilder builder) {
     String userService = "lb://sgivu-user";
     String authService = "lb://sgivu-auth";
+    String clientService = "lb://sgivu-client";
 
     return builder
         .routes()
+        // Client
+        .route(
+            "sgivu-v3-swagger-config-client-direct",
+            r ->
+                r.path("/docs/client" + API_DOCS_SWAGGER_CONFIG)
+                    .filters(f -> f.rewritePath("/docs/client/(?<segment>.*)", SEGMENT_REWRITE))
+                    .uri(clientService))
+        .route(
+            "sgivu-v3-swagger-config-client",
+            r ->
+                r.path(API_DOCS_SWAGGER_CONFIG)
+                    .and()
+                    .header(REFERER_HEADER, ".*/docs/client/.*")
+                    .uri(clientService))
+        .route(
+            "sgivu-client-docs",
+            r ->
+                r.path(
+                        "/docs/client/swagger-ui.html",
+                        "/docs/client/swagger-ui/**",
+                        "/docs/client/v3/api-docs/**",
+                        "/docs/client/webjars/**")
+                    .filters(f -> f.rewritePath("/docs/client/(?<segment>.*)", SEGMENT_REWRITE))
+                    .uri(clientService))
+        .route(
+            "sgivu-client",
+            r ->
+                r.path("/v1/persons/**", "/v1/companies/**")
+                    .filters(
+                        f ->
+                            f.tokenRelay()
+                                .circuitBreaker(
+                                    c ->
+                                        c.setName("clientServiceCircuitBreaker")
+                                            .setFallbackUri("forward:/fallback/client")))
+                    .uri(clientService))
+        // Auth
+        .route(
+            "sgivu-v3-swagger-config-auth-direct",
+            r ->
+                r.path("/docs/auth" + API_DOCS_SWAGGER_CONFIG)
+                    .filters(f -> f.rewritePath("/docs/auth/(?<segment>.*)", SEGMENT_REWRITE))
+                    .uri(authService))
         .route(
             "sgivu-v3-swagger-config-auth",
             r ->
-                r.path("/v3/api-docs/swagger-config")
+                r.path(API_DOCS_SWAGGER_CONFIG)
                     .and()
-                    .header("Referer", ".*/docs/auth/.*")
+                    .header(REFERER_HEADER, ".*/docs/auth/.*")
                     .uri(authService))
         .route(
-            "sgivu-v3-swagger-config-user",
+            "sgivu-auth-docs",
             r ->
-                r.path("/v3/api-docs/swagger-config")
-                    .and()
-                    .header("Referer", ".*/docs/user/.*")
-                    .uri(userService))
+                r.path(
+                        "/docs/auth/swagger-ui.html",
+                        "/docs/auth/swagger-ui/**",
+                        "/docs/auth/v3/api-docs/**",
+                        "/docs/auth/webjars/**")
+                    .filters(f -> f.rewritePath("/docs/auth/(?<segment>.*)", SEGMENT_REWRITE))
+                    .uri(authService))
         .route(
             "sgivu-auth",
             r ->
@@ -46,9 +91,20 @@ public class GatewayRoutesConfig {
                                     c.setName("authServiceCircuitBreaker")
                                         .setFallbackUri("forward:/fallback/auth")))
                     .uri(authService))
+        // User
         .route(
-            "sgivu-user-swagger-root",
-            r -> r.path("/swagger-ui.html", "/swagger-ui/**", "/webjars/**").uri(userService))
+            "sgivu-v3-swagger-config-user-direct",
+            r ->
+                r.path("/docs/user" + API_DOCS_SWAGGER_CONFIG)
+                    .filters(f -> f.rewritePath("/docs/user/(?<segment>.*)", SEGMENT_REWRITE))
+                    .uri(userService))
+        .route(
+            "sgivu-v3-swagger-config-user",
+            r ->
+                r.path(API_DOCS_SWAGGER_CONFIG)
+                    .and()
+                    .header(REFERER_HEADER, ".*/docs/user/.*")
+                    .uri(userService))
         .route(
             "sgivu-user-docs",
             r ->
@@ -57,18 +113,8 @@ public class GatewayRoutesConfig {
                         "/docs/user/swagger-ui/**",
                         "/docs/user/v3/api-docs/**",
                         "/docs/user/webjars/**")
-                    .filters(f -> f.rewritePath("/docs/user/(?<segment>.*)", "/${segment}"))
+                    .filters(f -> f.rewritePath("/docs/user/(?<segment>.*)", SEGMENT_REWRITE))
                     .uri(userService))
-        .route(
-            "sgivu-auth-docs",
-            r ->
-                r.path(
-                        "/docs/auth/swagger-ui.html",
-                        "/docs/auth/swagger-ui/**",
-                        "/docs/auth/v3/api-docs/**",
-                        "/docs/auth/webjars/**")
-                    .filters(f -> f.rewritePath("/docs/auth/(?<segment>.*)", "/${segment}"))
-                    .uri(authService))
         .route(
             "sgivu-user",
             r ->
@@ -81,18 +127,7 @@ public class GatewayRoutesConfig {
                                         c.setName("userServiceCircuitBreaker")
                                             .setFallbackUri("forward:/fallback/user")))
                     .uri(userService))
-        .route(
-            "sgivu-client",
-            r ->
-                r.path("/v1/persons/**", "/v1/companies/**")
-                    .filters(
-                        f ->
-                            f.tokenRelay()
-                                .circuitBreaker(
-                                    c ->
-                                        c.setName("clientServiceCircuitBreaker")
-                                            .setFallbackUri("forward:/fallback/client")))
-                    .uri("lb://sgivu-client"))
+        // Vehicle
         .route(
             "sgivu-vehicle",
             r ->
@@ -105,6 +140,7 @@ public class GatewayRoutesConfig {
                                         c.setName("vehicleServiceCircuitBreaker")
                                             .setFallbackUri("forward:/fallback/vehicle")))
                     .uri("lb://sgivu-vehicle"))
+        // Purchase-Sale
         .route(
             "sgivu-purchase-sale",
             r ->
@@ -117,6 +153,7 @@ public class GatewayRoutesConfig {
                                         c.setName("purchaseSaleServiceCircuitBreaker")
                                             .setFallbackUri("forward:/fallback/purchase-sale")))
                     .uri("lb://sgivu-purchase-sale"))
+        // ML
         .route(
             "sgivu-ml",
             r ->
