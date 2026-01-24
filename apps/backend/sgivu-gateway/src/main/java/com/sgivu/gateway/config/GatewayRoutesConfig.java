@@ -80,6 +80,28 @@ public class GatewayRoutesConfig {
                         "/docs/auth/webjars/**")
                     .filters(f -> f.rewritePath("/docs/auth/(?<segment>.*)", SEGMENT_REWRITE))
                     .uri(authService))
+        // Gateway (documentación propia) - servir /docs/gateway/swagger-ui/** desde
+        // /webjars/swagger-ui/**
+        .route(
+            "sgivu-gateway-swagger-webjars",
+            r ->
+                r.path("/docs/gateway/swagger-ui/**", "/docs/gateway/swagger-ui/index.html")
+                    .filters(
+                        f ->
+                            f.rewritePath(
+                                "/docs/gateway/swagger-ui/(?<segment>.*)",
+                                "/webjars/swagger-ui/${segment}"))
+                    .uri("http://127.0.0.1:8080"))
+        .route(
+            "sgivu-gateway-docs",
+            r ->
+                r.path(
+                        "/docs/gateway/swagger-ui.html",
+                        "/docs/gateway/swagger-ui/**",
+                        "/docs/gateway/v3/api-docs/**",
+                        "/docs/gateway/webjars/**")
+                    .filters(f -> f.rewritePath("/docs/gateway/(?<segment>.*)", SEGMENT_REWRITE))
+                    .uri("http://127.0.0.1:8080"))
         .route(
             "sgivu-auth",
             r ->

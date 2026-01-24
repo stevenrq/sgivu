@@ -176,7 +176,47 @@ server {
 
     # Redirige /v3/api-docs/ al Gateway para que Swagger UI en /docs/* obtenga el JSON de OpenAPI
     location /v3/api-docs/ {
-        proxy_pass http://gateway/v3/api-docs/; 
+        # Evitar añadir slash extra al path reenviado: mapear /v3/api-docs/ -> /v3/api-docs en upstream
+        proxy_pass http://gateway/v3/api-docs;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Port $server_port;
+    }
+
+    # Exponer OpenAPI UI y JSON del API Gateway
+    location = /docs/gateway {
+        return 302 /docs/gateway/swagger-ui.html;
+    }
+
+    location /docs/gateway/ {
+        # Enviar la ruta completa al gateway para que el RouteLocator pueda aplicar sus reescrituras
+        proxy_pass http://gateway/;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+        # Reescribimos los Location absolutos para que los enlaces del upstream funcionen bajo /docs/gateway/
+        proxy_redirect / /docs/gateway/;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Port $server_port;
+    }
+
+    location = /docs/gateway/v3/api-docs/swagger-config {
+        proxy_pass http://gateway/v3/api-docs/swagger-config;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Port $server_port;
+    }
+
+    location /docs/gateway/v3/api-docs/ {
+        # Evitar añadir slash extra al path reenviado: mapear /docs/gateway/v3/api-docs/ -> /v3/api-docs en upstream
+        proxy_pass http://gateway/v3/api-docs;
         proxy_set_header Host $host;
         proxy_set_header Connection "";
         proxy_set_header X-Real-IP $remote_addr;
@@ -317,5 +357,27 @@ server {
 	    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
 	    proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header X-Forwarded-Port $server_port;
+    }
+
+    # Proxy directo para Swagger UI del Gateway (fallback seguro cuando el enrutador interno no resuelva)
+    location = /docs/gateway/swagger-ui/index.html {
+        proxy_pass http://gateway/webjars/swagger-ui/index.html;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Port $server_port;
+    }
+
+    location /docs/gateway/swagger-ui/ {
+        proxy_pass http://gateway/webjars/swagger-ui/;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Port $server_port;
+        proxy_redirect / /docs/gateway/swagger-ui/;
     }
 }
