@@ -1,5 +1,6 @@
 package com.sgivu.gateway.controller;
 
+import io.swagger.v3.oas.annotations.Hidden;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -8,12 +9,10 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Respuestas controladas de degradación cuando un microservicio cae o el circuit breaker se abre.
- * Mantiene mensajes consistentes hacia el front mientras se preserva la estabilidad de los flujos
- * de autenticación, usuarios, clientes, inventario y compra-venta. Es invocado por las rutas
- * configuradas en {@link com.sgivu.gateway.config.GatewayRoutesConfig} a través de {@code
- * forward:/fallback/**}.
+ * Controlador para manejar las respuestas de fallback cuando los servicios downstream no están
+ * disponibles.
  */
+@Hidden
 @RestController
 @RequestMapping("/fallback")
 public class FallbackController {
