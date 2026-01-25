@@ -30,6 +30,8 @@ import lombok.NoArgsConstructor;
 @Table(name = "vehicles")
 @Entity
 @Inheritance(strategy = InheritanceType.JOINED)
+@io.swagger.v3.oas.annotations.media.Schema(
+    description = "Entidad base de vehículo usada como request en algunos endpoints")
 public abstract class Vehicle implements Serializable {
 
   @Serial private static final long serialVersionUID = 1L;

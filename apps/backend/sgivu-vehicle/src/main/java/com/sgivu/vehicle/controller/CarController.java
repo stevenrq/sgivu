@@ -1,5 +1,6 @@
 package com.sgivu.vehicle.controller;
 
+import com.sgivu.vehicle.controller.api.CarApi;
 import com.sgivu.vehicle.dto.CarResponse;
 import com.sgivu.vehicle.dto.CarSearchCriteria;
 import com.sgivu.vehicle.entity.Car;
@@ -38,7 +39,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/v1/cars")
-public class CarController {
+public class CarController implements CarApi {
 
   private final CarService carService;
   private final VehicleMapper vehicleMapper;

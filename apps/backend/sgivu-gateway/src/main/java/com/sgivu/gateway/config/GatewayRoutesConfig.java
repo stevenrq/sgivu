@@ -19,6 +19,7 @@ public class GatewayRoutesConfig {
     String authService = "lb://sgivu-auth";
     String clientService = "lb://sgivu-client";
     String purchaseSaleService = "lb://sgivu-purchase-sale";
+    String vehicleService = "lb://sgivu-vehicle";
 
     return builder
         .routes()
@@ -151,7 +152,30 @@ public class GatewayRoutesConfig {
                                         c.setName("userServiceCircuitBreaker")
                                             .setFallbackUri("forward:/fallback/user")))
                     .uri(userService))
-        // Vehicle
+        // Vehicle docs: Exponer OpenAPI UI/JSON bajo /docs/vehicle
+        .route(
+            "sgivu-v3-swagger-config-vehicle-direct",
+            r ->
+                r.path("/docs/vehicle" + API_DOCS_SWAGGER_CONFIG)
+                    .filters(f -> f.rewritePath("/docs/vehicle/(?<segment>.*)", SEGMENT_REWRITE))
+                    .uri(vehicleService))
+        .route(
+            "sgivu-v3-swagger-config-vehicle",
+            r ->
+                r.path(API_DOCS_SWAGGER_CONFIG)
+                    .and()
+                    .header(REFERER_HEADER, ".*/docs/vehicle/.*")
+                    .uri(vehicleService))
+        .route(
+            "sgivu-vehicle-docs",
+            r ->
+                r.path(
+                        "/docs/vehicle/swagger-ui.html",
+                        "/docs/vehicle/swagger-ui/**",
+                        "/docs/vehicle/v3/api-docs/**",
+                        "/docs/vehicle/webjars/**")
+                    .filters(f -> f.rewritePath("/docs/vehicle/(?<segment>.*)", SEGMENT_REWRITE))
+                    .uri("lb://sgivu-vehicle"))
         .route(
             "sgivu-vehicle",
             r ->
@@ -163,7 +187,7 @@ public class GatewayRoutesConfig {
                                     c ->
                                         c.setName("vehicleServiceCircuitBreaker")
                                             .setFallbackUri("forward:/fallback/vehicle")))
-                    .uri("lb://sgivu-vehicle"))
+                    .uri(vehicleService))
         // Purchase-Sale
         .route(
             "sgivu-v3-swagger-config-purchase-sale-direct",
