@@ -9,11 +9,6 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-/**
- * Anotación para validar que un campo no contenga caracteres especiales.
- *
- * <p>Esta anotación utiliza {@link NoSpecialCharactersValidator} para la validación.
- */
 @Constraint(validatedBy = NoSpecialCharactersValidator.class)
 @Target({METHOD, FIELD, ANNOTATION_TYPE, CONSTRUCTOR, PARAMETER, TYPE_USE})
 @Retention(RetentionPolicy.RUNTIME)

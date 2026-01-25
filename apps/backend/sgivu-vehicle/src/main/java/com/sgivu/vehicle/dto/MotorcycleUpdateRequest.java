@@ -1,6 +1,7 @@
 package com.sgivu.vehicle.dto;
 
 import com.sgivu.vehicle.enums.VehicleStatus;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.Column;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -22,12 +23,15 @@ import lombok.ToString;
 @Getter
 @Setter
 @ToString
+@Schema(description = "Payload para actualizar motocicletas en inventario")
 public class MotorcycleUpdateRequest {
 
+  @Schema(description = "Marca", example = "Honda", requiredMode = Schema.RequiredMode.REQUIRED)
   @NotBlank
   @Column(nullable = false, length = 20)
   private String brand;
 
+  @Schema(description = "Modelo", example = "CB500")
   @NotBlank
   @Column(nullable = false, length = 20)
   private String model;

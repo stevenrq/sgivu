@@ -12,12 +12,6 @@ import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 
-/**
- * Mapeo centralizado de excepciones hacia respuestas HTTP legibles.
- *
- * <p>Evita filtrar detalles sensibles (p. ej. contraseñas o claves internas) y normaliza mensajes
- * para clientes externos y otros microservicios.
- */
 @ControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -26,12 +20,6 @@ public class GlobalExceptionHandler {
   private static final String DETAILS_KEY = "details";
   private static final String STATUS_KEY = "status";
 
-  /**
-   * Responde conflictos de unicidad/valores inválidos en tiempo de validación de JPA/Bean
-   * Validation.
-   *
-   * @return respuesta 409 con detalles de la restricción infringida.
-   */
   @ExceptionHandler(ConstraintViolationException.class)
   public ResponseEntity<Object> handleConstraintViolationException(ConstraintViolationException e) {
     logger.error("Ocurrió una violación de restricción: {}", e.getMessage(), e);
@@ -46,12 +34,6 @@ public class GlobalExceptionHandler {
     return new ResponseEntity<>(errorResponse, HttpStatus.CONFLICT);
   }
 
-  /**
-   * Maneja violaciones de integridad (claves únicas, FK) provenientes de PostgreSQL.
-   *
-   * @return respuesta 409 indicando al cliente que revise duplicados de documento, correo o
-   *     teléfono.
-   */
   @ExceptionHandler(DataIntegrityViolationException.class)
   public ResponseEntity<Object> handleDataIntegrityViolationException(
       DataIntegrityViolationException e) {
@@ -67,11 +49,6 @@ public class GlobalExceptionHandler {
     return new ResponseEntity<>(errorResponse, HttpStatus.CONFLICT);
   }
 
-  /**
-   * Fallback genérico para errores inesperados.
-   *
-   * @return respuesta 500 minimizando la exposición de detalles.
-   */
   @ExceptionHandler(Exception.class)
   public ResponseEntity<Object> handleGeneralException(Exception e) {
     logger.error("Ocurrió un error inesperado: {}", e.getMessage(), e);
@@ -85,11 +62,6 @@ public class GlobalExceptionHandler {
     return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
   }
 
-  /**
-   * Respuesta estándar cuando Spring Security rechaza el acceso a un recurso.
-   *
-   * @return 403 con mensaje orientado a negocio.
-   */
   @ExceptionHandler(AuthorizationDeniedException.class)
   public ResponseEntity<Object> handleAuthorizationDeniedException(AuthorizationDeniedException e) {
     logger.warn("Acceso denegado: {}", e.getMessage());

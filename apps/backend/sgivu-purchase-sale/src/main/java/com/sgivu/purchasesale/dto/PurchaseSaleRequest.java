@@ -3,6 +3,7 @@ package com.sgivu.purchasesale.dto;
 import com.sgivu.purchasesale.enums.ContractStatus;
 import com.sgivu.purchasesale.enums.ContractType;
 import com.sgivu.purchasesale.enums.PaymentMethod;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -20,6 +21,7 @@ import lombok.ToString;
  * @apiNote Para contratos de compra se permite adjuntar {@link VehicleCreationRequest} con la
  *     información necesaria para dar de alta el vehículo en el microservicio de inventario.
  */
+@Schema(description = "Payload de entrada para crear o actualizar contratos de compra/venta")
 @Getter
 @Setter
 @ToString

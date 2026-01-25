@@ -63,7 +63,13 @@ public class SecurityConfig {
         .authorizeHttpRequests(
             authz ->
                 authz
-                    .requestMatchers("/actuator/health", "/actuator/info")
+                    .requestMatchers(
+                        "/actuator/health",
+                        "/actuator/info",
+                        "/swagger-ui.html",
+                        "/swagger-ui/**",
+                        "/v3/api-docs/**",
+                        "/webjars/**")
                     .permitAll()
                     // Servicios internos (clave) o clientes autenticados pueden acceder
                     .requestMatchers("/v1/cars/**", "/v1/motorcycles/**")

@@ -1,5 +1,6 @@
 package com.sgivu.purchasesale.controller;
 
+import com.sgivu.purchasesale.controller.api.PurchaseSaleApi;
 import com.sgivu.purchasesale.dto.PurchaseSaleDetailResponse;
 import com.sgivu.purchasesale.dto.PurchaseSaleFilterCriteria;
 import com.sgivu.purchasesale.dto.PurchaseSaleRequest;
@@ -20,20 +21,11 @@ import java.util.Objects;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -42,8 +34,7 @@ import org.springframework.web.bind.annotation.RestController;
  * construcción de respuestas detalladas que combinan información de usuarios, clientes y vehículos.
  */
 @RestController
-@RequestMapping("/v1/purchase-sales")
-public class PurchaseSaleController {
+public class PurchaseSaleController implements PurchaseSaleApi {
 
   private final PurchaseSaleService purchaseSaleService;
   private final PurchaseSaleMapper purchaseSaleMapper;
@@ -69,10 +60,9 @@ public class PurchaseSaleController {
    * @apiNote Delegado en {@link PurchaseSaleService#create} para aplicar reglas de inventario y
    *     estados de contrato. Este endpoint utiliza JWT para asociar el gestor responsable.
    */
-  @PostMapping
   @PreAuthorize("hasAuthority('purchase_sale:create')")
   public ResponseEntity<PurchaseSaleResponse> create(
-      @Valid @RequestBody PurchaseSaleRequest purchaseSaleRequest) {
+      @Valid PurchaseSaleRequest purchaseSaleRequest) {
     PurchaseSaleResponse response =
         purchaseSaleMapper.toPurchaseSaleResponse(purchaseSaleService.create(purchaseSaleRequest));
     return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -85,9 +75,8 @@ public class PurchaseSaleController {
    * @param id identificador del contrato
    * @return detalle completo o 404 cuando no existe
    */
-  @GetMapping("/{id}")
   @PreAuthorize("hasAuthority('purchase_sale:read')")
-  public ResponseEntity<PurchaseSaleDetailResponse> getById(@PathVariable Long id) {
+  public ResponseEntity<PurchaseSaleDetailResponse> getById(Long id) {
     return purchaseSaleService
         .findById(id)
         .map(contract -> ResponseEntity.ok(purchaseSaleDetailService.toDetail(contract)))
@@ -98,7 +87,6 @@ public class PurchaseSaleController {
    * Lista los contratos en formato simple, pensado para listados rápidos o integraciones que no
    * requieren datos enriquecidos.
    */
-  @GetMapping
   @PreAuthorize("hasAuthority('purchase_sale:read')")
   public ResponseEntity<List<PurchaseSaleResponse>> getAll() {
     List<PurchaseSaleResponse> responses =
@@ -112,7 +100,6 @@ public class PurchaseSaleController {
    * Lista los contratos con enriquecimiento de cliente, usuario y vehículo, disparando llamadas a
    * microservicios externos y aplicando caché intra-request para reducir latencia.
    */
-  @GetMapping("/detailed")
   @PreAuthorize("hasAuthority('purchase_sale:read')")
   public ResponseEntity<List<PurchaseSaleDetailResponse>> getAllDetailed() {
     return ResponseEntity.ok(purchaseSaleDetailService.toDetails(purchaseSaleService.findAll()));
@@ -122,9 +109,8 @@ public class PurchaseSaleController {
    * Paginación básica sin enriquecer datos externos; útil para tableros que resuelven detalles vía
    * llamadas adicionales al front.
    */
-  @GetMapping("/page/{page}")
   @PreAuthorize("hasAuthority('purchase_sale:read')")
-  public ResponseEntity<Page<PurchaseSaleResponse>> getByPage(@PathVariable Integer page) {
+  public ResponseEntity<Page<PurchaseSaleResponse>> getByPage(Integer page) {
     Page<PurchaseSaleResponse> pagedResponse =
         purchaseSaleService
             .findAll(PageRequest.of(page, 10))
@@ -136,10 +122,8 @@ public class PurchaseSaleController {
    * Paginación con enriquecimiento de datos externos. Ideal para reportes operativos donde se
    * necesitan nombres de clientes/usuarios y metadatos de inventario.
    */
-  @GetMapping("/page/{page}/detailed")
   @PreAuthorize("hasAuthority('purchase_sale:read')")
-  public ResponseEntity<Page<PurchaseSaleDetailResponse>> getDetailedPage(
-      @PathVariable Integer page) {
+  public ResponseEntity<Page<PurchaseSaleDetailResponse>> getDetailedPage(Integer page) {
     var pageable = PageRequest.of(page, 10);
     var pagedContracts = purchaseSaleService.findAll(pageable);
     return ResponseEntity.ok(toDetailPage(pagedContracts));
@@ -167,27 +151,24 @@ public class PurchaseSaleController {
    * @param term término de búsqueda libre
    * @return página de contratos detallados
    */
-  @GetMapping("/search")
   @PreAuthorize("hasAuthority('purchase_sale:read')")
   public ResponseEntity<Page<PurchaseSaleDetailResponse>> searchContracts(
-      @RequestParam(defaultValue = "0") Integer page,
-      @RequestParam(defaultValue = "10") Integer size,
-      @RequestParam(defaultValue = "true") boolean detailed,
-      @RequestParam(required = false) ContractType contractType,
-      @RequestParam(required = false) ContractStatus contractStatus,
-      @RequestParam(required = false) Long clientId,
-      @RequestParam(required = false) Long userId,
-      @RequestParam(required = false) Long vehicleId,
-      @RequestParam(required = false) PaymentMethod paymentMethod,
-      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-          LocalDate startDate,
-      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-          LocalDate endDate,
-      @RequestParam(required = false) Double minPurchasePrice,
-      @RequestParam(required = false) Double maxPurchasePrice,
-      @RequestParam(required = false) Double minSalePrice,
-      @RequestParam(required = false) Double maxSalePrice,
-      @RequestParam(required = false) String term) {
+      Integer page,
+      Integer size,
+      boolean detailed,
+      ContractType contractType,
+      ContractStatus contractStatus,
+      Long clientId,
+      Long userId,
+      Long vehicleId,
+      PaymentMethod paymentMethod,
+      LocalDate startDate,
+      LocalDate endDate,
+      Double minPurchasePrice,
+      Double maxPurchasePrice,
+      Double minSalePrice,
+      Double maxSalePrice,
+      String term) {
 
     var pageable = PageRequest.of(page, size);
     var criteria =
@@ -222,10 +203,9 @@ public class PurchaseSaleController {
    * @param purchaseSaleRequest datos nuevos del contrato
    * @return contrato actualizado o 404 si no existe
    */
-  @PutMapping("/{id}")
   @PreAuthorize("hasAuthority('purchase_sale:update')")
   public ResponseEntity<PurchaseSaleResponse> update(
-      @PathVariable Long id, @Valid @RequestBody PurchaseSaleRequest purchaseSaleRequest) {
+      Long id, @Valid PurchaseSaleRequest purchaseSaleRequest) {
     return purchaseSaleService
         .update(id, purchaseSaleRequest)
         .map(
@@ -241,9 +221,8 @@ public class PurchaseSaleController {
    * @param id identificador del contrato
    * @return 204 en caso de eliminación exitosa o 404 si no existe
    */
-  @DeleteMapping("/{id}")
   @PreAuthorize("hasAuthority('purchase_sale:delete')")
-  public ResponseEntity<Void> deleteById(@PathVariable Long id) {
+  public ResponseEntity<Void> deleteById(Long id) {
     return purchaseSaleService
         .findById(id)
         .map(
@@ -260,9 +239,8 @@ public class PurchaseSaleController {
    * @param clientId identificador del cliente
    * @return lista de contratos asociados
    */
-  @GetMapping("/client/{clientId}")
   @PreAuthorize("hasAuthority('purchase_sale:read')")
-  public ResponseEntity<List<PurchaseSaleResponse>> getByClientId(@PathVariable Long clientId) {
+  public ResponseEntity<List<PurchaseSaleResponse>> getByClientId(Long clientId) {
     List<PurchaseSaleResponse> responses =
         purchaseSaleService.findByClientId(clientId).stream()
             .map(purchaseSaleMapper::toPurchaseSaleResponse)
@@ -273,9 +251,8 @@ public class PurchaseSaleController {
   /**
    * Obtiene las operaciones gestionadas por un usuario interno específico (responsable comercial).
    */
-  @GetMapping("/user/{userId}")
   @PreAuthorize("hasAuthority('purchase_sale:read')")
-  public ResponseEntity<List<PurchaseSaleResponse>> getByUserId(@PathVariable Long userId) {
+  public ResponseEntity<List<PurchaseSaleResponse>> getByUserId(Long userId) {
     List<PurchaseSaleResponse> responses =
         purchaseSaleService.findByUserId(userId).stream()
             .map(purchaseSaleMapper::toPurchaseSaleResponse)
@@ -287,10 +264,8 @@ public class PurchaseSaleController {
    * Busca las operaciones asociadas a un vehículo, permitiendo diagnosticar su ciclo completo de
    * compra y venta dentro del inventario de usados.
    */
-  @GetMapping("/vehicle/{vehicleId}")
   @PreAuthorize("hasAuthority('purchase_sale:read')")
-  public ResponseEntity<List<PurchaseSaleDetailResponse>> getByVehicleId(
-      @PathVariable Long vehicleId) {
+  public ResponseEntity<List<PurchaseSaleDetailResponse>> getByVehicleId(Long vehicleId) {
     List<PurchaseSaleDetailResponse> responses =
         purchaseSaleDetailService.toDetails(purchaseSaleService.findByVehicleId(vehicleId));
     return ResponseEntity.ok(responses);
@@ -304,13 +279,8 @@ public class PurchaseSaleController {
    * @param endDate fecha máxima del reporte (opcional)
    * @return archivo PDF listo para descarga
    */
-  @GetMapping(value = "/report/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
   @PreAuthorize("hasAuthority('purchase_sale:read')")
-  public ResponseEntity<byte[]> exportPdfReport(
-      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-          LocalDate startDate,
-      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-          LocalDate endDate) {
+  public ResponseEntity<byte[]> exportPdfReport(LocalDate startDate, LocalDate endDate) {
     byte[] report = purchaseSaleReportService.generatePdf(startDate, endDate);
     return ResponseEntity.ok()
         .header(HttpHeaders.CONTENT_DISPOSITION, buildContentDisposition("pdf"))
@@ -325,15 +295,8 @@ public class PurchaseSaleController {
    * @param endDate fecha máxima del reporte (opcional)
    * @return archivo XLSX listo para descarga
    */
-  @GetMapping(
-      value = "/report/excel",
-      produces = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
   @PreAuthorize("hasAuthority('purchase_sale:read')")
-  public ResponseEntity<byte[]> exportExcelReport(
-      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-          LocalDate startDate,
-      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-          LocalDate endDate) {
+  public ResponseEntity<byte[]> exportExcelReport(LocalDate startDate, LocalDate endDate) {
     byte[] report = purchaseSaleReportService.generateExcel(startDate, endDate);
     return ResponseEntity.ok()
         .header(HttpHeaders.CONTENT_DISPOSITION, buildContentDisposition("xlsx"))
@@ -350,13 +313,8 @@ public class PurchaseSaleController {
    * @param endDate fecha máxima del reporte (opcional)
    * @return archivo CSV con los datos solicitados
    */
-  @GetMapping(value = "/report/csv", produces = "text/csv")
   @PreAuthorize("hasAuthority('purchase_sale:read')")
-  public ResponseEntity<byte[]> exportCsvReport(
-      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-          LocalDate startDate,
-      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-          LocalDate endDate) {
+  public ResponseEntity<byte[]> exportCsvReport(LocalDate startDate, LocalDate endDate) {
     byte[] report = purchaseSaleReportService.generateCsv(startDate, endDate);
     return ResponseEntity.ok()
         .header(HttpHeaders.CONTENT_DISPOSITION, buildContentDisposition("csv"))

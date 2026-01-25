@@ -10,14 +10,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.BindingResult;
 
-/**
- * Valida reglas de negocio del dominio de usuarios. Complementa Bean Validation con restricciones
- * de longitud para cédula y teléfono exigidas por contratos y notificaciones.
- */
 @Service
 public class ValidationService {
 
-  /** Orquesta validaciones propias y de Spring; devuelve respuesta 400 cuando hay errores. */
   public <T> ResponseEntity<ApiResponse<UserResponse>> handleValidation(
       T target, BindingResult bindingResult) {
     if (!(target instanceof User || target instanceof UserUpdateRequest)) {
@@ -37,13 +32,11 @@ public class ValidationService {
     return null;
   }
 
-  /** Devuelve 400 con el mapa de errores acumulados. */
   public <T> ResponseEntity<ApiResponse<T>> validationError(Map<String, String> errors) {
     ApiResponse<T> apiResponse = new ApiResponse<>(errors);
     return ResponseEntity.badRequest().body(apiResponse);
   }
 
-  /** Adapta los errores de Spring a la estructura genérica de la API. */
   public <T> ResponseEntity<ApiResponse<T>> validate(BindingResult bindingResult) {
     Map<String, String> errors = new HashMap<>();
 
@@ -62,23 +55,23 @@ public class ValidationService {
     return length >= minLength && length <= maxLength;
   }
 
-  /**
-   * Aplica reglas de longitud para cédula y teléfono según si es alta (User) o actualización
-   * (UserUpdateRequest).
-   */
   public Map<String, String> validate(Object user) {
     Map<String, String> validationsMessage = new HashMap<>();
     Long nationalId = 0L;
     Long phoneNumber;
 
-    if (user instanceof User u) {
-      nationalId = u.getNationalId();
-      phoneNumber = u.getPhoneNumber();
-    } else if (user instanceof UserUpdateRequest ur) {
-      // En actualización solo validamos teléfono porque la cédula no es editable.
-      phoneNumber = ur.getPhoneNumber();
-    } else {
-      throw new IllegalArgumentException("Tipo de usuario no válido");
+    switch (user) {
+      case User u -> {
+        nationalId = u.getNationalId();
+        phoneNumber = u.getPhoneNumber();
+      }
+      case UserUpdateRequest ur -> {
+        // En actualización solo validamos teléfono porque la cédula no es editable.
+        phoneNumber = ur.getPhoneNumber();
+      }
+      default -> {
+        throw new IllegalArgumentException("Tipo de usuario no válido");
+      }
     }
 
     if (!isValidLength(nationalId, 7, 10) && user instanceof User) {

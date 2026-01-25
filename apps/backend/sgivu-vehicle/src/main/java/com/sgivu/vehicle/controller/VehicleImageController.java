@@ -1,5 +1,6 @@
 package com.sgivu.vehicle.controller;
 
+import com.sgivu.vehicle.controller.api.VehicleImageApi;
 import com.sgivu.vehicle.dto.*;
 import com.sgivu.vehicle.mapper.VehicleMapper;
 import com.sgivu.vehicle.service.VehicleImageService;
@@ -18,7 +19,7 @@ import org.springframework.web.bind.annotation.*;
  */
 @RestController
 @RequestMapping("/v1/vehicles/{vehicleId}/images")
-public class VehicleImageController {
+public class VehicleImageController implements VehicleImageApi {
 
   private final VehicleImageService vehicleImageService;
   private final VehicleMapper vehicleMapper;

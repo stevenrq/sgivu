@@ -1,5 +1,6 @@
 package com.sgivu.client.controller;
 
+import com.sgivu.client.controller.api.PersonApi;
 import com.sgivu.client.dto.PersonResponse;
 import com.sgivu.client.dto.PersonSearchCriteria;
 import com.sgivu.client.entity.Person;
@@ -17,17 +18,16 @@ import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * API REST para gestionar personas dentro del catálogo de clientes SGIVU.
- * Expone operaciones consumidas por inventario, predicción de demanda y contratos para validar
- * datos de compradores y vendedores.
+ * API REST para gestionar personas dentro del catálogo de clientes SGIVU. Expone operaciones
+ * consumidas por inventario, predicción de demanda y contratos para validar datos de compradores y
+ * vendedores.
  *
  * <p>Los endpoints requieren autorización granular via JWT (rolesAndPermissions) y permiten
  * invocaciones internas desde servicios de SGIVU usando la clave compartida.
  */
 @RefreshScope
 @RestController
-@RequestMapping("/v1/persons")
-public class PersonController {
+public class PersonController implements PersonApi {
 
   private final PersonService personService;
   private final ClientMapper clientMapper;
@@ -44,8 +44,8 @@ public class PersonController {
    * @param person datos de la persona incluyendo información de contacto y domicilio
    * @param bindingResult resultado de validaciones básicas del request
    * @return {@link PersonResponse} con la persona persistida
-   * <p>Valida el payload antes de delegar a la capa de servicio; la creación queda centralizada
-   * para mantener coherencia de clientes en todo el ecosistema.
+   *     <p>Valida el payload antes de delegar a la capa de servicio; la creación queda centralizada
+   *     para mantener coherencia de clientes en todo el ecosistema.
    */
   @PostMapping
   @PreAuthorize("hasAuthority('person:create')")
@@ -132,8 +132,8 @@ public class PersonController {
    *
    * @param id identificador de la persona
    * @return 204 si se elimina, 404 si no existe
-   * <p>La eliminación delega en la capa de servicio; si otras tablas referencian el cliente, la
-   * lógica de dominio debería moverlo a un estado inactivo en lugar de removerlo.
+   *     <p>La eliminación delega en la capa de servicio; si otras tablas referencian el cliente, la
+   *     lógica de dominio debería moverlo a un estado inactivo en lugar de removerlo.
    */
   @DeleteMapping("/{id}")
   @PreAuthorize("hasAuthority('person:delete')")

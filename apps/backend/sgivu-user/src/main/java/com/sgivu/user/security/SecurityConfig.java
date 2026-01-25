@@ -24,12 +24,6 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.RequestAuthorizationContext;
 
-/**
- * Configuración central de seguridad para exponer el servicio como resource server con JWT y un
- * canal interno reforzado por clave compartida. El objetivo es aislar operaciones sensibles sobre
- * usuarios y roles cuando el Gateway o {@code sgivu-auth} necesitan acceder sin credenciales de
- * usuario final.
- */
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
@@ -50,12 +44,8 @@ public class SecurityConfig {
     return new BCryptPasswordEncoder();
   }
 
-  /**
-   * Define las reglas HTTP: salud pública, ruta interna para enriquecer tokens y resto protegido
-   * por JWT.
-   */
   @Bean
-  SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+  SecurityFilterChain securityFilterChain(HttpSecurity http) {
     http.oauth2ResourceServer(
             oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(convert())))
         .authorizeHttpRequests(
@@ -63,7 +53,9 @@ public class SecurityConfig {
                 authz
                     .requestMatchers("/actuator/health", "/actuator/info")
                     .permitAll()
-                    // Ruta reservada a sgivu-auth para enriquecer tokens internos
+                    .requestMatchers(
+                        "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/webjars/**")
+                    .permitAll()
                     .requestMatchers("/v1/users/username/**")
                     .access(internalServiceAuthManager)
                     .requestMatchers("/v1/users/**")
@@ -75,12 +67,6 @@ public class SecurityConfig {
     return http.build();
   }
 
-  /**
-   * Autoriza llamadas provenientes de servicios internos confiables o de clientes autenticados.
-   *
-   * <p>Se usa para endpoints donde el API Gateway puede enrutar tráfico tanto autenticado como
-   * interno (por ejemplo, sincronizaciones entre microservicios).
-   */
   @Bean
   AuthorizationManager<RequestAuthorizationContext> internalOrAuthenticatedAuthorizationManager() {
     AuthorizationManager<RequestAuthorizationContext> authenticatedManager =
@@ -96,7 +82,6 @@ public class SecurityConfig {
     return AuthorizationManagers.anyOf(internalServiceAuthManager, authenticatedManager);
   }
 
-  /** Decodificador JWT apuntando al emisor publicado por {@code sgivu-auth}. */
   @Bean
   JwtDecoder jwtDecoder() {
     return NimbusJwtDecoder.withIssuerLocation(
@@ -104,10 +89,6 @@ public class SecurityConfig {
         .build();
   }
 
-  /**
-   * Mapea el claim {@code rolesAndPermissions} a authorities de Spring sin reinterpretar el token;
-   * si el claim viene vacío no se asignan authorities para evitar accesos implícitos.
-   */
   @Bean
   JwtAuthenticationConverter convert() {
     JwtAuthenticationConverter jwtAuthenticationConverter = new JwtAuthenticationConverter();

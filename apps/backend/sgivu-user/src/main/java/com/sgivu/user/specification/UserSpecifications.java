@@ -8,22 +8,10 @@ import jakarta.persistence.criteria.JoinType;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.util.StringUtils;
 
-/**
- * Utilidades para construir {@link Specification} dinámicas sobre {@link User} usando los filtros
- * definidos en {@link UserFilterCriteria}.
- */
 public final class UserSpecifications {
 
   private UserSpecifications() {}
 
-  /**
-   * Construye especificaciones dinámicas según los criterios recibidos desde la API.
-   *
-   * @param criteria filtros opcionales; si es nulo se devuelve la consulta sin restricciones.
-   * @return specification combinada con lógica AND.
-   * @apiNote Se usa para búsquedas administrativas y sincronización con el Gateway sin escribir
-   *     consultas manuales.
-   */
   public static Specification<User> withFilters(UserFilterCriteria criteria) {
     Specification<User> specification = Specification.unrestricted();
 
@@ -65,12 +53,6 @@ public final class UserSpecifications {
     return specification;
   }
 
-  /**
-   * Genera una condición OR que compara nombre y apellido con coincidencia parcial.
-   *
-   * @param value fragmento de texto a buscar.
-   * @return specification que aplica {@code LIKE} sobre ambos campos en minúsculas.
-   */
   private static Specification<User> nameContains(String value) {
     final String normalized = like(value.toLowerCase());
     return (root, query, cb) ->
@@ -79,18 +61,10 @@ public final class UserSpecifications {
             cb.like(cb.lower(root.get("lastName")), normalized));
   }
 
-  /**
-   * Aplica filtro por rol, usando join para evitar N+1 y marcando la consulta como {@code distinct}
-   * para no duplicar usuarios con múltiples roles.
-   *
-   * @param roleName nombre del rol buscado.
-   * @return specification que filtra por el campo {@code name} de {@link Role}.
-   */
   private static Specification<User> roleEquals(String roleName) {
     final String normalized = roleName.toLowerCase();
     return (root, query, cb) -> {
       if (query != null) {
-        // Distinct evita multiplicar resultados cuando un usuario tiene más de un rol.
         query.distinct(true);
       }
       Join<User, Role> join = root.join("roles", JoinType.LEFT);
@@ -98,12 +72,6 @@ public final class UserSpecifications {
     };
   }
 
-  /**
-   * Normaliza el patrón para búsquedas {@code LIKE} envolviendo el valor con comodines.
-   *
-   * @param value cadena a envolver.
-   * @return patrón con comodines a izquierda y derecha.
-   */
   private static String like(String value) {
     return "%" + value + "%";
   }

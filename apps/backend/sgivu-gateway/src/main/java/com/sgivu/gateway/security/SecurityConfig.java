@@ -115,6 +115,13 @@ public class SecurityConfig {
         .authorizeExchange(
             exchanges ->
                 exchanges
+                    .pathMatchers(
+                        "/docs/**",
+                        "/v3/api-docs/**",
+                        "/swagger-ui.html",
+                        "/swagger-ui/**",
+                        "/webjars/**")
+                    .permitAll()
                     .pathMatchers("/oauth2/**", "/login/**")
                     .permitAll()
                     .pathMatchers(HttpMethod.GET, LOGOUT_URL)

@@ -41,13 +41,16 @@ public class SecurityConfig {
   }
 
   @Bean
-  SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+  SecurityFilterChain securityFilterChain(HttpSecurity http) {
     http.oauth2ResourceServer(
             oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(convert())))
         .authorizeHttpRequests(
             authz ->
                 authz
                     .requestMatchers("/actuator/health", "/actuator/info")
+                    .permitAll()
+                    .requestMatchers(
+                        "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/webjars/**")
                     .permitAll()
                     .requestMatchers("/v1/persons/**", "/v1/companies/**")
                     .access(internalOrAuthenticatedAuthorizationManager())

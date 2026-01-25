@@ -11,12 +11,6 @@ import java.time.LocalDateTime;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Datos civiles comunes para personas dentro de SGIVU (usuarios, clientes potenciales, etc.).
- *
- * <p>Se usa como base para {@link User}, permitiendo mantener la integridad de identificaciones
- * (cédula, teléfono) que son claves en contratos y operaciones de compraventa.
- */
 @Data
 @NoArgsConstructor
 @Table(name = "persons")
@@ -63,10 +57,6 @@ public abstract class Person implements Serializable {
 
   private LocalDateTime updatedAt;
 
-  /**
-   * Inicializa marcas de tiempo y, si corresponde, delega la preparación de estado de seguridad en
-   * {@link User#prePersistUser()}.
-   */
   @PrePersist
   public void prePersist() {
     this.createdAt = LocalDateTime.now();
@@ -78,7 +68,6 @@ public abstract class Person implements Serializable {
     }
   }
 
-  /** Actualiza la marca de tiempo de modificación antes de persistir cambios. */
   @PreUpdate
   public void preUpdate() {
     this.updatedAt = LocalDateTime.now();
