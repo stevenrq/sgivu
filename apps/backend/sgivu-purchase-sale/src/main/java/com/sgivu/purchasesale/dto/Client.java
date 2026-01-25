@@ -1,5 +1,6 @@
 package com.sgivu.purchasesale.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
@@ -9,6 +10,7 @@ import lombok.NoArgsConstructor;
  * compartir metadatos comunes como contacto y habilitación sin duplicar lógica en este
  * microservicio.
  */
+@Schema(description = "Modelo base de cliente con datos de contacto y estado de habilitación")
 @Data
 @NoArgsConstructor
 @EqualsAndHashCode

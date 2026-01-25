@@ -60,6 +60,9 @@ public class SecurityConfig {
                 authz
                     .requestMatchers("/actuator/health", "/actuator/info")
                     .permitAll()
+                    .requestMatchers(
+                        "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/webjars/**")
+                    .permitAll()
                     // Servicios internos (clave) o clientes autenticados pueden acceder
                     .requestMatchers("/v1/purchase-sales/**")
                     .access(internalOrAuthenticatedAuthorizationManager())
