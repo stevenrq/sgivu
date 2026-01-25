@@ -6,4 +6,16 @@ package com.sgivu.vehicle.dto;
  * <p>Incluye bucket y key firmados que luego serán confirmados para registrar la imagen en el
  * inventario.
  */
-public record VehicleImagePresignedUploadResponse(String bucket, String key, String uploadUrl) {}
+public record VehicleImagePresignedUploadResponse(
+    @io.swagger.v3.oas.annotations.media.Schema(
+            description = "Bucket de destino",
+            example = "sgivu-vehicles")
+        String bucket,
+    @io.swagger.v3.oas.annotations.media.Schema(
+            description = "Key del objeto",
+            example = "images/12345.jpg")
+        String key,
+    @io.swagger.v3.oas.annotations.media.Schema(
+            description = "URL para subir",
+            example = "https://...")
+        String uploadUrl) {}

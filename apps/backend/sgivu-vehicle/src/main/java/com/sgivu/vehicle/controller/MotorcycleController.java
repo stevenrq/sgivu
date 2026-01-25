@@ -1,5 +1,6 @@
 package com.sgivu.vehicle.controller;
 
+import com.sgivu.vehicle.controller.api.MotorcycleApi;
 import com.sgivu.vehicle.dto.MotorcycleResponse;
 import com.sgivu.vehicle.dto.MotorcycleSearchCriteria;
 import com.sgivu.vehicle.entity.Motorcycle;
@@ -36,7 +37,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/v1/motorcycles")
-public class MotorcycleController {
+public class MotorcycleController implements MotorcycleApi {
 
   private final MotorcycleService motorcycleService;
   private final VehicleMapper vehicleMapper;

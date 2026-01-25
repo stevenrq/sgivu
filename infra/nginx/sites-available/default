@@ -223,6 +223,55 @@ server {
         proxy_set_header X-Forwarded-Port $server_port;
     }
 
+    # Exponer OpenAPI UI y JSON del servicio sgivu-vehicle
+    location = /docs/vehicle {
+        return 302 /docs/vehicle/swagger-ui.html;
+    }
+
+    location /docs/vehicle/ {
+        proxy_pass http://gateway/docs/vehicle/;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+        # Reescribimos los Location absolutos para que los enlaces del upstream funcionen bajo /docs/vehicle/
+        proxy_redirect / /docs/vehicle/;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Port $server_port;
+    }
+
+    location = /docs/vehicle/v3/api-docs/swagger-config {
+        proxy_pass http://gateway/docs/vehicle/v3/api-docs/swagger-config;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Port $server_port;
+    }
+
+    # Proxy directo para el JSON OpenAPI de vehicle (sin caer en el fallback de la SPA)
+    location = /docs/vehicle/v3/api-docs {
+        proxy_pass http://gateway/docs/vehicle/v3/api-docs;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Port $server_port;
+    }
+
+    # Proxy para rutas bajo /docs/vehicle/v3/api-docs/ (prefijo)
+    location /docs/vehicle/v3/api-docs/ {
+        proxy_pass http://gateway/docs/vehicle/v3/api-docs/;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Port $server_port;
+    }
+
     # Redirige /v3/api-docs/ al Gateway para que Swagger UI en /docs/* obtenga el JSON de OpenAPI
     location /v3/api-docs/ {
         # Evitar añadir slash extra al path reenviado: mapear /v3/api-docs/ -> /v3/api-docs en upstream
