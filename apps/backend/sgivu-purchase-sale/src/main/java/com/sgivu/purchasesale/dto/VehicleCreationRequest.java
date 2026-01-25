@@ -1,6 +1,7 @@
 package com.sgivu.purchasesale.dto;
 
 import com.sgivu.purchasesale.enums.VehicleType;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
@@ -11,6 +12,10 @@ import lombok.ToString;
  * de compra. Se valida en {@code PurchaseSaleServiceImpl} antes de enviar la alta remota para
  * evitar registros incompletos que rompan la disponibilidad del stock.
  */
+@Schema(
+    description =
+        "Datos mínimos para registrar un vehículo en el microservicio de inventario cuando el"
+            + " contrato es de compra")
 @Getter
 @Setter
 @ToString

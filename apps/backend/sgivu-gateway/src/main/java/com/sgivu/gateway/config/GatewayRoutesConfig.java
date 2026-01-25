@@ -11,12 +11,14 @@ public class GatewayRoutesConfig {
   private static final String API_DOCS_SWAGGER_CONFIG = "/v3/api-docs/swagger-config";
   private static final String REFERER_HEADER = "Referer";
   private static final String SEGMENT_REWRITE = "/${segment}";
+  private static final String PURCHASE_SALE_REWRITE = "/docs/purchase-sale/(?<segment>.*)";
 
   @Bean
   RouteLocator customRouteLocator(RouteLocatorBuilder builder) {
     String userService = "lb://sgivu-user";
     String authService = "lb://sgivu-auth";
     String clientService = "lb://sgivu-client";
+    String purchaseSaleService = "lb://sgivu-purchase-sale";
 
     return builder
         .routes()
@@ -163,6 +165,37 @@ public class GatewayRoutesConfig {
                                             .setFallbackUri("forward:/fallback/vehicle")))
                     .uri("lb://sgivu-vehicle"))
         // Purchase-Sale
+        .route(
+            "sgivu-v3-swagger-config-purchase-sale-direct",
+            r ->
+                r.path("/docs/purchase-sale" + API_DOCS_SWAGGER_CONFIG)
+                    .filters(f -> f.rewritePath(PURCHASE_SALE_REWRITE, SEGMENT_REWRITE))
+                    .uri(purchaseSaleService))
+        // Coincidencia exacta para /docs/purchase-sale/v3/api-docs (algunos clientes solicitan sin
+        // barra diagonal final)
+        .route(
+            "sgivu-v3-api-docs-purchase-sale-exact",
+            r ->
+                r.path("/docs/purchase-sale/v3/api-docs")
+                    .filters(f -> f.rewritePath(PURCHASE_SALE_REWRITE, SEGMENT_REWRITE))
+                    .uri(purchaseSaleService))
+        .route(
+            "sgivu-v3-swagger-config-purchase-sale",
+            r ->
+                r.path(API_DOCS_SWAGGER_CONFIG)
+                    .and()
+                    .header(REFERER_HEADER, ".*/docs/purchase-sale/.*")
+                    .uri(purchaseSaleService))
+        .route(
+            "sgivu-purchase-sale-docs",
+            r ->
+                r.path(
+                        "/docs/purchase-sale/swagger-ui.html",
+                        "/docs/purchase-sale/swagger-ui/**",
+                        "/docs/purchase-sale/v3/api-docs/**",
+                        "/docs/purchase-sale/webjars/**")
+                    .filters(f -> f.rewritePath(PURCHASE_SALE_REWRITE, SEGMENT_REWRITE))
+                    .uri(purchaseSaleService))
         .route(
             "sgivu-purchase-sale",
             r ->

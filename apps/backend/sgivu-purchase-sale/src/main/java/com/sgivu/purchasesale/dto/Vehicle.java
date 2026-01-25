@@ -1,5 +1,6 @@
 package com.sgivu.purchasesale.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -8,6 +9,9 @@ import lombok.NoArgsConstructor;
  * atributos comunes entre automóviles y motocicletas para mantener un contrato único en las
  * operaciones de compra y venta.
  */
+@Schema(
+    description =
+        "Modelo base de vehículo usado con atributos comunes para integración con inventario")
 @Data
 @NoArgsConstructor
 public class Vehicle {
