@@ -195,14 +195,6 @@ public class GatewayRoutesConfig {
                 r.path("/docs/purchase-sale" + API_DOCS_SWAGGER_CONFIG)
                     .filters(f -> f.rewritePath(PURCHASE_SALE_REWRITE, SEGMENT_REWRITE))
                     .uri(purchaseSaleService))
-        // Coincidencia exacta para /docs/purchase-sale/v3/api-docs (algunos clientes solicitan sin
-        // barra diagonal final)
-        .route(
-            "sgivu-v3-api-docs-purchase-sale-exact",
-            r ->
-                r.path("/docs/purchase-sale/v3/api-docs")
-                    .filters(f -> f.rewritePath(PURCHASE_SALE_REWRITE, SEGMENT_REWRITE))
-                    .uri(purchaseSaleService))
         .route(
             "sgivu-v3-swagger-config-purchase-sale",
             r ->
