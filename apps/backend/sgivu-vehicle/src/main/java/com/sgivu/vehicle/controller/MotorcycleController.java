@@ -18,25 +18,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.util.StringUtils;
 import org.springframework.validation.BindingResult;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PatchMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Endpoints REST para motocicletas usadas.
- *
- * <p>Publica operaciones CRUD y búsquedas avanzadas consumidas por el front y otros servicios
- * (contratos, pricing). Protegido con permisos específicos via JWT.
- */
 @RestController
-@RequestMapping("/v1/motorcycles")
 public class MotorcycleController implements MotorcycleApi {
 
   private final MotorcycleService motorcycleService;
@@ -47,17 +31,10 @@ public class MotorcycleController implements MotorcycleApi {
     this.vehicleMapper = vehicleMapper;
   }
 
-  /**
-   * Registra una nueva moto en inventario.
-   *
-   * @param motorcycle entidad recibida
-   * @param bindingResult resultado de validación
-   * @return moto persistida
-   */
-  @PostMapping
+  @Override
   @PreAuthorize("hasAuthority('motorcycle:create')")
   public ResponseEntity<MotorcycleResponse> create(
-      @RequestBody Motorcycle motorcycle, BindingResult bindingResult) {
+      Motorcycle motorcycle, BindingResult bindingResult) {
     if (bindingResult.hasErrors()) {
       return ResponseEntity.badRequest().build();
     }
@@ -66,15 +43,9 @@ public class MotorcycleController implements MotorcycleApi {
     return ResponseEntity.status(HttpStatus.CREATED).body(motorcycleResponse);
   }
 
-  /**
-   * Recupera detalle de una moto.
-   *
-   * @param id identificador
-   * @return {@link MotorcycleResponse} o 404
-   */
-  @GetMapping("/{id}")
+  @Override
   @PreAuthorize("hasAuthority('motorcycle:read')")
-  public ResponseEntity<MotorcycleResponse> getById(@PathVariable Long id) {
+  public ResponseEntity<MotorcycleResponse> getById(Long id) {
     return motorcycleService
         .findById(id)
         .map(vehicleMapper::toMotorcycleResponse)
@@ -82,39 +53,26 @@ public class MotorcycleController implements MotorcycleApi {
         .orElse(ResponseEntity.notFound().build());
   }
 
-  /** Lista todas las motos (uso interno o catálogos reducidos). */
-  @GetMapping
+  @Override
   @PreAuthorize("hasAuthority('motorcycle:read')")
   public ResponseEntity<List<MotorcycleResponse>> getAll() {
     return ResponseEntity.ok(
         motorcycleService.findAll().stream().map(vehicleMapper::toMotorcycleResponse).toList());
   }
 
-  /**
-   * Lista paginada de motos para el catálogo público.
-   *
-   * @param page índice solicitado
-   */
-  @GetMapping("/page/{page}")
+  @Override
   @PreAuthorize("hasAuthority('motorcycle:read')")
-  public ResponseEntity<Page<MotorcycleResponse>> getAllPaginated(@PathVariable Integer page) {
+  public ResponseEntity<Page<MotorcycleResponse>> getAllPaginated(Integer page) {
     return ResponseEntity.ok(
         motorcycleService
             .findAll(PageRequest.of(page, 10))
             .map(vehicleMapper::toMotorcycleResponse));
   }
 
-  /**
-   * Reemplaza la información de la moto manteniendo unicidad de campos críticos.
-   *
-   * @param id identificador de la moto
-   * @param motorcycle datos nuevos
-   * @return moto actualizada o 404
-   */
-  @PutMapping("/{id}")
+  @Override
   @PreAuthorize("hasAuthority('motorcycle:update')")
   public ResponseEntity<MotorcycleResponse> update(
-      @PathVariable Long id, @RequestBody Motorcycle motorcycle, BindingResult bindingResult) {
+      Long id, Motorcycle motorcycle, BindingResult bindingResult) {
     if (bindingResult.hasErrors()) {
       return ResponseEntity.badRequest().build();
     }
@@ -126,14 +84,9 @@ public class MotorcycleController implements MotorcycleApi {
         .orElse(ResponseEntity.notFound().build());
   }
 
-  /**
-   * Elimina una moto del inventario.
-   *
-   * @param id identificador
-   */
-  @DeleteMapping("/{id}")
+  @Override
   @PreAuthorize("hasAuthority('motorcycle:delete')")
-  public ResponseEntity<Void> deleteById(@PathVariable Long id) {
+  public ResponseEntity<Void> deleteById(Long id) {
     if (motorcycleService.findById(id).isPresent()) {
       motorcycleService.deleteById(id);
       return ResponseEntity.noContent().build();
@@ -141,29 +94,16 @@ public class MotorcycleController implements MotorcycleApi {
     return ResponseEntity.notFound().build();
   }
 
-  /**
-   * Cambia el estado operativo de la moto (disponible, vendida, etc.).
-   *
-   * @param id identificador de la moto
-   * @param status nuevo estado
-   * @return estado aplicado
-   */
-  @PatchMapping("/{id}/status")
+  @Override
   @PreAuthorize("hasAuthority('motorcycle:update')")
-  public ResponseEntity<Map<String, String>> changeStatus(
-      @PathVariable Long id, @RequestBody VehicleStatus status) {
+  public ResponseEntity<Map<String, String>> changeStatus(Long id, VehicleStatus status) {
     if (motorcycleService.changeStatus(id, status).isPresent()) {
       return ResponseEntity.ok(Collections.singletonMap("status", status.name()));
     }
     return ResponseEntity.notFound().build();
   }
 
-  /**
-   * Conteo de disponibilidad de motos.
-   *
-   * @return totales y disponibles
-   */
-  @GetMapping("/count")
+  @Override
   @PreAuthorize("hasAuthority('motorcycle:read')")
   public ResponseEntity<Map<String, Long>> getMotorcycleCounts() {
     long totalMotorcycles = motorcycleService.findAll().size();
@@ -177,49 +117,25 @@ public class MotorcycleController implements MotorcycleApi {
     return ResponseEntity.ok(counts);
   }
 
-  /**
-   * Aplica filtros libres para encontrar motocicletas (placa, tipo, rango de precios, etc.).
-   *
-   * <p>Endpoint flexible para catálogos y módulos de demanda que necesitan combinar múltiples
-   * atributos sin disparar consultas manuales.
-   *
-   * @param plate placa
-   * @param brand marca
-   * @param line línea
-   * @param model modelo
-   * @param motorcycleType tipo de moto
-   * @param transmission transmisión
-   * @param city ciudad de registro
-   * @param status estado de negocio
-   * @param minYear año mínimo
-   * @param maxYear año máximo
-   * @param minCapacity cilindraje mínimo
-   * @param maxCapacity cilindraje máximo
-   * @param minMileage kilometraje mínimo
-   * @param maxMileage kilometraje máximo
-   * @param minSalePrice precio mínimo
-   * @param maxSalePrice precio máximo
-   * @return lista con las coincidencias
-   */
-  @GetMapping("/search")
+  @Override
   @PreAuthorize("hasAuthority('motorcycle:read')")
   public ResponseEntity<List<MotorcycleResponse>> searchMotorcycles(
-      @RequestParam(required = false) String plate,
-      @RequestParam(required = false) String brand,
-      @RequestParam(required = false) String line,
-      @RequestParam(required = false) String model,
-      @RequestParam(required = false) String motorcycleType,
-      @RequestParam(required = false) String transmission,
-      @RequestParam(required = false) String city,
-      @RequestParam(required = false) VehicleStatus status,
-      @RequestParam(required = false) Integer minYear,
-      @RequestParam(required = false) Integer maxYear,
-      @RequestParam(required = false) Integer minCapacity,
-      @RequestParam(required = false) Integer maxCapacity,
-      @RequestParam(required = false) Integer minMileage,
-      @RequestParam(required = false) Integer maxMileage,
-      @RequestParam(required = false) Double minSalePrice,
-      @RequestParam(required = false) Double maxSalePrice) {
+      String plate,
+      String brand,
+      String line,
+      String model,
+      String motorcycleType,
+      String transmission,
+      String city,
+      VehicleStatus status,
+      Integer minYear,
+      Integer maxYear,
+      Integer minCapacity,
+      Integer maxCapacity,
+      Integer minMileage,
+      Integer maxMileage,
+      Double minSalePrice,
+      Double maxSalePrice) {
 
     MotorcycleSearchCriteria criteria =
         MotorcycleSearchCriteria.builder()
@@ -248,52 +164,27 @@ public class MotorcycleController implements MotorcycleApi {
     return ResponseEntity.ok(motorcycleResponses);
   }
 
-  /**
-   * Variante paginada del buscador de motocicletas.
-   *
-   * <p>Resuelve búsquedas extensas sin sobrecargar el front ni el microservicio de predicción.
-   *
-   * @param page índice solicitado
-   * @param size tamaño de página
-   * @param plate placa
-   * @param brand marca
-   * @param line línea
-   * @param model modelo
-   * @param motorcycleType tipo de moto
-   * @param transmission transmisión
-   * @param city ciudad de registro
-   * @param status estado
-   * @param minYear año mínimo
-   * @param maxYear año máximo
-   * @param minCapacity cilindraje mínimo
-   * @param maxCapacity cilindraje máximo
-   * @param minMileage kilometraje mínimo
-   * @param maxMileage kilometraje máximo
-   * @param minSalePrice precio mínimo
-   * @param maxSalePrice precio máximo
-   * @return página de DTOs
-   */
-  @GetMapping("/search/page/{page}")
+  @Override
   @PreAuthorize("hasAuthority('motorcycle:read')")
   public ResponseEntity<Page<MotorcycleResponse>> searchMotorcyclesPaginated(
-      @PathVariable Integer page,
-      @RequestParam(defaultValue = "10") Integer size,
-      @RequestParam(required = false) String plate,
-      @RequestParam(required = false) String brand,
-      @RequestParam(required = false) String line,
-      @RequestParam(required = false) String model,
-      @RequestParam(required = false) String motorcycleType,
-      @RequestParam(required = false) String transmission,
-      @RequestParam(required = false) String city,
-      @RequestParam(required = false) VehicleStatus status,
-      @RequestParam(required = false) Integer minYear,
-      @RequestParam(required = false) Integer maxYear,
-      @RequestParam(required = false) Integer minCapacity,
-      @RequestParam(required = false) Integer maxCapacity,
-      @RequestParam(required = false) Integer minMileage,
-      @RequestParam(required = false) Integer maxMileage,
-      @RequestParam(required = false) Double minSalePrice,
-      @RequestParam(required = false) Double maxSalePrice) {
+      Integer page,
+      Integer size,
+      String plate,
+      String brand,
+      String line,
+      String model,
+      String motorcycleType,
+      String transmission,
+      String city,
+      VehicleStatus status,
+      Integer minYear,
+      Integer maxYear,
+      Integer minCapacity,
+      Integer maxCapacity,
+      Integer minMileage,
+      Integer maxMileage,
+      Double minSalePrice,
+      Double maxSalePrice) {
 
     MotorcycleSearchCriteria criteria =
         MotorcycleSearchCriteria.builder()
@@ -322,12 +213,6 @@ public class MotorcycleController implements MotorcycleApi {
     return ResponseEntity.ok(responsePage);
   }
 
-  /**
-   * Normaliza parámetros opcionales devolviendo null cuando quedan vacíos tras el trim.
-   *
-   * @param value texto recibido en la consulta
-   * @return texto limpio o null
-   */
   private String trimToNull(String value) {
     if (!StringUtils.hasText(value)) {
       return null;

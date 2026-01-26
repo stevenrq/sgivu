@@ -21,15 +21,10 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 
-/**
- * Servicio encargado de orquestar la gestión de imágenes de vehículos (presigned URLs, confirmación
- * y eliminación). Coordina el acceso a S3 y la persistencia local de metadatos.
- */
 @Service
 @Transactional
 public class VehicleImageServiceImpl implements VehicleImageService {
 
-  // Tipos soportados por la vitrina y por el pipeline de optimización/CDN
   private static final Set<String> ALLOWED_TYPES = Set.of("image/jpeg", "image/png", "image/webp");
 
   private final VehicleBaseRepository vehicleBaseRepository;
@@ -51,14 +46,6 @@ public class VehicleImageServiceImpl implements VehicleImageService {
     this.s3Client = s3Client;
   }
 
-  /**
-   * Genera una URL prefirmada de subida validando el tipo de contenido permitido.
-   *
-   * @param vehicleId identificador del vehículo
-   * @param request tipo MIME solicitado
-   * @return datos de bucket, key y URL
-   * @throws IllegalArgumentException si el tipo de imagen no está soportado o falta
-   */
   @Override
   public VehicleImagePresignedUploadResponse createPresignedUploadUrl(
       Long vehicleId, VehicleImagePresignedUploadRequest request) {
@@ -82,13 +69,6 @@ public class VehicleImageServiceImpl implements VehicleImageService {
     return new VehicleImagePresignedUploadResponse(bucket, key, url);
   }
 
-  /**
-   * Verifica que la imagen exista en S3, evita duplicados y persiste los metadatos.
-   *
-   * @param vehicleId vehículo objetivo
-   * @param request datos retornados por el cliente tras subir la imagen
-   * @return entidad {@link VehicleImage} persistida
-   */
   @Override
   public VehicleImage confirmUpload(Long vehicleId, VehicleImageConfirmUploadRequest request) {
     Vehicle vehicle =
@@ -144,12 +124,6 @@ public class VehicleImageServiceImpl implements VehicleImageService {
     return vehicleImageRepository.save(image);
   }
 
-  /**
-   * Recupera las imágenes de un vehículo y genera URLs prefirmadas de descarga.
-   *
-   * @param vehicleId identificador del vehículo
-   * @return respuestas con URLs temporales
-   */
   @Override
   @Transactional(readOnly = true)
   public List<VehicleImageResponse> getImagesByVehicle(Long vehicleId) {
@@ -167,12 +141,6 @@ public class VehicleImageServiceImpl implements VehicleImageService {
         .toList();
   }
 
-  /**
-   * Elimina una imagen tanto de S3 como del repositorio local, reasignando una primaria si era la
-   * principal.
-   *
-   * @param imageId identificador de la imagen
-   */
   @Override
   public void deleteImage(Long imageId) {
     VehicleImage image =
@@ -201,12 +169,6 @@ public class VehicleImageServiceImpl implements VehicleImageService {
     }
   }
 
-  /**
-   * Obtiene la extensión adecuada a partir del tipo MIME validado.
-   *
-   * @param contentType tipo MIME de la imagen
-   * @return extensión con punto (ej. .jpg)
-   */
   private String getExtensionFromContentType(String contentType) {
     return switch (contentType) {
       case "image/jpeg" -> ".jpg";

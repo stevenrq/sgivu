@@ -5,11 +5,6 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
-/**
- * Modelo base de cliente (persona o empresa) devuelto por el microservicio de clientes. Permite
- * compartir metadatos comunes como contacto y habilitación sin duplicar lógica en este
- * microservicio.
- */
 @Schema(description = "Modelo base de cliente con datos de contacto y estado de habilitación")
 @Data
 @NoArgsConstructor

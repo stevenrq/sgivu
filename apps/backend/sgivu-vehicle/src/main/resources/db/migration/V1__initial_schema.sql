@@ -1,10 +1,3 @@
--- Migración inicial: Estructura de tablas para el servicio sgivu-vehicle
-
--- =============================================================================
--- TABLA: vehicles
--- Tabla base para todos los vehículos del inventario de usados
--- Centraliza atributos comunes (placas, números de motor/chasis, etc.)
--- =============================================================================
 CREATE TABLE IF NOT EXISTS vehicles
 (
     id              BIGSERIAL PRIMARY KEY,
@@ -28,21 +21,14 @@ CREATE TABLE IF NOT EXISTS vehicles
     updated_at      TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- Índices para búsqueda y filtrado eficiente de vehículos
 CREATE INDEX IF NOT EXISTS idx_vehicles_status ON vehicles (status);
 CREATE INDEX IF NOT EXISTS idx_vehicles_brand_model ON vehicles (brand, model);
 CREATE INDEX IF NOT EXISTS idx_vehicles_year ON vehicles (year);
 CREATE INDEX IF NOT EXISTS idx_vehicles_plate ON vehicles (plate);
 CREATE INDEX IF NOT EXISTS idx_vehicles_city_registered ON vehicles (city_registered);
 
--- Secuencia para generación de IDs
 CREATE SEQUENCE IF NOT EXISTS vehicles_id_seq START WITH 1 INCREMENT BY 1;
 
--- =============================================================================
--- TABLA: cars
--- Automóviles en el inventario (hereda de vehicles)
--- Añade tipología de carrocería, combustible y número de puertas
--- =============================================================================
 CREATE TABLE IF NOT EXISTS cars
 (
     vehicle_id      BIGINT PRIMARY KEY,
@@ -52,15 +38,9 @@ CREATE TABLE IF NOT EXISTS cars
     CONSTRAINT fk_cars_vehicles_id FOREIGN KEY (vehicle_id) REFERENCES vehicles (id) ON DELETE CASCADE ON UPDATE RESTRICT
 );
 
--- Índices para búsqueda por tipo de carrocería y combustible
 CREATE INDEX IF NOT EXISTS idx_cars_body_type ON cars (body_type);
 CREATE INDEX IF NOT EXISTS idx_cars_fuel_type ON cars (fuel_type);
 
--- =============================================================================
--- TABLA: motorcycles
--- Motocicletas en el inventario (hereda de vehicles)
--- Añade tipo de motocicleta (scooter, deportiva, alto cilindraje, etc.)
--- =============================================================================
 CREATE TABLE IF NOT EXISTS motorcycles
 (
     vehicle_id      BIGINT PRIMARY KEY,
@@ -68,14 +48,8 @@ CREATE TABLE IF NOT EXISTS motorcycles
     CONSTRAINT fk_motorcycles_vehicles_id FOREIGN KEY (vehicle_id) REFERENCES vehicles (id) ON DELETE CASCADE ON UPDATE RESTRICT
 );
 
--- Índice para búsqueda por tipo de motocicleta
 CREATE INDEX IF NOT EXISTS idx_motorcycles_motorcycle_type ON motorcycles (motorcycle_type);
 
--- =============================================================================
--- TABLA: vehicle_images
--- Metadatos de imágenes asociadas a vehículos (almacenadas en S3)
--- Permite auditoría de uploads y control de imagen principal
--- =============================================================================
 CREATE TABLE IF NOT EXISTS vehicle_images
 (
     id         BIGSERIAL PRIMARY KEY,
@@ -90,9 +64,7 @@ CREATE TABLE IF NOT EXISTS vehicle_images
     CONSTRAINT fk_vehicle_images_vehicles_id FOREIGN KEY (vehicle_id) REFERENCES vehicles (id) ON DELETE CASCADE ON UPDATE RESTRICT
 );
 
--- Índices para búsqueda de imágenes por vehículo e imagen principal
 CREATE INDEX IF NOT EXISTS idx_vehicle_images_vehicle_id ON vehicle_images (vehicle_id);
 CREATE INDEX IF NOT EXISTS idx_vehicle_images_is_primary ON vehicle_images (is_primary);
 
--- Secuencia para generación de IDs
 CREATE SEQUENCE IF NOT EXISTS vehicle_images_id_seq START WITH 1 INCREMENT BY 1;

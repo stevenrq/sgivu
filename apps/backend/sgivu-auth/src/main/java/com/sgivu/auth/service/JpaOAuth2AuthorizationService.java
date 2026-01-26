@@ -33,10 +33,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 
-/**
- * Implementación JPA de {@link OAuth2AuthorizationService} que serializa tokens y atributos
- * (incluyendo {@link CustomUserDetails}) para reconstruir autorizaciones emitidas por SGIVU.
- */
 @Component
 public class JpaOAuth2AuthorizationService implements OAuth2AuthorizationService {
 
@@ -325,22 +321,31 @@ public class JpaOAuth2AuthorizationService implements OAuth2AuthorizationService
   }
 
   /**
-   * Un 'mixin' de Jackson para la clase {@link CustomUserDetails}.
+   * Mixin de Jackson para (de)serializar {@link com.sgivu.auth.security.CustomUserDetails}.
    *
-   * <p>Esta clase abstracta se utiliza para anotar la clase {@link CustomUserDetails} con las
-   * anotaciones de Jackson necesarias para la serialización y deserialización. Esto es crucial
-   * porque {@code CustomUserDetails} se almacena como un atributo dentro del objeto {@link
-   * OAuth2Authorization}, que necesita ser persistido en la base de datos en formato JSON.
+   * <p>Se registra en el {@link ObjectMapper} de esta clase mediante {@code
+   * objectMapper.addMixIn(CustomUserDetails.class, CustomUserDetailsMixin.class)} para permitir que
+   * instancias de {@code CustomUserDetails} (que extienden clases de Spring Security) se conviertan
+   * a JSON al persistir las autorizaciones y se reconstruyan al leerlas desde la base de datos.
    *
-   * <p>Con esta configuración, se asegura que Jackson pueda:
+   * <p>Este mixin consigue lo siguiente:
    *
    * <ul>
-   *   <li>Incluir información de tipo ({@code @class}) para una correcta deserialización
-   *       polimórfica.
-   *   <li>Mapear correctamente las propiedades JSON a los campos del constructor de {@code
-   *       CustomUserDetails}.
-   *   <li>Ignorar propiedades desconocidas para mantener la compatibilidad hacia adelante.
+   *   <li>Incluye información de tipo concreta durante la (de)serialización ({@link JsonTypeInfo}),
+   *       necesaria para deserializar correctamente subclases y mantener la identificación de
+   *       clase.
+   *   <li>Forza la visibilidad de los campos privados para evitar depender exclusivamente de
+   *       getters o de Lombok en tiempo de deserialización ({@link JsonAutoDetect}).
+   *   <li>Ignora propiedades desconocidas para mantener compatibilidad hacia adelante ({@link
+   *       JsonIgnoreProperties}).
+   *   <li>Define un {@link JsonCreator} con las propiedades necesarias para recrear un {@code
+   *       CustomUserDetails} (incluido el id de dominio y las autoridades).
    * </ul>
+   *
+   * <p>Es necesario porque las instancias de {@code CustomUserDetails} se almacenan en los
+   * atributos/metadata de {@link
+   * org.springframework.security.oauth2.server.authorization.OAuth2Authorization} y se serializan
+   * con este {@link ObjectMapper} al persistir la entidad {@code Authorization}.
    */
   @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS)
   @JsonAutoDetect(

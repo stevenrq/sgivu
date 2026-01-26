@@ -10,16 +10,8 @@ import org.springframework.util.StringUtils;
 
 public final class CompanySpecifications {
 
-  /** Utilidades para construir especificaciones dinámicas de búsqueda de empresas. */
   private CompanySpecifications() {}
 
-  /**
-   * Construye filtros dinámicos para empresas combinando criterios fiscales, contacto y ubicación.
-   * Apoya consultas de contratos y abastecimiento corporativo.
-   *
-   * @param criteria criterios opcionales
-   * @return especificación JPA
-   */
   public static Specification<Company> withFilters(CompanySearchCriteria criteria) {
     Specification<Company> specification = Specification.unrestricted();
 
@@ -68,8 +60,6 @@ public final class CompanySpecifications {
       specification =
           specification.and(
               (root, query, cb) -> {
-                // LEFT JOIN evita descartar empresas sin domicilio cargado, pero permite filtrar
-                // cuando la ciudad es requerida para logística.
                 Join<Company, Address> address = root.join("address", JoinType.LEFT);
                 return cb.like(
                     cb.lower(address.get("city")), like(criteria.getCity().trim().toLowerCase()));

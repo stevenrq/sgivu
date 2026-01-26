@@ -10,7 +10,6 @@ import org.springframework.data.domain.Pageable;
 
 public interface PurchaseSaleService {
 
-  /** Registra un contrato alineado con inventario, clientes y usuarios externos. */
   PurchaseSale create(PurchaseSaleRequest purchaseSaleRequest);
 
   Optional<PurchaseSale> findById(Long id);
@@ -19,13 +18,6 @@ public interface PurchaseSaleService {
 
   Page<PurchaseSale> findAll(Pageable pageable);
 
-  /**
-   * Actualiza un contrato manteniendo su tipo original y revalidando reglas de negocio.
-   *
-   * @param id identificador del contrato
-   * @param purchaseSaleRequest datos a modificar
-   * @return contrato actualizado o vacío si no existe
-   */
   Optional<PurchaseSale> update(Long id, PurchaseSaleRequest purchaseSaleRequest);
 
   void deleteById(Long id);
@@ -36,12 +28,5 @@ public interface PurchaseSaleService {
 
   List<PurchaseSale> findByVehicleId(Long vehicleId);
 
-  /**
-   * Búsqueda avanzada aplicando filtros combinados de negocio.
-   *
-   * @param criteria filtros opcionales (estado, tipo, fechas, precios, término libre)
-   * @param pageable paginación
-   * @return página filtrada de contratos
-   */
   Page<PurchaseSale> search(PurchaseSaleFilterCriteria criteria, Pageable pageable);
 }

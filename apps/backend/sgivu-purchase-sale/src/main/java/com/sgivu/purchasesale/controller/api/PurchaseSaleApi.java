@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.util.List;
 import org.springframework.data.domain.Page;
@@ -36,7 +37,8 @@ public interface PurchaseSaleApi {
         @ApiResponse(responseCode = "403", description = "Prohibido")
       })
   @PostMapping
-  ResponseEntity<PurchaseSaleResponse> create(@RequestBody PurchaseSaleRequest purchaseSaleRequest);
+  ResponseEntity<PurchaseSaleResponse> create(
+      @Valid @RequestBody PurchaseSaleRequest purchaseSaleRequest);
 
   @Operation(
       summary = "Obtener contrato por ID",
@@ -96,7 +98,7 @@ public interface PurchaseSaleApi {
 
   @PutMapping("/{id}")
   ResponseEntity<PurchaseSaleResponse> update(
-      @PathVariable Long id, @RequestBody PurchaseSaleRequest purchaseSaleRequest);
+      @PathVariable Long id, @Valid @RequestBody PurchaseSaleRequest purchaseSaleRequest);
 
   @DeleteMapping("/{id}")
   ResponseEntity<Void> deleteById(@PathVariable Long id);

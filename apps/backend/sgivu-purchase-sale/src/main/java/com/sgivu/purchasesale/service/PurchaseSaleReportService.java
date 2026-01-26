@@ -44,11 +44,7 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
-/**
- * Orquesta la generación de reportes (PDF, Excel y CSV) para el módulo de compras/ventas. Reutiliza
- * la capa de detalles para enriquecer la información mostrada y aplica formateos regionales,
- * etiquetas y bloques narrativos listos para ser enviados a clientes externos.
- */
+/** Servicio para generar reportes de compras y ventas de vehículos en formatos PDF, Excel y CSV. */
 @Service
 public class PurchaseSaleReportService {
 
@@ -100,14 +96,6 @@ public class PurchaseSaleReportService {
     initialiseLabels();
   }
 
-  /**
-   * Genera un PDF con la lista de contratos dentro del rango indicado, aplicando cabeceras y tablas
-   * listas para impresión.
-   *
-   * @param startDate fecha mínima (opcional)
-   * @param endDate fecha máxima (opcional)
-   * @return bytes del documento PDF
-   */
   public byte[] generatePdf(LocalDate startDate, LocalDate endDate) {
     List<PurchaseSale> contracts = findContracts(startDate, endDate);
     List<PurchaseSaleDetailResponse> details = purchaseSaleDetailService.toDetails(contracts);
@@ -143,14 +131,6 @@ public class PurchaseSaleReportService {
     }
   }
 
-  /**
-   * Produce una hoja de cálculo con todo el dataset, utilizando encabezados localizados y ajuste de
-   * columnas.
-   *
-   * @param startDate fecha mínima (opcional)
-   * @param endDate fecha máxima (opcional)
-   * @return bytes del archivo XLSX
-   */
   public byte[] generateExcel(LocalDate startDate, LocalDate endDate) {
     List<PurchaseSale> contracts = findContracts(startDate, endDate);
     List<PurchaseSaleDetailResponse> details = purchaseSaleDetailService.toDetails(contracts);
@@ -233,14 +213,6 @@ public class PurchaseSaleReportService {
     }
   }
 
-  /**
-   * Exporta el dataset a CSV con codificación UTF-8 y encabezados autoexplicativos; ideal para
-   * integraciones sencillas o procesamiento en otros sistemas.
-   *
-   * @param startDate fecha mínima (opcional)
-   * @param endDate fecha máxima (opcional)
-   * @return bytes del archivo CSV
-   */
   public byte[] generateCsv(LocalDate startDate, LocalDate endDate) {
     List<PurchaseSale> contracts = findContracts(startDate, endDate);
     List<PurchaseSaleDetailResponse> details = purchaseSaleDetailService.toDetails(contracts);
@@ -268,29 +240,12 @@ public class PurchaseSaleReportService {
     }
   }
 
-  /**
-   * Recupera contratos ordenados por fecha y aplica, en memoria, el filtro opcional por rango de
-   * fechas cuando ambos valores son provistos.
-   *
-   * @param startDate fecha mínima permitida
-   * @param endDate fecha máxima permitida
-   * @return lista de contratos que cumplen el rango solicitado
-   */
   private List<PurchaseSale> findContracts(LocalDate startDate, LocalDate endDate) {
     return purchaseSaleRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt")).stream()
         .filter(contract -> filterByDateRange(contract.getCreatedAt(), startDate, endDate))
         .toList();
   }
 
-  /**
-   * Determina si una fecha está dentro del rango solicitado. Cuando algún extremo es nulo, se
-   * considera sin límite en esa dirección.
-   *
-   * @param value fecha completa de la entidad
-   * @param startDate límite inferior opcional
-   * @param endDate límite superior opcional
-   * @return {@code true} si la fecha pertenece al rango
-   */
   private boolean filterByDateRange(LocalDateTime value, LocalDate startDate, LocalDate endDate) {
     if (value == null) {
       return false;
@@ -301,12 +256,6 @@ public class PurchaseSaleReportService {
     return afterStart && beforeEnd;
   }
 
-  /**
-   * Construye la tabla principal del PDF con los bloques formateados para cada contrato.
-   *
-   * @param contracts lista de contratos detallados
-   * @return tabla lista para agregarse al documento PDF
-   */
   private PdfPTable buildPdfTable(List<PurchaseSaleDetailResponse> contracts) {
     float[] columnWidths = {1.5f, 2.0f, 1.7f, 1.9f, 1.9f, 1.6f};
     PdfPTable table = new PdfPTable(columnWidths);
@@ -388,12 +337,6 @@ public class PurchaseSaleReportService {
     return "Periodo: " + start + " - " + end;
   }
 
-  /**
-   * Construye el bloque textual de la sección de contrato (tipo, estado, pago y observaciones).
-   *
-   * @param contract contrato detallado
-   * @return texto listo para celdas PDF
-   */
   private String formatContractBlock(PurchaseSaleDetailResponse contract) {
     return LABEL_TIPO
         + getContractTypeLabel(contract.getContractType())

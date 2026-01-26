@@ -6,7 +6,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.*;
 
-/** DTO con flags de seguridad y roles/permisos recuperados de sgivu-user. */
 @AllArgsConstructor
 @NoArgsConstructor
 @Getter

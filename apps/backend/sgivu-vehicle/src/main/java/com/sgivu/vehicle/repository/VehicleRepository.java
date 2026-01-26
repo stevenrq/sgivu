@@ -7,12 +7,6 @@ import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
-/**
- * Repositorio genérico para entidades de vehículos.
- *
- * <p>Expone consultas reutilizables que soportan búsquedas por identificadores clave y paginación,
- * optimizadas para reportes y sincronización con otros microservicios de SGIVU.
- */
 public interface VehicleRepository<T extends Vehicle>
     extends JpaRepository<T, Long>, JpaSpecificationExecutor<T> {
   Optional<T> findByPlate(String plate);

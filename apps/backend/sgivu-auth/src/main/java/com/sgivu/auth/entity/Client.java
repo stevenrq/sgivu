@@ -8,10 +8,6 @@ import java.time.Instant;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Entidad que almacena la configuración de los clientes registrados que consumen el Authorization
- * Server.
- */
 @Data
 @NoArgsConstructor
 @Entity

@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
@@ -36,7 +37,9 @@ public interface PersonApi {
       })
   @PostMapping
   ResponseEntity<PersonResponse> create(
-      @Parameter(description = "Datos de la persona a registrar", required = true) @RequestBody
+      @Parameter(description = "Datos de la persona a registrar", required = true)
+          @Valid
+          @RequestBody
           Person person,
       BindingResult bindingResult);
 
@@ -64,6 +67,75 @@ public interface PersonApi {
   @GetMapping("/page/{page}")
   ResponseEntity<Page<PersonResponse>> getAllPaginated(
       @Parameter(description = "Número de página (base 0)") @PathVariable Integer page);
+
+  @Operation(summary = "Actualizar persona", description = "Actualiza una persona existente")
+  @ApiResponses(
+      value = {
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "200",
+            description = "Persona actualizada",
+            content = @Content(schema = @Schema(implementation = PersonResponse.class))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "400",
+            description = "Datos inválidos",
+            content = @Content),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "404",
+            description = "No encontrada",
+            content = @Content)
+      })
+  @PutMapping("/{id}")
+  ResponseEntity<PersonResponse> update(
+      @Parameter(description = "ID de la persona", required = true) @PathVariable Long id,
+      @Parameter(description = "Datos para actualizar", required = true) @Valid @RequestBody
+          Person person,
+      BindingResult bindingResult);
+
+  @Operation(summary = "Eliminar persona", description = "Elimina una persona por su ID")
+  @ApiResponses(
+      value = {
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "204",
+            description = "Eliminada",
+            content = @Content),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "404",
+            description = "No encontrada",
+            content = @Content)
+      })
+  @DeleteMapping("/{id}")
+  ResponseEntity<Void> deleteById(
+      @Parameter(description = "ID de la persona", required = true) @PathVariable Long id);
+
+  @Operation(summary = "Cambiar estado", description = "Habilita/Deshabilita persona")
+  @ApiResponses(
+      value = {
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "200",
+            description = "Estado actualizado",
+            content = @Content(schema = @Schema(implementation = java.util.Map.class))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "404",
+            description = "No encontrada",
+            content = @Content)
+      })
+  @PatchMapping("/{id}/status")
+  ResponseEntity<java.util.Map<String, Boolean>> changeStatus(
+      @Parameter(description = "ID de la persona", required = true) @PathVariable Long id,
+      @RequestBody boolean enabled);
+
+  @Operation(
+      summary = "Contadores de personas",
+      description = "Obtiene totales, activos e inactivos")
+  @ApiResponses(
+      value = {
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "200",
+            description = "Contadores obtenidos",
+            content = @Content(schema = @Schema(implementation = java.util.Map.class)))
+      })
+  @GetMapping("/count")
+  ResponseEntity<java.util.Map<String, Long>> getPersonCounts();
 
   @Operation(
       summary = "Búsqueda de personas",

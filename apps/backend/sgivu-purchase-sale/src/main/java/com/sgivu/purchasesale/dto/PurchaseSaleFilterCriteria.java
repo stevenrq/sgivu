@@ -8,11 +8,6 @@ import java.time.LocalDate;
 import lombok.Builder;
 import lombok.Getter;
 
-/**
- * Filtros combinados para búsquedas de contratos. Se utiliza en la capa de especificaciones para
- * construir predicados dinámicos (estado, tipo, rangos de fecha/precio y término libre) sin exponer
- * lógica de queries en el controlador.
- */
 @Schema(
     description =
         "Criterios de búsqueda/paginación para contratos: filtros por tipo, estado, rango de fechas"

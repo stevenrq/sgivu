@@ -5,10 +5,6 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
-/**
- * Cliente de tipo persona natural retornado por el microservicio de clientes. Se utiliza para
- * validar identidad y mostrar datos legibles en contratos y reportes.
- */
 @Schema(description = "Datos de un cliente persona natural (identificación y nombres)")
 @Data
 @NoArgsConstructor

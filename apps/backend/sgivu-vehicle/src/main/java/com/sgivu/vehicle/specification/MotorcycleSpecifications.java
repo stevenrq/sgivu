@@ -10,25 +10,10 @@ import java.util.List;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.util.StringUtils;
 
-/**
- * Construye especificaciones dinámicas para motocicletas.
- *
- * <p>Habilita búsquedas combinadas (tipo, ciudad, rango de precio) sin concatenar SQL, manteniendo
- * legibilidad y consistencia en la capa de persistencia.
- */
 public final class MotorcycleSpecifications {
 
   private MotorcycleSpecifications() {}
 
-  /**
-   * Genera especificación dinámica para búsquedas de motocicletas.
-   *
-   * <p>Aplica solo los filtros presentes para mantener desempeño en consultas de catálogo y
-   * dashboards de demanda.
-   *
-   * @param criteria filtros opcionales
-   * @return {@link Specification} lista para repositorio
-   */
   public static Specification<Motorcycle> withFilters(MotorcycleSearchCriteria criteria) {
     // Evita nulls; si no hay filtros, devuelve conjunción para no restringir resultados
     return (root, query, cb) -> {
@@ -77,14 +62,6 @@ public final class MotorcycleSpecifications {
     };
   }
 
-  /**
-   * Agrega un predicado LIKE case-insensitive cuando el valor no está vacío.
-   *
-   * @param predicates colección donde se acumulan condiciones
-   * @param cb builder de criterios
-   * @param path atributo sobre el que se aplicará el filtro
-   * @param value texto a buscar
-   */
   private static void like(
       List<Predicate> predicates, CriteriaBuilder cb, Path<String> path, String value) {
     if (!StringUtils.hasText(value)) {
@@ -93,16 +70,6 @@ public final class MotorcycleSpecifications {
     predicates.add(cb.like(cb.lower(path), "%" + value.trim().toLowerCase() + "%"));
   }
 
-  /**
-   * Agrega predicados para valores mínimos y máximos numéricos.
-   *
-   * @param predicates lista de predicados acumulados
-   * @param cb builder de criterios
-   * @param path atributo numérico
-   * @param min valor mínimo permitido
-   * @param max valor máximo permitido
-   * @param <N> tipo numérico comparable
-   */
   private static <N extends Number & Comparable<N>> void range(
       List<Predicate> predicates, CriteriaBuilder cb, Path<N> path, N min, N max) {
     if (min != null) {

@@ -5,7 +5,6 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/** Dirección asociada al cliente proveniente del microservicio de clientes. */
 @Schema(description = "Dirección asociada al cliente (calle, número, ciudad)")
 @Data
 @NoArgsConstructor

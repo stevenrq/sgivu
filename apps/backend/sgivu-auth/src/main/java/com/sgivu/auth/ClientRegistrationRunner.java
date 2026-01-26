@@ -18,11 +18,7 @@ import org.springframework.security.oauth2.server.authorization.settings.ClientS
 import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
 import org.springframework.stereotype.Component;
 
-/**
- * Siembra los clientes OIDC que usan el portal Angular, entornos locales y herramientas de QA en el
- * arranque del Authorization Server, persistiendo la configuración en {@link
- * JpaRegisteredClientRepository}.
- */
+/** Registra clientes OAuth2 en la base de datos al iniciar la aplicación si no existen. */
 @Component
 public class ClientRegistrationRunner implements CommandLineRunner {
 
@@ -47,7 +43,6 @@ public class ClientRegistrationRunner implements CommandLineRunner {
   @Override
   public void run(String... args) throws Exception {
 
-    // Cliente para el Gateway
     if (this.jpaRegisteredClientRepository.findByClientId(GATEWAY_CLIENT_ID) == null) {
       String gatewayUrl = gatewayClientProperties.getUrl();
       logger.info("Registrando el cliente '{}'...", GATEWAY_CLIENT_ID);

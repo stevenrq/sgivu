@@ -22,9 +22,6 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.RequestAuthorizationContext;
 
-/**
- * Configura el servicio como Resource Server JWT y permite llamadas internas con clave compartida.
- */
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
@@ -61,10 +58,6 @@ public class SecurityConfig {
     return http.build();
   }
 
-  /**
-   * Permite acceso tanto por clave interna como por JWT, evitando bloquear flujos servicio a
-   * servicio cuando no hay contexto de usuario.
-   */
   @Bean
   AuthorizationManager<RequestAuthorizationContext> internalOrAuthenticatedAuthorizationManager() {
     AuthorizationManager<RequestAuthorizationContext> authenticatedManager =
@@ -80,7 +73,6 @@ public class SecurityConfig {
     return AuthorizationManagers.anyOf(internalServiceAuthManager, authenticatedManager);
   }
 
-  /** Issuer resuelto desde configuración externa para adaptar el decoder por entorno. */
   @Bean
   JwtDecoder jwtDecoder() {
     return NimbusJwtDecoder.withIssuerLocation(
@@ -88,9 +80,6 @@ public class SecurityConfig {
         .build();
   }
 
-  /**
-   * Mapea el claim {@code rolesAndPermissions} a autoridades para evitar mapeos estáticos locales.
-   */
   @Bean
   JwtAuthenticationConverter convert() {
     JwtAuthenticationConverter jwtAuthenticationConverter = new JwtAuthenticationConverter();

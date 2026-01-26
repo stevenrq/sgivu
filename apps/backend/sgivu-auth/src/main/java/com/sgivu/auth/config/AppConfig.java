@@ -18,10 +18,6 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.support.RestClientAdapter;
 import org.springframework.web.service.invoker.HttpServiceProxyFactory;
 
-/**
- * Configuración transversal: clientes REST hacia otros microservicios, cifrado de contraseñas y
- * circuitos de resiliencia.
- */
 @Configuration
 public class AppConfig {
 
@@ -51,8 +47,8 @@ public class AppConfig {
 
   /**
    * RestClient.Builder sin balanceo de carga para conexiones directas (infraestructura). Marcado
-   * como @Primary para que Eureka lo use por defecto, evitando el problema circular donde Eureka
-   * client necesita LoadBalancer, pero LoadBalancer necesita Eureka para resolver servicios.
+   * como {@code @Primary} para que Eureka lo use por defecto, evitando el problema circular donde
+   * Eureka client necesita LoadBalancer, pero LoadBalancer necesita Eureka para resolver servicios.
    */
   @Bean
   @Primary
@@ -60,10 +56,6 @@ public class AppConfig {
     return RestClient.builder();
   }
 
-  /**
-   * Cliente tipado para consultar usuarios en {@code sgivu-user}, inyectando la cabecera interna
-   * necesaria para llamadas de servicio a servicio.
-   */
   @Bean
   UserClient userClient(
       @Qualifier("loadBalancedRestClientBuilder") RestClient.Builder restClientBuilder) {
@@ -78,10 +70,6 @@ public class AppConfig {
     return factory.createClient(UserClient.class);
   }
 
-  /**
-   * Circuito de Resilience4j para el cliente de usuarios: abre con 50% de fallos y corta llamadas
-   * tras 3 segundos para que el login no bloquee ventas o contratos.
-   */
   @Bean
   Customizer<Resilience4JCircuitBreakerFactory> userServiceCircuitBreakerCustomizer() {
     CircuitBreakerConfig circuitBreakerConfig =

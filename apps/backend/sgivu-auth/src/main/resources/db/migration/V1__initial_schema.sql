@@ -1,10 +1,3 @@
--- Migración inicial: Estructura de tablas para el servicio sgivu-auth
--- OAuth2 Authorization Server + Spring Session
-
--- =============================================================================
--- TABLA: clients
--- Clientes OAuth2 registrados en el Authorization Server
--- =============================================================================
 CREATE TABLE IF NOT EXISTS clients
 (
     id                            VARCHAR(255)                            NOT NULL,
@@ -23,13 +16,8 @@ CREATE TABLE IF NOT EXISTS clients
     PRIMARY KEY (id)
 );
 
--- Índice para búsqueda por client_id (principal método de autenticación)
 CREATE UNIQUE INDEX IF NOT EXISTS idx_clients_client_id ON clients (client_id);
 
--- =============================================================================
--- TABLA: authorizations
--- Autorizaciones OAuth2 activas (tokens, códigos de autorización, etc.)
--- =============================================================================
 CREATE TABLE IF NOT EXISTS authorizations
 (
     id                            VARCHAR(255) NOT NULL,
@@ -69,18 +57,12 @@ CREATE TABLE IF NOT EXISTS authorizations
     PRIMARY KEY (id)
 );
 
--- Índices para búsqueda de autorizaciones activas
 CREATE INDEX IF NOT EXISTS idx_authorizations_principal_name ON authorizations (principal_name);
 CREATE INDEX IF NOT EXISTS idx_authorizations_client_id ON authorizations (registered_client_id);
 CREATE INDEX IF NOT EXISTS idx_authorizations_state ON authorizations (state);
--- Índice para limpieza de tokens expirados
 CREATE INDEX IF NOT EXISTS idx_authorizations_access_token_expires_at ON authorizations (access_token_expires_at);
 CREATE INDEX IF NOT EXISTS idx_authorizations_refresh_token_expires_at ON authorizations (refresh_token_expires_at);
 
--- =============================================================================
--- TABLA: authorization_consents
--- Consentimientos de usuario para clientes OAuth2
--- =============================================================================
 CREATE TABLE IF NOT EXISTS authorization_consents
 (
     registered_client_id VARCHAR(255)  NOT NULL,
@@ -89,10 +71,6 @@ CREATE TABLE IF NOT EXISTS authorization_consents
     PRIMARY KEY (registered_client_id, principal_name)
 );
 
--- =============================================================================
--- TABLA: SPRING_SESSION
--- Sesiones HTTP gestionadas por Spring Session JDBC
--- =============================================================================
 CREATE TABLE IF NOT EXISTS SPRING_SESSION
 (
     PRIMARY_ID            CHAR(36) NOT NULL,
@@ -109,10 +87,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS SPRING_SESSION_IX1 ON SPRING_SESSION (SESSION_
 CREATE INDEX IF NOT EXISTS SPRING_SESSION_IX2 ON SPRING_SESSION (EXPIRY_TIME);
 CREATE INDEX IF NOT EXISTS SPRING_SESSION_IX3 ON SPRING_SESSION (PRINCIPAL_NAME);
 
--- =============================================================================
--- TABLA: SPRING_SESSION_ATTRIBUTES
--- Atributos serializados de las sesiones HTTP
--- =============================================================================
 CREATE TABLE IF NOT EXISTS SPRING_SESSION_ATTRIBUTES
 (
     SESSION_PRIMARY_ID CHAR(36)     NOT NULL,

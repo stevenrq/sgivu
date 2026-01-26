@@ -10,15 +10,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Implementación base genérica para servicios de {@link Vehicle}.
- *
- * <p>Proporciona operaciones comunes y gestión de estado para entidades de tipo {@code T} que
- * extienden {@link Vehicle}.
- *
- * @param <T> Tipo de entidad que extiende {@link Vehicle}.
- * @param <R> Tipo de repositorio que maneja la entidad {@code T}.
- */
 @Transactional(readOnly = true)
 public abstract class AbstractVehicleServiceImpl<T extends Vehicle, R extends VehicleRepository<T>>
     implements VehicleService<T> {
@@ -50,13 +41,6 @@ public abstract class AbstractVehicleServiceImpl<T extends Vehicle, R extends Ve
     return vehicleRepository.findById(id);
   }
 
-  /**
-   * Aplica cambios sobre atributos comunes manteniendo unicidad de identificadores críticos
-   * (placa, motor, chasis).
-   *
-   * @apiNote Los hijos complementan este método para actualizar sus propios atributos; se mantiene
-   *     la coherencia transaccional para no dejar vehículos en estados parciales.
-   */
   @Transactional
   @Override
   public Optional<T> update(Long id, T vehicle) {
@@ -90,12 +74,6 @@ public abstract class AbstractVehicleServiceImpl<T extends Vehicle, R extends Ve
     vehicleRepository.deleteById(id);
   }
 
-  /**
-   * Ajusta el estado operativo del vehículo.
-   *
-   * @apiNote Usado por flujos de ventas y mantenimiento para bloquear publicaciones o reservas
-   *     según el estado. Se ejecuta dentro de transacción para evitar condiciones de carrera.
-   */
   @Transactional
   @Override
   public Optional<T> changeStatus(Long id, VehicleStatus status) {

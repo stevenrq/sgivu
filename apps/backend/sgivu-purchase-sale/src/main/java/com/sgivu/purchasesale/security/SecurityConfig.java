@@ -23,11 +23,6 @@ import org.springframework.security.oauth2.server.resource.web.authentication.Be
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.RequestAuthorizationContext;
 
-/**
- * Configura el microservicio como recurso protegido por JWT emitidos por el Authorization Server de
- * SGIVU. Combina autorización por roles/permisos con un canal dedicado para llamadas internas
- * autenticadas mediante clave compartida.
- */
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
@@ -46,11 +41,6 @@ public class SecurityConfig {
     this.internalServiceAuthenticationFilter = internalServiceAuthenticationFilter;
   }
 
-  /**
-   * Define las reglas de seguridad HTTP: expone health/info sin autenticación, protege el resto con
-   * JWT y habilita acceso combinado para clientes externos autenticados o servicios internos
-   * firmados con cabecera {@code X-Internal-Service-Key}.
-   */
   @Bean
   SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
     http.oauth2ResourceServer(
@@ -63,20 +53,18 @@ public class SecurityConfig {
                     .requestMatchers(
                         "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/webjars/**")
                     .permitAll()
-                    // Servicios internos (clave) o clientes autenticados pueden acceder
+                    // Solo los servicios internos o clientes autenticados pueden acceder
                     .requestMatchers("/v1/purchase-sales/**")
                     .access(internalOrAuthenticatedAuthorizationManager())
                     .anyRequest()
                     .authenticated())
         .csrf(AbstractHttpConfigurer::disable)
-        // Inyecta Authentication con permisos cuando se usa la clave interna
         .addFilterBefore(
             internalServiceAuthenticationFilter, BearerTokenAuthenticationFilter.class);
 
     return http.build();
   }
 
-  /** Autoriza llamadas provenientes de servicios internos confiables o de clientes autenticados. */
   @Bean
   AuthorizationManager<RequestAuthorizationContext> internalOrAuthenticatedAuthorizationManager() {
     AuthorizationManager<RequestAuthorizationContext> authenticatedManager =
@@ -92,11 +80,6 @@ public class SecurityConfig {
     return AuthorizationManagers.anyOf(internalServiceAuthManager, authenticatedManager);
   }
 
-  /**
-   * Configura el decodificador JWT con la URL del Authorization Server de SGIVU.
-   *
-   * @return {@link JwtDecoder} inicializado con el issuer configurado
-   */
   @Bean
   JwtDecoder jwtDecoder() {
     return NimbusJwtDecoder.withIssuerLocation(
@@ -104,12 +87,6 @@ public class SecurityConfig {
         .build();
   }
 
-  /**
-   * Convierte el claim {@code rolesAndPermissions} en una lista de {@link SimpleGrantedAuthority}
-   * para que Spring Security pueda evaluarlos en anotaciones {@code @PreAuthorize}.
-   *
-   * @return convertidor JWT listo para extraer roles y permisos del token
-   */
   @Bean
   JwtAuthenticationConverter convert() {
     JwtAuthenticationConverter jwtAuthenticationConverter = new JwtAuthenticationConverter();

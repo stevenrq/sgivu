@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
@@ -27,7 +28,7 @@ public interface MotorcycleApi {
   @ApiResponse(responseCode = "400", description = "Datos inválidos")
   @PostMapping
   ResponseEntity<MotorcycleResponse> create(
-      @RequestBody @Parameter(description = "Entidad Motorcycle")
+      @Valid @RequestBody @Parameter(description = "Entidad Motorcycle")
           com.sgivu.vehicle.entity.Motorcycle motorcycle,
       BindingResult bindingResult);
 
@@ -48,7 +49,7 @@ public interface MotorcycleApi {
   @PutMapping("/{id}")
   ResponseEntity<MotorcycleResponse> update(
       @PathVariable @Parameter(description = "ID") Long id,
-      @RequestBody @Parameter(description = "Entidad Motorcycle")
+      @Valid @RequestBody @Parameter(description = "Entidad Motorcycle")
           com.sgivu.vehicle.entity.Motorcycle motorcycle,
       BindingResult bindingResult);
 

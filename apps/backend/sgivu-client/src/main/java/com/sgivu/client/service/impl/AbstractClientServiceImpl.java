@@ -9,10 +9,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Capa base que centraliza CRUD y actualización de contacto para personas y empresas, manteniendo
- * consistencia transaccional y evitando duplicar reglas básicas entre servicios concretos.
- */
 @Transactional(readOnly = true)
 public abstract class AbstractClientServiceImpl<T extends Client, R extends ClientRepository<T>>
     implements ClientService<T> {

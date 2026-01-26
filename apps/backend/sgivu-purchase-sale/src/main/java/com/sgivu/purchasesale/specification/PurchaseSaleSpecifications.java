@@ -13,23 +13,10 @@ import java.util.List;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.util.StringUtils;
 
-/**
- * Builders centralizados de {@link Specification} para contratos de compra y venta. Este componente
- * encapsula toda la lógica de combinación de filtros, rangos y búsquedas libres utilizada por el
- * repositorio, de modo que los controladores y servicios solo deban armar el objeto
- * {@link PurchaseSaleFilterCriteria}.
- */
 public final class PurchaseSaleSpecifications {
 
   private PurchaseSaleSpecifications() {}
 
-  /**
-   * Construye una especificación que aplica los filtros recibidos. Mezcla comparaciones directas,
-   * rangos de fechas/precios y criterios de texto libre en un único predicado AND.
-   *
-   * @param criteria conjunto de filtros opcionales
-   * @return especificación lista para pasarse al repositorio
-   */
   public static Specification<PurchaseSale> withFilters(PurchaseSaleFilterCriteria criteria) {
     return (root, query, cb) -> {
       if (criteria == null) {
@@ -73,19 +60,8 @@ public final class PurchaseSaleSpecifications {
     };
   }
 
-  /**
-   * Construye un predicado OR para búsquedas libres. Intenta hacer match contra strings,
-   * enumeraciones y valores numéricos (ids y precios) para brindar resultados más flexibles.
-   *
-   * @param term término ingresado por el usuario
-   * @param root raíz de la entidad en la consulta
-   * @param cb builder de criterios
-   * @return predicado listo para unirse mediante OR
-   */
   private static Predicate buildSearchPredicate(
-      String term,
-      jakarta.persistence.criteria.Root<PurchaseSale> root,
-      CriteriaBuilder cb) {
+      String term, jakarta.persistence.criteria.Root<PurchaseSale> root, CriteriaBuilder cb) {
     String normalizedTerm = term.trim().toLowerCase();
     String likePattern = "%" + normalizedTerm + "%";
     List<Predicate> orPredicates = new ArrayList<>();
@@ -113,14 +89,6 @@ public final class PurchaseSaleSpecifications {
     return cb.or(orPredicates.toArray(new Predicate[0]));
   }
 
-  /**
-   * Agrega un predicado de igualdad solo cuando el valor no es nulo, evitando joins innecesarios.
-   *
-   * @param predicates lista mutable donde se adjuntará el predicado
-   * @param cb builder de criterios
-   * @param path atributo evaluado
-   * @param value valor esperado
-   */
   private static void equals(
       List<Predicate> predicates, CriteriaBuilder cb, Path<?> path, Object value) {
     if (value != null) {
@@ -128,23 +96,8 @@ public final class PurchaseSaleSpecifications {
     }
   }
 
-  /**
-   * Agrega predicados de rango inclusive para campos numéricos cuando existen valores mínimos o
-   * máximos.
-   *
-   * @param predicates colección de salida
-   * @param cb builder de criterios
-   * @param path atributo numérico
-   * @param min límite inferior opcional
-   * @param max límite superior opcional
-   * @param <N> tipo numérico comparable
-   */
   private static <N extends Number & Comparable<N>> void range(
-      List<Predicate> predicates,
-      CriteriaBuilder cb,
-      Path<N> path,
-      N min,
-      N max) {
+      List<Predicate> predicates, CriteriaBuilder cb, Path<N> path, N min, N max) {
     if (min != null) {
       predicates.add(cb.greaterThanOrEqualTo(path, min));
     }
@@ -153,16 +106,6 @@ public final class PurchaseSaleSpecifications {
     }
   }
 
-  /**
-   * Limita los resultados por fecha usando `updatedAt`. Ajusta los límites a comienzo/fin del día
-   * para cubrir rangos completos.
-   *
-   * @param predicates lista donde se agregan los predicados generados
-   * @param cb builder de criterios
-   * @param path atributo de fecha/hora
-   * @param startDate fecha inicial (inclusive)
-   * @param endDate fecha final (inclusive)
-   */
   private static void betweenDates(
       List<Predicate> predicates,
       CriteriaBuilder cb,
@@ -177,13 +120,6 @@ public final class PurchaseSaleSpecifications {
     }
   }
 
-  /**
-   * Normaliza cadenas con dígitos (por ejemplo, términos mezclados con texto) intentando extraer un
-   * {@link Long}. Devuelve {@code null} si no hay suficientes dígitos o el número es inválido.
-   *
-   * @param value texto ingresado por el usuario
-   * @return número válido o {@code null} si no se pudo parsear
-   */
   private static Long parseLongLoose(String value) {
     if (!StringUtils.hasText(value)) {
       return null;
@@ -199,13 +135,6 @@ public final class PurchaseSaleSpecifications {
     }
   }
 
-  /**
-   * Convierte cadenas a {@link Double} manejando comas o espacios. Si el valor no es numérico
-   * devuelve {@code null} para ignorar el filtro.
-   *
-   * @param value texto a convertir
-   * @return número decimal o {@code null}
-   */
   private static Double parseDouble(String value) {
     if (!StringUtils.hasText(value)) {
       return null;

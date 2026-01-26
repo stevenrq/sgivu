@@ -14,12 +14,6 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 
-/**
- * Payload para actualizar motocicletas en inventario.
- *
- * <p>Garantiza que la información crítica (placa, números de identificación, estado) se valide
- * antes de impactar flujos de venta o reservas internas.
- */
 @Getter
 @Setter
 @ToString

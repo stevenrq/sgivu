@@ -45,12 +45,6 @@ import org.springframework.web.cors.reactive.CorsConfigurationSource;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 import reactor.core.publisher.Mono;
 
-/**
- * Configura el API Gateway como BFF con soporte OAuth2/OIDC y resource server JWT. Controla acceso
- * a los dominios de SGIVU (inventario de vehículos usados, contratos, compras/ventas y predicción
- * de demanda) y aplica CORS estricto hacia el front Angular corporativo. El login se delega a
- * `sgivu-auth` y los tokens se propagan hacia los microservicios desde el gateway.
- */
 @Configuration
 @EnableWebFluxSecurity
 public class SecurityConfig {
@@ -188,7 +182,7 @@ public class SecurityConfig {
   }
 
   @Bean
-  public ReactiveJwtDecoder jwtDecoder() {
+  ReactiveJwtDecoder jwtDecoder() {
     return NimbusReactiveJwtDecoder.withIssuerLocation(
             servicesProperties.getMap().get("sgivu-auth").getUrl())
         .build();
@@ -211,7 +205,7 @@ public class SecurityConfig {
   }
 
   @Bean
-  public ServerOAuth2AuthorizedClientRepository authorizedClientRepository() {
+  ServerOAuth2AuthorizedClientRepository authorizedClientRepository() {
     return new WebSessionServerOAuth2AuthorizedClientRepository();
   }
 
