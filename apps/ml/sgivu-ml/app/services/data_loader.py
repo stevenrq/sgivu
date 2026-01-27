@@ -14,14 +14,13 @@ logger = logging.getLogger(__name__)
 
 
 class PurchaseSaleClient:
-    """Cliente HTTP para recuperar contratos de compra/venta via gateway."""
+    """Cliente para interactuar con el microservicio de compra-venta."""
 
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
         self.base_url = settings.sgivu_purchase_sale_url.rstrip("/")
 
     def _headers(self) -> Dict[str, str]:
-        """Encabezados internos; otros microservicios validan X-Internal-Service-Key."""
         headers = {"Accept": "application/json"}
         if self.settings.service_internal_secret_key:
             headers["X-Internal-Service-Key"] = (
@@ -32,15 +31,6 @@ class PurchaseSaleClient:
     async def fetch_contracts(
         self, start_date: Optional[date] = None, end_date: Optional[date] = None
     ) -> List[Dict[str, Any]]:
-        """Paginación de contratos con filtro temporal opcional.
-
-        Args:
-            start_date: Fecha mínima ISO (filtra updatedAt/createdAt en el MS).
-            end_date: Fecha máxima ISO.
-
-        Returns:
-            Lista de dicts con contratos crudos (estructura de PurchaseSaleController).
-        """
         results: List[Dict[str, Any]] = []
         page = 0
         size = 200
@@ -77,7 +67,7 @@ class PurchaseSaleClient:
 
 
 class VehicleClient:
-    """Cliente HTTP para enriquecer contratos con detalle del inventario."""
+    """Cliente para interactuar con el microservicio de inventario de vehículos."""
 
     def __init__(self, settings: Settings, concurrency: int = 10) -> None:
         self.settings = settings
@@ -96,11 +86,6 @@ class VehicleClient:
     async def fetch_vehicle(
         self, vehicle_id: int, vehicle_type: str | None
     ) -> Dict[str, Any]:
-        """Obtiene detalle de un vehículo desde el gateway.
-
-        Selecciona endpoint según tipo (cars/motorcycles) y hace fallback si
-        no se conoce el tipo con certeza.
-        """
         endpoints = ["cars", "motorcycles"]
         if vehicle_type == "CAR":
             endpoints = ["cars"]
@@ -133,7 +118,6 @@ class VehicleClient:
     async def fetch_bulk(
         self, vehicles: Iterable[Tuple[int, Optional[str]]]
     ) -> Dict[int, Dict[str, Any]]:
-        """Recupera en paralelo múltiples vehículos para minimizar latencia."""
         vehicles = [(vid, vtype) for vid, vtype in vehicles if vid]
         tasks = [
             self.fetch_vehicle(vehicle_id, vehicle_type)
@@ -151,12 +135,7 @@ class VehicleClient:
 
 
 class DemandDatasetLoader:
-    """Orquesta la recuperación de datos crudos (compras/ventas + inventario).
-
-    - Descarga contratos desde purchase-sale.
-    - Enriquecer con atributos de inventario (marca/modelo/línea/año/kilometraje).
-    - Devuelve un DataFrame homogéneo para ingeniería de características.
-    """
+    """Carga y prepara datos de compra-venta para modelado de demanda."""
 
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
@@ -166,15 +145,6 @@ class DemandDatasetLoader:
     async def load_transactions(
         self, start_date: Optional[date] = None, end_date: Optional[date] = None
     ) -> pd.DataFrame:
-        """Descarga y fusiona contratos con detalle de vehículo.
-
-        Args:
-            start_date: Fecha mínima (opcional) para reducir el historial.
-            end_date: Fecha máxima (opcional).
-
-        Returns:
-            DataFrame con columnas normalizadas para el pipeline de entrenamiento.
-        """
         contracts = await self.purchase_client.fetch_contracts(
             start_date=start_date, end_date=end_date
         )

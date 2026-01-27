@@ -5,23 +5,9 @@ import Swal from 'sweetalert2';
 @Injectable({
   providedIn: 'root',
 })
-/** Utilidades de UI para confirmar y ejecutar acciones sobre usuarios. */
 export class UserUiHelperService {
   private readonly userService = inject(UserService);
 
-  /**
-   * Centraliza la confirmación SweetAlert y la llamada a `UserService.updateStatus`.
-   * El callback `onSuccess` permite reutilizar la misma rutina en listas o
-   * vistas de detalle para refrescar la UI tras un éxito.
-   *
-   * @param id - Identificador del usuario a actualizar.
-   * @param status - Estado destino (`true` = activo, `false` = inactivo).
-   * @param onSuccess - Acción que se ejecuta tras un éxito (p.ej. recargar la lista).
-   *
-   * @example
-   * const currentPage = this.pager?.number ?? 0;
-   * this.userUiHelper.updateStatus(id, status, () => this.loadUsers(currentPage));
-   */
   updateStatus(id: number, status: boolean, onSuccess: () => void): void {
     Swal.fire({
       title: '¿Estás seguro?',
@@ -55,18 +41,6 @@ export class UserUiHelperService {
     });
   }
 
-  /**
-   * Centraliza la confirmación SweetAlert y la llamada a `UserService.delete`.
-   * El callback `onSuccess` permite decidir cómo refrescar la navegación tras
-   * una eliminación exitosa.
-   *
-   * @param id - Identificador del usuario a eliminar.
-   * @param onSuccess - Acción tras un éxito (p.ej. recargar la lista o redirigir).
-   *
-   * @example
-   * const currentPage = this.pager?.number ?? 0;
-   * this.userUiHelper.delete(id, () => this.loadUsers(currentPage));
-   */
   delete(id: number, onSuccess: () => void): void {
     Swal.fire({
       title: '¿Estás seguro?',

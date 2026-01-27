@@ -15,14 +15,13 @@ jwt_backend = JsonWebToken(["RS256", "HS256"])
 
 
 class JWKSCache:
-    """Cache ligero de JWKS con TTL fijo (1h) para reducir llamadas al IdP."""
+    """Caché simple para llaves públicas JWKS."""
 
     def __init__(self) -> None:
         self.cached: Dict[str, Any] = {}
         self.expires_at: float = 0.0
 
     async def get_key_set(self, jwks_url: str, timeout: float) -> Any:
-        """Descarga el JWKS y lo cachea una hora para amortizar el discovery."""
         if not jwks_url:
             return None
 
@@ -46,7 +45,6 @@ oidc_expires_at: float = 0.0
 
 
 async def discover_config(settings: Settings) -> dict | None:
-    """Obtiene y cachea el discovery OIDC si se configuró (o puede derivarse)."""
     global oidc_cache, oidc_expires_at
 
     discovery_url = settings.sgivu_auth_discovery_url
@@ -68,8 +66,6 @@ async def discover_config(settings: Settings) -> dict | None:
 
 
 async def decode_token(raw_token: str) -> dict:
-    """Valida y decodifica el JWT usando Authlib (JWKS via discovery OIDC)."""
-
     settings = get_settings()
 
     discovery_config = await discover_config(settings)
@@ -107,7 +103,6 @@ async def decode_token(raw_token: str) -> dict:
 
 
 def _extract_permissions(claims: dict) -> Set[str]:
-    """Normaliza el claim rolesAndPermissions en un set de strings."""
     raw = claims.get("rolesAndPermissions")
     if raw is None:
         return set()
@@ -125,7 +120,6 @@ def _extract_permissions(claims: dict) -> Set[str]:
 async def require_token(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
 ) -> dict:
-    """Dependencia para proteger endpoints; exige Authorization: Bearer <JWT>."""
     if not credentials or not credentials.credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -135,11 +129,9 @@ async def require_token(
 
 
 def require_permissions(required: Iterable[str]):
-    """Crea una dependencia que valida intersección con permisos requeridos."""
     required_set = {permission for permission in required if permission}
 
     def dependency(claims: dict = Depends(require_token)) -> dict:
-        """Verifica que el JWT incluya al menos uno de los permisos exigidos."""
         permissions = _extract_permissions(claims)
         if required_set and not permissions.intersection(required_set):
             raise HTTPException(
@@ -152,14 +144,12 @@ def require_permissions(required: Iterable[str]):
 
 
 def require_internal_or_permissions(required: Iterable[str]):
-    """Permite autenticarse con clave interna o JWT con los permisos dados."""
     required_set = {permission for permission in required if permission}
 
     async def dependency(
         request: Request,
         credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
     ) -> dict:
-        """Permite acceso con clave interna o valida permisos sobre un JWT."""
         settings = get_settings()
         internal_key = request.headers.get("X-Internal-Service-Key")
 

@@ -18,32 +18,17 @@ logger = logging.getLogger(__name__)
 
 
 class ModelRegistry:
-    """Repositorio local de modelos entrenados (artefacto + metadata).
-
-    Gestiona versiones serializadas en disco para rollback y trazabilidad,
-    manteniendo un apuntador al último modelo entrenado en ``latest.json``.
-    """
+    """Registro de modelos basado en el sistema de archivos local."""
 
     def __init__(self, settings: Settings | None = None) -> None:
-        """Prepara rutas de almacenamiento y configuración de modelos."""
         self.settings = settings or get_settings()
         self.model_dir: Path = self.settings.model_path()
         self.latest_metadata_path = self.model_dir / "latest.json"
 
     def _artifact_path(self, version: str) -> Path:
-        """Construye la ruta del artefacto .joblib para una versión."""
         return self.model_dir / f"{self.settings.model_name}_{version}.joblib"
 
     def save(self, model: Any, metadata: Dict[str, Any]) -> Dict[str, Any]:
-        """Persiste el modelo y la metadata asociada.
-
-        Args:
-            model: Pipeline o estimador ya entrenado listo para inferencia.
-            metadata: Información de entrenamiento (métricas, features, versión).
-
-        Returns:
-            Dict con la metadata enriquecida con el campo ``version`` asignado.
-        """
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
         merged_metadata = {**metadata, "version": timestamp}
         artifact_path = self._artifact_path(timestamp)
@@ -53,14 +38,6 @@ class ModelRegistry:
         return merged_metadata
 
     def load_latest(self) -> Tuple[Any, Dict[str, Any]]:
-        """Carga el último modelo entrenado.
-
-        Raises:
-            FileNotFoundError: Si aún no existe un modelo persistido.
-
-        Returns:
-            Tuple con el modelo y la metadata asociada.
-        """
         if not self.latest_metadata_path.exists():
             raise FileNotFoundError("No se encontro modelo entrenado.")
 
@@ -72,21 +49,19 @@ class ModelRegistry:
         return model, model_metadata
 
     def latest_metadata(self) -> Dict[str, Any] | None:
-        """Devuelve la metadata del modelo activo sin cargar el artefacto."""
         if not self.latest_metadata_path.exists():
             return None
         return json.loads(self.latest_metadata_path.read_text())
 
 
 class DatabaseModelRegistry:
-    """Repositorio de modelos entrenados persistidos en PostgreSQL."""
+    """Registro de modelos usando una base de datos SQL."""
 
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
         self.enabled = database_enabled(self.settings)
 
     def save(self, model: Any, metadata: Dict[str, Any]) -> Dict[str, Any]:
-        """Persiste el modelo y metadata en la base de datos."""
         if not self.enabled:
             raise RuntimeError("DATABASE_URL no configurada para guardar el modelo.")
 
@@ -109,7 +84,6 @@ class DatabaseModelRegistry:
         return merged_metadata
 
     def load_latest(self) -> Tuple[Any, Dict[str, Any]]:
-        """Carga el último modelo entrenado desde la base de datos."""
         if not self.enabled:
             raise FileNotFoundError("No hay base de datos configurada.")
 
@@ -134,7 +108,6 @@ class DatabaseModelRegistry:
         return model, metadata
 
     def latest_metadata(self) -> Dict[str, Any] | None:
-        """Devuelve la metadata del modelo activo desde PostgreSQL."""
         if not self.enabled:
             return None
 

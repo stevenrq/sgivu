@@ -91,6 +91,8 @@ interface PurchaseSaleUiFilters {
   maxSalePrice: string;
 }
 
+type ExportFormat = 'pdf' | 'excel' | 'csv';
+type ReportExtension = 'pdf' | 'xlsx' | 'csv';
 type QuickSuggestionType = 'client' | 'user' | 'vehicle' | 'status' | 'type';
 interface QuickSuggestion {
   label: string;
@@ -117,12 +119,6 @@ interface QuickSuggestion {
   templateUrl: './purchase-sale-list.component.html',
   styleUrl: './purchase-sale-list.component.css',
 })
-/**
- * Coordina el listado de contratos de compra/venta. Además de paginar, mantiene
- * sincronizados filtros complejos con la URL, carga catálogos auxiliares
- * (clientes, usuarios y vehículos) y genera métricas/resúmenes utilizados en
- * múltiples vistas. También expone sugerencias rápidas para búsquedas libres.
- */
 export class PurchaseSaleListComponent implements OnInit, OnDestroy {
   private readonly purchaseSaleService = inject(PurchaseSaleService);
   private readonly personService = inject(PersonService);
@@ -174,7 +170,7 @@ export class PurchaseSaleListComponent implements OnInit, OnDestroy {
 
   reportStartDate: string | null = null;
   reportEndDate: string | null = null;
-  exportLoading: Record<'pdf' | 'excel' | 'csv', boolean> = {
+  exportLoading: Record<ExportFormat, boolean> = {
     pdf: false,
     excel: false,
     csv: false,
@@ -398,9 +394,6 @@ export class PurchaseSaleListComponent implements OnInit, OnDestroy {
     this.reportEndDate = null;
   }
 
-  /**
-   * @description Aplica los filtros actuales sincronizando query params para compartir la búsqueda y desencadenar carga paginada desde la página 0.
-   */
   applyFilters(): void {
     this.quickSuggestions = [];
     this.hintQuickSearchFilters();
@@ -421,11 +414,7 @@ export class PurchaseSaleListComponent implements OnInit, OnDestroy {
     this.filters[field] = displayValue;
   }
 
-  /**
-   * @description Genera y descarga el reporte en el formato solicitado validando previamente el rango de fechas para no enviar solicitudes inválidas al backend.
-   * @param format Formato requerido por el usuario (pdf/excel/csv).
-   */
-  downloadReport(format: 'pdf' | 'excel' | 'csv'): void {
+  downloadReport(format: ExportFormat): void {
     if (this.reportStartDate && this.reportEndDate) {
       if (this.reportStartDate > this.reportEndDate) {
         void Swal.fire({
@@ -454,7 +443,7 @@ export class PurchaseSaleListComponent implements OnInit, OnDestroy {
           link.download = fileName;
           document.body.appendChild(link);
           link.click();
-          document.body.removeChild(link);
+          link.remove();
           URL.revokeObjectURL(url);
           this.showSuccessMessage(
             `Reporte ${extension.toUpperCase()} generado correctamente.`,
@@ -491,17 +480,8 @@ export class PurchaseSaleListComponent implements OnInit, OnDestroy {
     this.applyFilters();
   }
 
-  /**
-   * Devuelve el observable apropiado para descargar el reporte según el formato requerido.
-   * Centraliza las llamadas de servicio para mantener el switch en un solo lugar.
-   *
-   * @param format Formato solicitado por el usuario.
-   * @param start Fecha inicial del reporte (opcional).
-   * @param end Fecha final del reporte (opcional).
-   * @returns Observable que emite el archivo generado.
-   */
   private getReportObservable(
-    format: 'pdf' | 'excel' | 'csv',
+    format: ExportFormat,
     start?: string,
     end?: string,
   ) {
@@ -516,15 +496,7 @@ export class PurchaseSaleListComponent implements OnInit, OnDestroy {
     }
   }
 
-  /**
-   * Traduce el formato semántico seleccionado en la UI a la extensión real del archivo generado.
-   *
-   * @param format Identificador del formato (pdf/excel/csv).
-   * @returns Extensión asociada al archivo descargado.
-   */
-  private getExtension(
-    format: 'pdf' | 'excel' | 'csv',
-  ): 'pdf' | 'xlsx' | 'csv' {
+  private getExtension(format: ExportFormat): ReportExtension {
     if (format === 'pdf') {
       return 'pdf';
     }
@@ -534,14 +506,7 @@ export class PurchaseSaleListComponent implements OnInit, OnDestroy {
     return 'csv';
   }
 
-  /**
-   * Construye el nombre del archivo descargado incluyendo el rango aplicado para facilitar la
-   * trazabilidad de reportes guardados localmente.
-   *
-   * @param extension Extensión final del documento.
-   * @returns Nombre amigable para el archivo.
-   */
-  private buildReportFileName(extension: 'pdf' | 'xlsx' | 'csv'): string {
+  private buildReportFileName(extension: ReportExtension): string {
     const today = new Date().toISOString().split('T')[0];
     const rangeLabel =
       this.reportStartDate || this.reportEndDate
@@ -550,11 +515,6 @@ export class PurchaseSaleListComponent implements OnInit, OnDestroy {
     return `reporte-compras-ventas-${rangeLabel}-${today}.${extension}`;
   }
 
-  /**
-   * @description Solicita confirmación y actualiza el estado de un contrato, asegurando que tras la mutación se recalculen KPIs y la página actual refleje el cambio.
-   * @param contract Contrato a modificar.
-   * @param status Estado destino.
-   */
   updateStatus(contract: PurchaseSale, status: ContractStatus): void {
     if (!contract.id) {
       return;
@@ -605,14 +565,6 @@ export class PurchaseSaleListComponent implements OnInit, OnDestroy {
     this.loadContracts(this.currentPage, this.activeSearchFilters ?? undefined);
   }
 
-  /**
-   * Descarga los contratos de la página solicitada; cuando se reciben filtros
-   * construidos desde la URL, invoca el endpoint de búsqueda para mantener
-   * paginación y query params alineados.
-   *
-   * @param page - Índice actual solicitado por la ruta.
-   * @param filters - Filtros efectivos que ya pasaron por `extractFiltersFromQuery`.
-   */
   private loadContracts(
     page: number,
     filters?: PurchaseSaleSearchFilters,
@@ -642,13 +594,6 @@ export class PurchaseSaleListComponent implements OnInit, OnDestroy {
     });
   }
 
-  /**
-   * Obtiene en paralelo los catálogos de clientes, usuarios y vehículos que se
-   * usan en filtros, sugerencias y validaciones. Todos los resultados se
-   * normalizan en listas ordenadas para facilitar su reuso en plantillas.
-   *
-   * @returns void
-   */
   private loadLookups(): void {
     const clients$ = forkJoin([
       this.personService.getAll(),
@@ -674,15 +619,19 @@ export class PurchaseSaleListComponent implements OnInit, OnDestroy {
 
     const lookupSub = forkJoin([clients$, users$, vehicles$]).subscribe({
       next: ([clientOptions, userOptions, vehicleOptions]) => {
-        this.clients.set(
-          clientOptions.sort((a, b) => a.label.localeCompare(b.label)),
-        );
-        this.users.set(
-          userOptions.sort((a, b) => a.label.localeCompare(b.label)),
-        );
-        this.vehicles.set(
-          vehicleOptions.sort((a, b) => a.label.localeCompare(b.label)),
-        );
+        const sortedClients = clientOptions
+          .slice()
+          .sort((a, b) => a.label.localeCompare(b.label));
+        const sortedUsers = userOptions
+          .slice()
+          .sort((a, b) => a.label.localeCompare(b.label));
+        const sortedVehicles = vehicleOptions
+          .slice()
+          .sort((a, b) => a.label.localeCompare(b.label));
+
+        this.clients.set(sortedClients);
+        this.users.set(sortedUsers);
+        this.vehicles.set(sortedVehicles);
       },
       error: (error) => {
         this.handleError(error, 'cargar la información auxiliar');
@@ -692,13 +641,6 @@ export class PurchaseSaleListComponent implements OnInit, OnDestroy {
     this.subscriptions.push(lookupSub);
   }
 
-  /**
-   * Vuelve a calcular los KPIs (totales, compras, ventas) y también actualiza
-   * los conjuntos de ids vinculados para que las búsquedas rápidas sugieran
-   * entidades con contratos existentes.
-   *
-   * @returns void
-   */
   private refreshSummary(): void {
     const summarySub = this.purchaseSaleService.getAll().subscribe({
       next: (contracts) => {
@@ -729,14 +671,6 @@ export class PurchaseSaleListComponent implements OnInit, OnDestroy {
     this.subscriptions.push(summarySub);
   }
 
-  /**
-   * Reconstruye los conjuntos de clientes, usuarios y vehículos que tienen
-   * contratos asociados. Se ejecuta tras refrescar el resumen para que las
-   * sugerencias sólo muestren entidades realmente enlazadas.
-   *
-   * @param contracts - Colección desde la cual se extraen los ids vinculados.
-   * @returns void
-   */
   private updateLinkedEntities(contracts: PurchaseSale[]): void {
     this.linkedClientIds.clear();
     this.linkedUserIds.clear();
@@ -784,14 +718,6 @@ export class PurchaseSaleListComponent implements OnInit, OnDestroy {
     };
   }
 
-  /**
-   * Aprovecha la búsqueda rápida para rellenar filtros específicos cuando es
-   * posible. Por ejemplo, si el término coincide con un cliente/vehículo/usuario
-   * conocido, se precarga su id en el filtro correspondiente además de enviar el
-   * término libre.
-   *
-   * @returns void
-   */
   private hintQuickSearchFilters(): void {
     const rawTerm = (this.filters.term ?? '').trim();
     if (!rawTerm) {
@@ -830,14 +756,6 @@ export class PurchaseSaleListComponent implements OnInit, OnDestroy {
     this.filters.term = rawTerm;
   }
 
-  /**
-   * Recalcula las sugerencias rápidas considerando clientes, usuarios,
-   * vehículos y coincidencias de tipo/estado. Limita los resultados para
-   * mantener la lista ligera.
-   *
-   * @param term - Texto ingresado por el usuario en la búsqueda libre.
-   * @returns void
-   */
   private updateQuickSuggestions(term: string): void {
     const normalized = term.trim().toLowerCase();
     if (normalized.length < 2) {
@@ -920,12 +838,6 @@ export class PurchaseSaleListComponent implements OnInit, OnDestroy {
     this.quickSuggestions = matches.slice(0, 9);
   }
 
-  /**
-   * Convierte los filtros de la UI en query params limpios para sincronizar la
-   * URL y compartir búsquedas. Solo incluye valores válidos o convertidos.
-   *
-   * @returns Objeto de parámetros o `undefined` si no hay filtros activos.
-   */
   private buildQueryParamsFromFilters(): Params | undefined {
     const params: Params = {};
 
@@ -993,13 +905,6 @@ export class PurchaseSaleListComponent implements OnInit, OnDestroy {
     );
   }
 
-  /**
-   * Rehidrata los filtros partiendo de los query params, separando el estado de
-   * formulario (strings) de los filtros que se enviarán al backend.
-   *
-   * @param query - Parámetros activos tomados de la ruta.
-   * @returns Filtros para la UI, filtros efectivos y la representación final de query params.
-   */
   private extractFiltersFromQuery(query: ParamMap): {
     uiFilters: PurchaseSaleUiFilters;
     requestFilters: PurchaseSaleSearchFilters | null;
@@ -1008,104 +913,61 @@ export class PurchaseSaleListComponent implements OnInit, OnDestroy {
     const uiFilters = this.getDefaultUiFilters();
     const requestFilters: PurchaseSaleSearchFilters = {};
 
-    const contractTypeParam = query.get('contractType');
-    if (this.isValidContractType(contractTypeParam)) {
-      uiFilters.contractType = contractTypeParam as ContractTypeFilter;
-      requestFilters.contractType = contractTypeParam as ContractType;
-    }
+    const applyEnum = <T extends string>(
+      key: string,
+      isValid: (v: string | null) => v is T,
+    ) => {
+      const val = query.get(key);
+      if (isValid(val)) {
+        (uiFilters as any)[key] = val;
+        (requestFilters as any)[key] = val;
+      }
+    };
 
-    const contractStatusParam = query.get('contractStatus');
-    if (this.isValidContractStatus(contractStatusParam)) {
-      uiFilters.contractStatus = contractStatusParam as ContractStatusFilter;
-      requestFilters.contractStatus = contractStatusParam as ContractStatus;
-    }
-
-    const paymentMethodParam = query.get('paymentMethod');
-    if (this.isValidPaymentMethod(paymentMethodParam)) {
-      uiFilters.paymentMethod = paymentMethodParam!;
-      requestFilters.paymentMethod = paymentMethodParam as PaymentMethod;
-    }
-
-    const clientIdParam = query.get('clientId');
-    if (clientIdParam) {
-      uiFilters.clientId = clientIdParam;
-      const parsed = this.parseNumberParam(clientIdParam);
+    const applyNumber = (key: string, requestKey?: string) => {
+      const val = query.get(key);
+      if (!val) return;
+      (uiFilters as any)[key] = val;
+      const parsed = this.parseNumberParam(val);
       if (parsed !== undefined) {
-        requestFilters.clientId = parsed;
+        (requestFilters as any)[requestKey ?? key] = parsed;
       }
-    }
+    };
 
-    const userIdParam = query.get('userId');
-    if (userIdParam) {
-      uiFilters.userId = userIdParam;
-      const parsed = this.parseNumberParam(userIdParam);
-      if (parsed !== undefined) {
-        requestFilters.userId = parsed;
-      }
-    }
-
-    const vehicleIdParam = query.get('vehicleId');
-    if (vehicleIdParam) {
-      uiFilters.vehicleId = vehicleIdParam;
-      const parsed = this.parseNumberParam(vehicleIdParam);
-      if (parsed !== undefined) {
-        requestFilters.vehicleId = parsed;
-      }
-    }
-
-    const minPurchase = query.get('minPurchasePrice');
-    if (minPurchase) {
+    const applyPrice = (key: string, requestKey?: string) => {
+      const val = query.get(key);
+      if (!val) return;
       const { numericValue, displayValue } = normalizeMoneyInput(
-        minPurchase,
+        val,
         this.priceDecimals,
       );
-      uiFilters.minPurchasePrice = displayValue;
+      (uiFilters as any)[key] = displayValue;
       if (numericValue !== null) {
-        requestFilters.minPurchasePrice = numericValue;
+        (requestFilters as any)[requestKey ?? key] = numericValue;
       }
-    }
+    };
 
-    const maxPurchase = query.get('maxPurchasePrice');
-    if (maxPurchase) {
-      const { numericValue, displayValue } = normalizeMoneyInput(
-        maxPurchase,
-        this.priceDecimals,
-      );
-      uiFilters.maxPurchasePrice = displayValue;
-      if (numericValue !== null) {
-        requestFilters.maxPurchasePrice = numericValue;
-      }
-    }
+    const applyString = (key: string) => {
+      const val = query.get(key);
+      if (!val) return;
+      (uiFilters as any)[key] = val;
+      (requestFilters as any)[key] = val;
+    };
 
-    const minSale = query.get('minSalePrice');
-    if (minSale) {
-      const { numericValue, displayValue } = normalizeMoneyInput(
-        minSale,
-        this.priceDecimals,
-      );
-      uiFilters.minSalePrice = displayValue;
-      if (numericValue !== null) {
-        requestFilters.minSalePrice = numericValue;
-      }
-    }
+    applyEnum('contractType', this.isValidContractType);
+    applyEnum('contractStatus', this.isValidContractStatus);
+    applyEnum('paymentMethod', this.isValidPaymentMethod);
 
-    const maxSale = query.get('maxSalePrice');
-    if (maxSale) {
-      const { numericValue, displayValue } = normalizeMoneyInput(
-        maxSale,
-        this.priceDecimals,
-      );
-      uiFilters.maxSalePrice = displayValue;
-      if (numericValue !== null) {
-        requestFilters.maxSalePrice = numericValue;
-      }
-    }
+    applyNumber('clientId', 'clientId');
+    applyNumber('userId', 'userId');
+    applyNumber('vehicleId', 'vehicleId');
 
-    const term = query.get('term');
-    if (term) {
-      uiFilters.term = term;
-      requestFilters.term = term;
-    }
+    applyPrice('minPurchasePrice', 'minPurchasePrice');
+    applyPrice('maxPurchasePrice', 'maxPurchasePrice');
+    applyPrice('minSalePrice', 'minSalePrice');
+    applyPrice('maxSalePrice', 'maxSalePrice');
+
+    applyString('term');
 
     const queryParams = this.paramMapToObject(query);
     const hasFilters = !this.arePurchaseSaleFiltersEmpty(requestFilters);
@@ -1208,7 +1070,7 @@ export class PurchaseSaleListComponent implements OnInit, OnDestroy {
       return '';
     }
 
-    return message.replace(/veh[ií]culo con id (\d+)/gi, (_, id: string) => {
+    return message.replaceAll(/veh[ií]culo con id (\d+)/gi, (_, id: string) => {
       const numericId = Number(id);
       const label = this.getVehicleLabelById(numericId);
       return label ?? `vehículo con id ${id}`;

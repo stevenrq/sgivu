@@ -39,7 +39,6 @@ interface Role {
   templateUrl: './roles-permissions.component.html',
   styleUrls: ['./roles-permissions.component.css'],
 })
-/** Pantalla para listar roles y administrar sus permisos de forma masiva. */
 export class RolesPermissionsComponent implements OnInit {
   roles: Role[] = [];
   permissionGroups: PermissionGroup[] = [];

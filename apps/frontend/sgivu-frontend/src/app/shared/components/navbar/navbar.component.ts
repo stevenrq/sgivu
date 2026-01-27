@@ -24,10 +24,6 @@ import { Theme, ThemeService } from '../../services/theme.service';
   templateUrl: './navbar.component.html',
   styleUrl: './navbar.component.css',
 })
-/**
- * Barra de navegación principal que gestiona autenticación, selección de tema
- * y comportamiento responsive con el componente Collapse de Bootstrap.
- */
 export class NavbarComponent implements OnInit, AfterViewInit {
   readonly authService = inject(AuthService);
   private readonly userService = inject(UserService);
@@ -83,33 +79,27 @@ export class NavbarComponent implements OnInit, AfterViewInit {
   }
 
   toggleMenu(): void {
-    if (!this.isMobileView) {
-      return;
-    }
-    if (!this.collapseInstance) {
-      this.initializeCollapseInstance();
-    }
-    if (this.isMenuOpen) {
-      this.collapseInstance?.hide();
-    } else {
-      this.collapseInstance?.show();
+    if (this.isMobileView) {
+      if (!this.collapseInstance) {
+        this.initializeCollapseInstance();
+      }
+      if (this.isMenuOpen) {
+        this.collapseInstance?.hide();
+      } else {
+        this.collapseInstance?.show();
+      }
     }
   }
 
   handleNavigation(): void {
-    if (!this.isMobileView) {
-      return;
+    if (this.isMobileView) {
+      if (!this.collapseInstance) {
+        this.initializeCollapseInstance();
+      }
+      this.collapseInstance?.hide();
     }
-    if (!this.collapseInstance) {
-      this.initializeCollapseInstance();
-    }
-    this.collapseInstance?.hide();
   }
 
-  /**
-   * Prepara la instancia de `Collapse` asegurando que solo se ejecute en el browser
-   * y sincroniza el flag interno `isMenuOpen` con los eventos de Bootstrap.
-   */
   private initializeCollapseInstance(): void {
     if (!this.navbarCollapse || !isPlatformBrowser(this.platformId)) {
       return;
@@ -137,10 +127,6 @@ export class NavbarComponent implements OnInit, AfterViewInit {
     );
   }
 
-  /**
-   * Determina si la vista es móvil o desktop en función del ancho de pantalla
-   * y muestra/oculta el menú en consecuencia.
-   */
   private updateResponsiveState(): void {
     if (!isPlatformBrowser(this.platformId)) {
       this.isMobileView = false;
@@ -149,13 +135,12 @@ export class NavbarComponent implements OnInit, AfterViewInit {
 
     this.isMobileView = window.innerWidth < this.desktopBreakpoint;
 
-    if (!this.isMobileView) {
-      this.showDesktopMenu();
-      this.isMenuOpen = false;
-    } else {
+    if (this.isMobileView) {
       this.collapseInstance?.hide();
-      this.isMenuOpen = false;
+    } else {
+      this.showDesktopMenu();
     }
+    this.isMenuOpen = false;
   }
 
   private showDesktopMenu(): void {

@@ -1,3 +1,5 @@
-<div class="spinner-border" [ngClass]="spinnerClass" role="status">
-  <span class="visually-hidden">{{ label }}</span>
+<div class="spinner-border" [ngClass]="spinnerClass" aria-hidden="true">
+  <output class="visually-hidden" aria-live="polite" aria-atomic="true">{{
+    label
+  }}</output>
 </div>

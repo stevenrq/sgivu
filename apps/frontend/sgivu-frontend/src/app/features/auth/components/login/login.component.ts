@@ -7,9 +7,6 @@ import { AuthService } from '../../services/auth.service';
   templateUrl: './login.component.html',
   styleUrl: './login.component.css',
 })
-/**
- * Punto de entrada para iniciar el flujo BFF; redirige al gateway.
- */
 export class LoginComponent implements OnInit {
   private readonly authService = inject(AuthService);
 

@@ -14,14 +14,13 @@ logger = logging.getLogger(__name__)
 
 
 def _safe_float(value: Any) -> float:
-    """Normaliza valores numéricos evitando NaN/None."""
     if value is None or pd.isna(value):
         return 0.0
     return float(value)
 
 
 class FeatureStore:
-    """Persistencia de snapshots de features mensuales por versión de modelo."""
+    """Persistencia de snapshots de features de entrenamiento."""
 
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
@@ -38,9 +37,11 @@ class FeatureStore:
             payloads.append(
                 {
                     "model_version": model_version,
-                    "event_month": event_month.date()
-                    if hasattr(event_month, "date")
-                    else event_month,
+                    "event_month": (
+                        event_month.date()
+                        if event_month is not None and hasattr(event_month, "date")
+                        else event_month
+                    ),
                     "vehicle_type": getattr(row, "vehicle_type", None),
                     "brand": getattr(row, "brand", None),
                     "model": getattr(row, "model", None),
@@ -50,9 +51,7 @@ class FeatureStore:
                         getattr(row, "purchases_count", None)
                     ),
                     "avg_margin": _safe_float(getattr(row, "avg_margin", None)),
-                    "avg_sale_price": _safe_float(
-                        getattr(row, "avg_sale_price", None)
-                    ),
+                    "avg_sale_price": _safe_float(getattr(row, "avg_sale_price", None)),
                     "avg_purchase_price": _safe_float(
                         getattr(row, "avg_purchase_price", None)
                     ),
@@ -65,12 +64,8 @@ class FeatureStore:
                     "lag_1": _safe_float(getattr(row, "lag_1", None)),
                     "lag_3": _safe_float(getattr(row, "lag_3", None)),
                     "lag_6": _safe_float(getattr(row, "lag_6", None)),
-                    "rolling_mean_3": _safe_float(
-                        getattr(row, "rolling_mean_3", None)
-                    ),
-                    "rolling_mean_6": _safe_float(
-                        getattr(row, "rolling_mean_6", None)
-                    ),
+                    "rolling_mean_3": _safe_float(getattr(row, "rolling_mean_3", None)),
+                    "rolling_mean_6": _safe_float(getattr(row, "rolling_mean_6", None)),
                     "month": int(getattr(row, "month", 0) or 0),
                     "year": int(getattr(row, "year", 0) or 0),
                     "month_sin": _safe_float(getattr(row, "month_sin", None)),
@@ -85,7 +80,7 @@ class FeatureStore:
                 )
             )
             if payloads:
-                session.bulk_insert_mappings(TrainingFeature, payloads)
+                session.bulk_insert_mappings(TrainingFeature.__mapper__, payloads)
 
         logger.info(
             "Snapshot de features guardado: %s filas para version %s",
@@ -143,7 +138,6 @@ class FeatureStore:
     def load_segment_history(
         self, model_version: str, filters: Dict[str, Any]
     ) -> pd.DataFrame:
-        """Recupera el historial mensual de un segmento específico."""
         if not self.enabled:
             return pd.DataFrame()
 
@@ -152,9 +146,7 @@ class FeatureStore:
                 session.execute(
                     select(TrainingFeature)
                     .where(TrainingFeature.model_version == model_version)
-                    .where(
-                        TrainingFeature.vehicle_type == filters.get("vehicle_type")
-                    )
+                    .where(TrainingFeature.vehicle_type == filters.get("vehicle_type"))
                     .where(TrainingFeature.brand == filters.get("brand"))
                     .where(TrainingFeature.model == filters.get("model"))
                     .where(TrainingFeature.line == filters.get("line"))
@@ -197,7 +189,7 @@ class FeatureStore:
 
 
 class PredictionStore:
-    """Persistencia de solicitudes y respuestas de predicción."""
+    """Persistencia de registros de predicciones de ML."""
 
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()

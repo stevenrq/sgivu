@@ -18,6 +18,7 @@
 .table-container.table-responsive {
   overflow-x: auto;
   overflow-y: visible;
+  position: relative;
 }
 
 .table-container table {
@@ -87,10 +88,6 @@
 .table-container tbody tr:focus-within > *,
 .table-container tbody tr:has(.dropdown-menu.show) > * {
   z-index: 6;
-}
-
-.table-container.table-responsive {
-  position: relative;
 }
 
 .table-container .table-hover tbody tr:hover,

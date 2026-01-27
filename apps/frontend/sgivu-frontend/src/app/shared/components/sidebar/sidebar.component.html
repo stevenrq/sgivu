@@ -20,14 +20,16 @@
   }
 
   @if (isMobileView) {
-    <div
+    <button
+      type="button"
       class="sidebar-backdrop"
       [class.show]="isSidebarOpen"
       (click)="closeSidebar()"
-      tabindex="0"
-      role="button"
+      [attr.tabindex]="isSidebarOpen ? 0 : -1"
+      [attr.aria-hidden]="!isSidebarOpen ? true : null"
+      aria-label="Cerrar menú lateral"
       (keydown.escape)="closeSidebar()"
-    ></div>
+    ></button>
   }
 
   <nav

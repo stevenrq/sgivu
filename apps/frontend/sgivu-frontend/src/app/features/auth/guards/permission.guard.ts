@@ -28,8 +28,8 @@ import { map, Observable } from 'rxjs';
  * ```
  *
  * @param route - Snapshot de la ruta actual que intenta activarse.
- * @returns `true` si no hay validación definida.
- *          Un `Observable<boolean | UrlTree>` según el resultado de `canActivateFn`.
+ * @returns `true` si no hay validación definida o si el permiso es concedido,
+ * un `Observable<boolean | UrlTree>` según el resultado de `canActivateFn`.
  */
 export const permissionGuard: CanActivateFn = (route) => {
   const permissionService = inject(PermissionService);

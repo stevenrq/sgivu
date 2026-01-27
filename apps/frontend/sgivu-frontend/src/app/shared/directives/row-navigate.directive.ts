@@ -11,10 +11,6 @@ import { NavigationExtras, Router } from '@angular/router';
   selector: '[appRowNavigate]',
   standalone: true,
 })
-/**
- * Permite hacer clic en filas (o cualquier contenedor) para navegar, ignorando
- * clicks en elementos interactivos internos como enlaces, botones o selects.
- */
 export class RowNavigateDirective {
   private readonly router = inject(Router);
 
@@ -36,10 +32,7 @@ export class RowNavigateDirective {
     if (this.appRowNavigateDisabled) return;
 
     const target = event.target as HTMLElement | null;
-    if (
-      target &&
-      target.closest('a, button, select, option, input, textarea, label')
-    ) {
+    if (target?.closest('a, button, select, option, input, textarea, label')) {
       return; // Respeta interacciones internas.
     }
 

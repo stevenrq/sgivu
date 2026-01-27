@@ -10,7 +10,6 @@ import { ThemePreference, ThemeService } from '../../services/theme.service';
   templateUrl: './settings.component.html',
   styleUrl: './settings.component.css',
 })
-/** Vista de ajustes personales que permite cambiar el tema y muestra datos del usuario actual. */
 export class SettingsComponent implements OnInit {
   private readonly authService = inject(AuthService);
   private readonly themeService = inject(ThemeService);

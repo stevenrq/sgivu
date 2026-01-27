@@ -13,9 +13,6 @@ const defaultNumberOptions: Intl.NumberFormatOptions = {
   maximumFractionDigits: 0,
 };
 
-/**
- * Resultado de normalizar un valor monetario ingresado por el usuario.
- */
 export interface NormalizeMoneyResult {
   numericValue: number | null;
   displayValue: string;
@@ -39,10 +36,6 @@ function buildNumberFormatter(
   });
 }
 
-/**
- * Formatea un valor numérico a la representación monetaria en COP.
- * Devuelve cadena vacía si el valor es nulo o inválido.
- */
 export function formatCopCurrency(
   value: number | null | undefined,
   options?: Partial<Intl.NumberFormatOptions>,
@@ -53,7 +46,6 @@ export function formatCopCurrency(
   return buildCurrencyFormatter(options).format(value);
 }
 
-/** Formatea un número siguiendo las convenciones locales de Colombia. */
 export function formatCopNumber(
   value: number | null | undefined,
   options?: Partial<Intl.NumberFormatOptions>,
@@ -64,10 +56,6 @@ export function formatCopNumber(
   return buildNumberFormatter(options).format(value);
 }
 
-/**
- * Intenta transformar texto o número en un valor decimal, limpiando símbolos
- * y separadores comunes de moneda colombiana.
- */
 export function parseCopCurrency(
   value: string | number | null | undefined,
 ): number | null {
@@ -81,19 +69,15 @@ export function parseCopCurrency(
   }
 
   const sanitized = text
-    .replace(/\s+/g, '')
-    .replace(/[^\d,.-]/g, '')
-    .replace(/\./g, '')
-    .replace(',', '.');
+    .replaceAll(/\s+/g, '')
+    .replaceAll(/[^\d,.-]/g, '')
+    .replaceAll('.', '')
+    .replaceAll(',', '.');
 
   const numeric = Number(sanitized);
   return Number.isFinite(numeric) ? numeric : null;
 }
 
-/**
- * Limpia y formatea una entrada de texto para campos monetarios,
- * retornando tanto el valor numérico como su representación formateada.
- */
 export function normalizeMoneyInput(
   rawValue: string,
   decimals = 0,

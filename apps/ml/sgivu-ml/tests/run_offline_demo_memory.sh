@@ -1,16 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Ejecuta la prueba offline del modelo con el CSV de ejemplo.
-# - PYTHON_BIN: intérprete a usar (por defecto python3).
-# - --csv: ruta al archivo de contratos CSV.
-# - --horizon: meses a pronosticar.
-# - --vehicle-type/--brand/--model/--line: segmento que se desea predecir (la línea es obligatoria).
-# Ajusta los argumentos si deseas probar otro segmento o archivo. Mantén --line con un valor no vacío.
+# Script para ejecutar una demo offline del modelo de demanda usando un CSV local.
+
+# PYTHON_BIN: intérprete a usar (por defecto python3).
+# --csv: ruta al archivo de contratos CSV.
+# --horizon: meses a pronosticar.
+# --vehicle-type: tipo de vehículo a filtrar.
+# --brand: marca del vehículo a filtrar.
+# --model: modelo del vehículo a filtrar.
+# --line: línea del vehículo a filtrar.
+# --plot: ruta para guardar la gráfica del pronóstico.
 
 PYTHON_BIN=${PYTHON_BIN:-python3}
 command -v "$PYTHON_BIN" >/dev/null 2>&1 || { echo "No se encontro $PYTHON_BIN en PATH"; exit 1; }
-
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 export PYTHONPATH="${PYTHONPATH:-$ROOT_DIR}"
 
