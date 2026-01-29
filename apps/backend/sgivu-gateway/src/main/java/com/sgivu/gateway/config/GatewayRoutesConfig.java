@@ -5,6 +5,28 @@ import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * Configuración de rutas del API Gateway (Spring Cloud Gateway).
+ *
+ * <p>Declara el bean {@link RouteLocator} que define las rutas para los microservicios del sistema
+ * (auth, user, client, purchase-sale, vehicle, ml, etc.). La configuración cubre:
+ *
+ * <ul>
+ *   <li>Reescrituras de path para exponer la UI de Swagger/OpenAPI bajo <code>/docs/*</code>.
+ *   <li>Passthroughs para APIs de negocio bajo <code>/v1/</code> y endpoints de sesión/logout.
+ *   <li>Filtrado y enriquecimiento con filtros como <code>tokenRelay</code> y <code>circuitBreaker
+ *       </code>, incluyendo URIs de fallback.
+ *   <li>Rutas para recursos estáticos y webjars del propio Gateway.
+ * </ul>
+ *
+ * <p>Notas:
+ *
+ * <ul>
+ *   <li>Se utilizan constantes (p.ej. {@code API_DOCS_SWAGGER_CONFIG}) para centralizar patrones.
+ *   <li>Los destinos se resuelven ya sea por balanceo de carga (<code>lb://</code>) o URIs
+ *       directas.
+ * </ul>
+ */
 @Configuration
 public class GatewayRoutesConfig {
 
@@ -152,7 +174,7 @@ public class GatewayRoutesConfig {
                                         c.setName("userServiceCircuitBreaker")
                                             .setFallbackUri("forward:/fallback/user")))
                     .uri(userService))
-        // Vehicle docs: Exponer OpenAPI UI/JSON bajo /docs/vehicle
+        // Vehicle
         .route(
             "sgivu-v3-swagger-config-vehicle-direct",
             r ->

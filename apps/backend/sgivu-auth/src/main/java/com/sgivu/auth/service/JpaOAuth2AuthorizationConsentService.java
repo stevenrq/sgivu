@@ -16,10 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 
-/**
- * Implementación JPA de {@link OAuth2AuthorizationConsentService} que persiste scopes otorgados a
- * cada cliente OIDC.
- */
 @Component
 public class JpaOAuth2AuthorizationConsentService implements OAuth2AuthorizationConsentService {
 

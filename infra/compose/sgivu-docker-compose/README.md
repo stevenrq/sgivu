@@ -1,4 +1,4 @@
-# SGIVU - sgivu-docker-compose
+# sgivu-docker-compose - SGIVU
 
 ## Descripción
 
@@ -9,19 +9,6 @@ Repositorio de infraestructura para levantar el ecosistema de microservicios de 
 - Orquesta los servicios de configuración, descubrimiento, gateway, autenticación, usuarios y clientes de SGIVU.
 - Expone imágenes pre construidas (`stevenrq/*`) y servicios de terceros como Zipkin y bases de datos.
 - Punto de entrada para levantar el backend de forma integrada, reduciendo fricción entre desarrollo y operación.
-
-### Estructura del repositorio
-
-```text
-├── .env                        # Variables de entorno para despliegues en AWS (no se versiona)
-├── .env.dev                    # Variables de entorno para desarrollo local (no se versiona)
-├── clave.pem                   # Clave privada para acceso SSH a instancias EC2 (no se versiona)
-├── docker-compose.yml          # Definición principal orientada a entornos productivos
-├── docker-compose.dev.yml      # Variante local con bases de datos autogestionadas
-├── build-and-push-images.bash  # Script para construir y publicar todas las imágenes
-├── rebuild-service.bash        # Script para reconstruir un servicio y recrearlo en Compose
-└── README.md
-```
 
 ## Tecnologías
 
@@ -98,7 +85,7 @@ Puertos típicos en local (según `docker-compose*.yml`):
 - Usa `docker compose ps` y `docker compose logs -f sgivu-gateway` para verificar arranques.
 - Zipkin disponible si se configura `ZIPKIN_BASE_URL`.
 
-## Troubleshooting
+## Solución de Problemas
 
 - Variables faltantes en `docker compose config`: revisa `.env.dev`/`.env` usando `.env.example` como base.
 - Puertos ocupados (8000/8080/8081/8082/8083/8084/9000/8888/8761/9411): libera procesos o ajusta mapeos.
@@ -108,17 +95,7 @@ Puertos típicos en local (según `docker-compose*.yml`):
 - Acceso desde host (desarrollo local): agrega alias en `/etc/hosts` para `sgivu-auth` y `sgivu-gateway`. En producción con Nginx no es necesario.
   Ver `apps/backend/sgivu-auth/sgivu-auth-access.md` y `apps/backend/sgivu-gateway/sgivu-gateway-access.md`.
 
-## Buenas Prácticas y Convenciones
+## Contribuciones
 
-- Contenedores y puertos alineados con cada microservicio.
-- Código fuente en inglés; documentación en español; commits en inglés con Conventional Commits.
-- Versiona imágenes con tags (`stevenrq/sgivu-auth:v1`, etc.) y documenta cambios.
-
-## Diagramas
-
-- Arquitectura general: `../../../docs/diagrams/01-system-architecture.puml`.
-- Pipeline de build/push: `../../../docs/diagrams/02-build-pipeline.puml`.
-
-## Autor
-
-- Steven Ricardo Quiñones (2025)
+1. Fork → branch → PR
+2. Añadir tests para cambios funcionales

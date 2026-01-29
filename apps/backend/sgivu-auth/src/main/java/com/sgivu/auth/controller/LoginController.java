@@ -10,10 +10,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
-/**
- * Gestiona la pantalla de login y redirige al portal Angular cuando la sesión ya existe,
- * traduciendo códigos de error a mensajes consumibles por la UI.
- */
+/** Controlador para manejar las solicitudes de login y redirigir usuarios autenticados. */
 @Hidden
 @Controller
 public class LoginController {

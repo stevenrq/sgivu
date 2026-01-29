@@ -5,10 +5,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * DTO base para exponer clientes a otros microservicios y frontales. Incluye datos de contacto
- * necesarios para contratos y logística.
- */
 @Data
 @NoArgsConstructor
 @Schema(description = "DTO base para clientes expuesto por el servicio de clientes")

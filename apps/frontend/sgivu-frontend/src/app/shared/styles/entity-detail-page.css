@@ -1,5 +1,5 @@
 :host {
-  font-family: 'Inter', sans-serif;
+  font-family: "Inter", sans-serif;
   display: block;
   width: 100%;
   --detail-primary-color: var(--accent);

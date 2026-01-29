@@ -11,14 +11,6 @@ import java.time.LocalDateTime;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Entidad base para clientes (personas y empresas) del microservicio. Centraliza datos de contacto
- * utilizados por inventario y contratos para validar compradores/vendedores en transacciones de
- * vehículos usados.
- *
- * <p>La estrategia JOINED evita duplicar datos comunes y facilita auditorías de cambios de contacto
- * a lo largo del ciclo de vida del cliente.
- */
 @Data
 @NoArgsConstructor
 @Table(name = "clients")

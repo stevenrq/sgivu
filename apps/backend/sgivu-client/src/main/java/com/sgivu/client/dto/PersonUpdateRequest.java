@@ -11,10 +11,6 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 
-/**
- * Payload para actualizar datos de una persona cuando cambia su información de contacto en procesos
- * de postventa o renovación de contratos.
- */
 @Getter
 @Setter
 @ToString

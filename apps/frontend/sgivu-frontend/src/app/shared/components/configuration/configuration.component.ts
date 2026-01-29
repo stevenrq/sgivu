@@ -6,5 +6,4 @@ import { Component } from '@angular/core';
   templateUrl: './configuration.component.html',
   styleUrl: './configuration.component.css',
 })
-/** Sección de configuración pendiente de implementar. */
 export class ConfigurationComponent {}

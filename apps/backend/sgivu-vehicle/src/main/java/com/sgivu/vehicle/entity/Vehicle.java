@@ -15,23 +15,11 @@ import java.util.List;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Entidad base para vehículos usados administrados por SGIVU.
- *
- * <p>Centraliza los atributos comunes necesarios para los flujos de compra/venta y contratos
- * (placas únicas, números de motor/chasis para auditoría y trazabilidad). Se usa con herencia
- * JOINED para mantener coherencia en inventario y proyecciones JPA sobre autos y motos.
- *
- * @apiNote La estrategia JOINED permite consultas polimórficas sin duplicar columnas en tablas
- *     concretas, útil para reportes consolidados de inventario.
- */
 @Data
 @NoArgsConstructor
 @Table(name = "vehicles")
 @Entity
 @Inheritance(strategy = InheritanceType.JOINED)
-@io.swagger.v3.oas.annotations.media.Schema(
-    description = "Entidad base de vehículo usada como request en algunos endpoints")
 public abstract class Vehicle implements Serializable {
 
   @Serial private static final long serialVersionUID = 1L;
@@ -116,7 +104,6 @@ public abstract class Vehicle implements Serializable {
 
   private LocalDateTime updatedAt;
 
-  /** Inicializa fechas de auditoría y asegura estado disponible por defecto. */
   @PrePersist
   public void prePersist() {
     this.createdAt = LocalDateTime.now();
@@ -124,7 +111,6 @@ public abstract class Vehicle implements Serializable {
     if (this.status == null) this.status = VehicleStatus.AVAILABLE; // evita registrar sin estado
   }
 
-  /** Actualiza fecha de modificación antes de persistir cambios. */
   @PreUpdate
   public void preUpdate() {
     this.updatedAt = LocalDateTime.now();

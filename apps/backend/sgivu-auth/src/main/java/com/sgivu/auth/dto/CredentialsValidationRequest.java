@@ -3,7 +3,6 @@ package com.sgivu.auth.dto;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
 
-/** Request para validar credenciales de usuario. */
 @Schema(description = "Solicitud de validación de credenciales de usuario")
 public record CredentialsValidationRequest(
     @Schema(

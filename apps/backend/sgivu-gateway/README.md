@@ -1,121 +1,116 @@
-# SGIVU - sgivu-gateway
+# sgivu-gateway - SGIVU
 
 ## Descripción
 
-Gateway reactivo que centraliza y enruta el tráfico HTTP del ecosistema SGIVU aplicando seguridad, resiliencia y trazabilidad.
+`sgivu-gateway` es el API Gateway y BFF del ecosistema **SGIVU**. Implementado con Spring Cloud Gateway (WebFlux), actúa como:
 
-## Arquitectura y Rol
+- **BFF (Backend For Frontend)** para la SPA (provee `/auth/session`, `/auth` flows).
+- **Proxy y enroutador** para todas las APIs de negocio (`/v1/*`), aplicando seguridad (token relay / JWT validation), circuit breakers, reescrituras de rutas y fallbacks.
 
-- Microservicio Spring Boot / Spring Cloud Gateway (WebFlux).
-- Interactúa con `sgivu-config`, `sgivu-discovery`, `sgivu-auth`, `sgivu-user`, `sgivu-client` (y otros servicios proxied).
-- Registra instancias en Eureka y balancea solicitudes con `lb://`; configuración remota vía Config Server.
-- Actúa como BFF: inicia sesión OIDC en `sgivu-auth`, mantiene sesión HTTP y propaga tokens hacia los microservicios.
+## Tecnologías y Dependencias
 
-## Tecnologías
+- Java 21
+- Spring Boot 3.5.8
+- Spring Cloud Gateway (WebFlux)
+- Spring Security (OAuth2 client + resource server)
+- Spring Session (Redis)
+- Resilience4j (circuit breaker)
+- Micrometer Tracing + Zipkin (tracing)
+- SpringDoc OpenAPI (Swagger UI)
+- Lombok
 
-- Lenguaje: Java 21
-- Framework: Spring Boot 3.5.8, Spring Cloud 2025.0.0
-- Gateway: Spring Cloud Gateway + Resilience4j
-- Persistencia de Sesión: Spring Session Data Redis
-- Seguridad: OAuth 2.1 Resource Server + OAuth2 Client (BFF), JWT (Nimbus Reactive Decoder)
-- Observabilidad: Micrometer Tracing, Brave, Zipkin, Actuator
+## Requisitos Previos
 
-## Configuración
+- JDK 21
+- Maven 3.9+
+- Docker & docker-compose
+- Redis (para sesiones) — definido en `infra/compose/sgivu-docker-compose` como `sgivu-redis`
+- `sgivu-config`, `sgivu-discovery` y `sgivu-auth` deben estar disponibles (o levantar la stack completa con docker-compose)
 
-- Variables clave: `SPRING_CLOUD_CONFIG_URI` o `SPRING_CONFIG_IMPORT`, `EUREKA_CLIENT_SERVICEURL_DEFAULTZONE`, `services.sgivu-auth.url`, CORS (`angular-client.url`) y OAuth2 client (`spring.security.oauth2.client.registration.sgivu-gateway.*`, `spring.security.oauth2.client.provider.sgivu-auth.*`).
-- Perfiles gestionados en Config Server; ajusta rutas y filtros allí.
-- `SGIVU_GATEWAY_URL` (configurado en `sgivu-auth`) solo define el `redirect_uri` usado por el navegador en el flujo OAuth2. No afecta la comunicacion interna entre microservicios.
+## Arranque y Ejecución
 
-## Ejecución Local
+### Desarrollo (docker-compose)
+
+Desde `infra/compose/sgivu-docker-compose`:
 
 ```bash
-export SPRING_PROFILES_ACTIVE=dev
-export SPRING_CLOUD_CONFIG_URI=http://localhost:8888
-export EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://localhost:8761/eureka
+docker compose -f docker-compose.dev.yml up -d
+```
+
+### Ejecución Local
+
+```bash
+./mvnw clean package
 ./mvnw spring-boot:run
 ```
 
-Accede a `http://localhost:8080` para consumir rutas proxied.
+### Docker
+
+```bash
+./build-image.bash
+docker build -t stevenrq/sgivu-gateway:v1 .
+docker run -p 8080:8080 --env-file infra/compose/sgivu-docker-compose/.env stevenrq/sgivu-gateway:v1
+```
+
+Puerto por defecto: `8080` (configurable via `PORT` o configserver).
 
 ## Endpoints Principales
 
-```text
-GET/POST /v1/auth/**          -> Proxy sgivu-auth
-GET       /auth/session       -> Estado de sesión BFF para la SPA
-GET       /v1/users/**        -> Proxy sgivu-user
-GET       /v1/roles/**        -> Proxy sgivu-user
-GET       /v1/permissions/**  -> Proxy sgivu-user
-GET       /v1/persons/**      -> Proxy sgivu-client
-GET       /v1/companies/**    -> Proxy sgivu-client
-GET       /v1/vehicles/**     -> Proxy sgivu-vehicle
-GET       /v1/cars/**         -> Proxy sgivu-vehicle
-GET       /v1/motorcycles/**  -> Proxy sgivu-vehicle
-GET       /v1/purchase-sales/** -> Proxy sgivu-purchase-sale
-GET       /v1/ml/**           -> Proxy sgivu-ml
-GET       /fallback/*         -> Fallback 503 controlado
-```
+| Endpoint | Descripción |
+| --- | --- |
+| `GET /auth/session` | Información de sesión BFF (subject, username, roles, isAdmin) |
+| `/docs/<service>/...` | Documentación Swagger proxificada a microservicios |
+| `/v1/*` | APIs de negocio (protegidas, requieren token) |
+| `GET /fallback/*` | Endpoints de fallback cuando un servicio falla |
+| `GET /actuator/health` | Estado de salud del servicio |
+
+### Rutas y Filtros
+
+- **Documentación:** `/docs/<service>/...` → reescritura y proxy a microservicios
+- **APIs:** `/v1/*` → tokenRelay + circuitBreaker + fallback `forward:/fallback/<service>`
+- **ML routing:** a `http://sgivu-ml:8000`
+
+### Filtros Globales
+
+- `ZipkinTracingGlobalFilter`: crea spans, añade `X-Trace-Id` y etiqueta spans con status/duration.
+- `AddUserIdHeaderGlobalFilter`: añade header `X-User-ID` con subject/claim del token.
 
 ## Seguridad
 
-- **Rol como BFF (Backend For Frontend):** `sgivu-gateway` es el encargado de almacenar y servir el `access_token` y el `refresh_token` necesarios para la aplicación Angular. Aunque los tokens son creados y emitidos por `sgivu-auth`, el gateway actúa como el mediador que gestiona estos tokens para el frontend.
-- Soporta login OIDC como BFF y valida JWT emitidos por `sgivu-auth` (`services.sgivu-auth.url`).
-- Propaga access tokens a microservicios con token relay y renueva tokens en backend vía refresh tokens.
-- Rutas públicas limitadas (`/v1/auth/**`, `/authorized`, `/auth`, `/user`, `/logout`, `/oauth2/**`, `/login/**`).
-- Rutas internas requieren autenticación; convierte `rolesAndPermissions` a autoridades y propaga `X-User-ID`.
-- CORS dinámico basado en `angular-client.url` desde Config Server.
+- `sgivu-gateway` actúa como **OAuth2 client** (para login/PKCE) y como **Resource Server** (valida JWT) para rutas API.
+- Configuración del cliente (registrations/providers) se encuentra en `sgivu-config-repo/sgivu-gateway.yml`.
+- El gateway aplica `tokenRelay()` en rutas de backend para pasar el token del usuario a los microservicios.
+- **Rutas públicas:** `/docs/**`, `/v3/api-docs/**`, `/swagger-ui/**`, `/oauth2/**`, `/login/**`, `/auth/session`, `/fallback/**`.
+- **Rutas protegidas:** `/v1/users/**`, `/v1/persons/**`, `/v1/companies/**`, `/v1/vehicles/**`, `/v1/purchase-sales/**`, `/v1/ml/**`, etc.
 
-## Dependencias
+> Recomendación: revisar reglas de CORS en `SecurityConfig`.
 
-- `sgivu-config`, `sgivu-discovery`, `sgivu-auth`, `sgivu-user`, `sgivu-client`, `sgivu-vehicle`, `sgivu-purchase-sale`, `sgivu-ml`; Zipkin/Prometheus opcionales.
+## Observabilidad
 
-## Dockerización
+- **Tracing:** Brave/Zipkin integrado (header `X-Trace-Id` para trazabilidad). Zipkin endpoint configurado via configserver.
 
-- Imagen: `sgivu-gateway`
-- Puerto expuesto: 8080
-
-Ejemplo:
+## Pruebas
 
 ```bash
-./mvnw clean package -DskipTests
-docker build -t sgivu-gateway .
-
-  -e SPRING_PROFILES_ACTIVE=prod \
-  -e SPRING_CLOUD_CONFIG_URI=http://sgivu-config:8888 \
-  -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://sgivu-discovery:8761/eureka \
-  sgivu-gateway
+./mvnw test
 ```
 
-## Build y Push Docker
+- Test base: `src/test/java/com/sgivu/gateway/GatewayApplicationTests.java`
+- Recomendación: añadir tests de integración que validen:
+  - Rutas y reescrituras de `/docs/*`
+  - Propagación del token (`tokenRelay`)
+  - Circuit breaker + fallback behaviors
+  - Global filters (X-Trace-Id y X-User-ID)
 
-- `./build-image.bash` limpia contenedores previos, empaqueta con Maven y publica `stevenrq/sgivu-gateway:v1`.
+## Solución de Problemas
 
-## Despliegue
+| Problema | Solución |
+| --- | --- |
+| 401/403 en APIs | Verificar token Bearer válido (aud/issuer) y que `sgivu-auth` esté operativo |
+| Fallos en enroutamiento | Comprobar resolución de servicios en Eureka y `eureka.client.service-url.defaultZone` |
+| Problemas de sesión | Comprobar Redis (`REDIS_HOST`, `REDIS_PASSWORD`) |
 
-- Publica imagen en ECR y despliega en EC2/ECS con ALB; acceso a VPC privada con Config, Discovery, Zipkin y bases.
-- Variables: `SPRING_PROFILES_ACTIVE=prod`, `SPRING_CLOUD_CONFIG_URI`, `EUREKA_CLIENT_SERVICEURL_DEFAULTZONE`, `ZIPKIN_BASE_URL` si aplica.
+## Contribuciones
 
-## Monitoreo
-
-- `ZipkinTracingGlobalFilter` genera spans y `X-Trace-Id`; Micrometer Tracing exportable a Prometheus/CloudWatch.
-- Actuator: `/actuator/health`, `/actuator/info`, `/actuator/prometheus` (si se expone en config).
-
-## Troubleshooting
-
-- CORS bloqueado: ajusta `angular-client.url` en Config Server.
-- 401/invalid_token: valida issuer y JWKS de `sgivu-auth`.
-- 503/fallback: revisar estado de servicios proxied y circuit breakers.
-- No aparece en Eureka: confirma `EUREKA_CLIENT_SERVICEURL_DEFAULTZONE` y conectividad.
-- Acceso desde host: si el navegador no resuelve `sgivu-gateway`, configura `/etc/hosts`.
-  Ver `sgivu-gateway-access.md`.
-
-## Buenas Prácticas y Convenciones
-
-- Código en inglés; documentación en español; commits en inglés con Conventional Commits.
-
-## Diagramas
-
-- Arquitectura general: ../../../docs/diagrams/01-system-architecture.puml
-
-## Autor
-
-- Steven Ricardo Quiñones (2025)
+1. Fork → branch → PR
+2. Añadir tests para cambios funcionales

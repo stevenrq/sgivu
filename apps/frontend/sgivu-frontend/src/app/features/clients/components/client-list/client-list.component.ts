@@ -39,6 +39,8 @@ type ClientTab = 'person' | 'company';
 
 type ClientEntity = Person | Company;
 
+type FilterEnabled = boolean | '' | 'true' | 'false';
+
 interface ClientListState<T extends ClientEntity> {
   items: T[];
   pager?: PaginatedResponse<T>;
@@ -96,11 +98,6 @@ interface ClientCountsResult<T extends ClientEntity = ClientEntity> {
   templateUrl: './client-list.component.html',
   styleUrl: './client-list.component.css',
 })
-/**
- * Administra el catálogo de clientes personas y empresas. Mantiene sincronía
- * entre los filtros almacenados en la URL, los contadores de cada tab y las
- * estrategias de fallback para cuando la API no entrega datos consistentes.
- */
 export class ClientListComponent implements OnInit, OnDestroy {
   private readonly personService = inject(PersonService);
   private readonly companyService = inject(CompanyService);
@@ -109,10 +106,10 @@ export class ClientListComponent implements OnInit, OnDestroy {
   private readonly clientUiHelper = inject(ClientUiHelperService);
 
   personFilters: PersonSearchFilters & {
-    enabled?: boolean | '' | 'true' | 'false';
+    enabled?: FilterEnabled;
   } = this.createPersonFilterState();
   companyFilters: CompanySearchFilters & {
-    enabled?: boolean | '' | 'true' | 'false';
+    enabled?: FilterEnabled;
   } = this.createCompanyFilterState();
 
   activeTab: ClientTab = 'person';
@@ -383,13 +380,6 @@ export class ClientListComponent implements OnInit, OnDestroy {
     this.companyQueryParams = null;
   }
 
-  /**
-   * Descarga la página de personas y delega el cálculo de contadores a
-   * `loadClients` para evitar duplicar lógica entre tabs.
-   *
-   * @param page - Índice solicitado desde la ruta.
-   * @param filters - Filtros aplicables cuando existen valores válidos.
-   */
   private loadPersons(page: number, filters?: PersonSearchFilters): void {
     const activeFilters =
       filters && !this.areFiltersEmpty(filters as Record<string, unknown>)
@@ -420,12 +410,6 @@ export class ClientListComponent implements OnInit, OnDestroy {
     });
   }
 
-  /**
-   * Variante de `loadPersons` que apunta al catálogo de empresas.
-   *
-   * @param page - Índice solicitado para el tab de empresas.
-   * @param filters - Filtros normalizados para empresas.
-   */
   private loadCompanies(page: number, filters?: CompanySearchFilters): void {
     const activeFilters =
       filters && !this.areFiltersEmpty(filters as Record<string, unknown>)
@@ -456,14 +440,6 @@ export class ClientListComponent implements OnInit, OnDestroy {
     });
   }
 
-  /**
-   * Núcleo del paginador: descarga simultáneamente la data y los contadores,
-   * corrige los totales y activa un fallback con todo el dataset cuando la API
-   * no proporciona cifras coherentes.
-   *
-   * @typeParam T - Entidad objetivo (persona o empresa).
-   * @param config - Callbacks y metadatos necesarios para la carga.
-   */
   private loadClients<T extends ClientEntity>(
     config: ClientLoadConfig<T>,
   ): void {
@@ -574,16 +550,6 @@ export class ClientListComponent implements OnInit, OnDestroy {
     this.subscriptions.push(loader$);
   }
 
-  /**
-   * Determina el total de registros priorizando el valor reportado y usando los
-   * conteos locales como respaldo cuando la API no envía un número válido.
-   *
-   * @param totalElements - Total devuelto por la API (puede ser `undefined`).
-   * @param active - Registros activos calculados.
-   * @param inactive - Registros inactivos calculados.
-   * @param fallbackLength - Conteo basado en los elementos locales.
-   * @returns Total consistente para mostrar en los KPIs.
-   */
   private resolveTotal(
     totalElements: number | undefined,
     active: number,
@@ -604,13 +570,6 @@ export class ClientListComponent implements OnInit, OnDestroy {
     return Number.isFinite(parsed);
   }
 
-  /**
-   * Decide si es necesario recalcular los totales a partir de todo el dataset
-   * cuando los datos provenientes de la API están incompletos.
-   *
-   * @param context - Comparativo entre conteos esperados y reportados.
-   * @returns Verdadero cuando conviene descargar todo para recalcular.
-   */
   private shouldFallbackToFullDataset(context: {
     hasCounts: boolean;
     expectedActive: number;
@@ -672,18 +631,6 @@ export class ClientListComponent implements OnInit, OnDestroy {
     return items.slice(start, start + pageSize);
   }
 
-  /**
-   * Reconstruye la respuesta paginada una vez que se generaron datos de
-   * fallback, manteniendo la semántica de paginación que espera la vista.
-   *
-   * @typeParam T - Entidad listada en la tabla.
-   * @param pager - Respuesta original de la API (posiblemente incompleta).
-   * @param pageItems - Elementos corregidos para la página actual.
-   * @param totalElements - Total recalculado mediante fallback.
-   * @param pageSize - Tamaño efectivo de página.
-   * @param pageIndex - Página actual que se está mostrando.
-   * @returns Nueva respuesta paginada consistente con los datos corregidos.
-   */
   private mergePagerWithFallback<T extends ClientEntity>(
     pager: PaginatedResponse<T>,
     pageItems: T[],
@@ -844,17 +791,10 @@ export class ClientListComponent implements OnInit, OnDestroy {
     }
   }
 
-  /**
-   * Reconstruye los filtros de personas a partir de los query params para
-   * rehidratar formulario, filtros efectivos y querystring.
-   *
-   * @param map - Query params actuales aplicados al tab de personas.
-   * @returns Estructura compuesta con filtros efectivos y estado de UI.
-   */
   private extractPersonFiltersFromQuery(map: ParamMap): {
     filters: PersonSearchFilters | null;
     uiState: PersonSearchFilters & {
-      enabled?: boolean | '' | 'true' | 'false';
+      enabled?: FilterEnabled;
     };
     queryParams: Params | null;
   } {
@@ -894,16 +834,10 @@ export class ClientListComponent implements OnInit, OnDestroy {
     };
   }
 
-  /**
-   * Versión para empresas que sincroniza formulario, filtros efectivos y URL.
-   *
-   * @param map - Query params activos en la ruta de empresas.
-   * @returns Filtros construidos y estado para la vista.
-   */
   private extractCompanyFiltersFromQuery(map: ParamMap): {
     filters: CompanySearchFilters | null;
     uiState: CompanySearchFilters & {
-      enabled?: boolean | '' | 'true' | 'false';
+      enabled?: FilterEnabled;
     };
     queryParams: Params | null;
   } {
@@ -944,7 +878,7 @@ export class ClientListComponent implements OnInit, OnDestroy {
   }
 
   private createPersonFilterState(): PersonSearchFilters & {
-    enabled?: boolean | '' | 'true' | 'false';
+    enabled?: FilterEnabled;
   } {
     return {
       name: '',
@@ -957,7 +891,7 @@ export class ClientListComponent implements OnInit, OnDestroy {
   }
 
   private createCompanyFilterState(): CompanySearchFilters & {
-    enabled?: boolean | '' | 'true' | 'false';
+    enabled?: FilterEnabled;
   } {
     return {
       companyName: '',
@@ -1042,11 +976,11 @@ export class ClientListComponent implements OnInit, OnDestroy {
       return undefined;
     }
     const trimmed = value.trim();
-    return trimmed ? trimmed : undefined;
+    return trimmed || undefined;
   }
 
   private normalizeStatus(
-    value: boolean | '' | 'true' | 'false' | undefined,
+    value: FilterEnabled | undefined,
   ): boolean | undefined {
     if (value === '' || value === undefined) {
       return undefined;

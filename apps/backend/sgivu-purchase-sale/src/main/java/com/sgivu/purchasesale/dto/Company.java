@@ -5,10 +5,6 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
-/**
- * Cliente corporativo proveniente del microservicio de clientes. Complementa la jerarquía con NIT y
- * razón social para contratos con empresas.
- */
 @Schema(description = "Cliente corporativo con NIT y razón social para contratos con empresas")
 @Data
 @NoArgsConstructor

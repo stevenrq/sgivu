@@ -5,12 +5,6 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 
-/**
- * Abstracción sobre Amazon S3 usada por el microservicio de vehículos.
- *
- * <p>Centraliza operaciones de bucket/objetos para que la gestión de imágenes sea intercambiable y
- * testeable sin acoplar lógica de inventario a AWS.
- */
 public interface S3Service {
   String createBucket(String bucket);
 

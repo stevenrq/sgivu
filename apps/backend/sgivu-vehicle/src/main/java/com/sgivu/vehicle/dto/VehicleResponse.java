@@ -5,12 +5,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * DTO base expuesto por la API para representar vehículos.
- *
- * <p>Se utiliza como contrato con front y otros microservicios (cotizaciones, contratos) evitando
- * exponer entidades JPA y controlando exactamente los datos visibles del inventario.
- */
 @Data
 @NoArgsConstructor
 @Schema(description = "DTO base expuesto por la API para representar vehículos")

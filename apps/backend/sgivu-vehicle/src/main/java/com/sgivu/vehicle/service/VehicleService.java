@@ -7,12 +7,6 @@ import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
-/**
- * Contrato genérico para gestionar el ciclo de vida de vehículos en SGIVU.
- *
- * <p>Se usa transversalmente por compras/ventas, contratos y sincronizaciones, manteniendo las
- * reglas de unicidad (placa, motor, chasis) y estados de negocio.
- */
 public interface VehicleService<T extends Vehicle> {
   T save(T vehicle);
 

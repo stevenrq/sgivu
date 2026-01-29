@@ -13,7 +13,7 @@ import {
   Validators,
 } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { DecimalPipe, NgClass, NgForOf, NgIf } from '@angular/common';
+import { DecimalPipe, NgClass } from '@angular/common';
 import { FormShellComponent } from '../../../../shared/components/form-shell/form-shell.component';
 import { finalize, firstValueFrom, Observable, Subscription } from 'rxjs';
 import Swal from 'sweetalert2';
@@ -43,26 +43,10 @@ type MotorcyclePayload = Omit<Motorcycle, 'id'> &
 @Component({
   selector: 'app-vehicle-form',
   standalone: true,
-  imports: [
-    ReactiveFormsModule,
-    NgClass,
-    NgIf,
-    NgForOf,
-    DecimalPipe,
-    FormShellComponent,
-  ],
+  imports: [ReactiveFormsModule, NgClass, DecimalPipe, FormShellComponent],
   templateUrl: './vehicle-form.component.html',
   styleUrl: './vehicle-form.component.css',
 })
-/**
- * Orquesta el registro y edición de automóviles y motocicletas. Ajusta
- * dinámicamente validaciones, payloads y navegación según el tipo de vehículo,
- * además de coordinar la carga de imágenes y las operaciones de guardado.
- *
- * @remarks
- * Es el formulario principal del módulo de vehículos y, por tanto, concentra
- * las reglas compartidas entre autos y motos.
- */
 export class VehicleFormComponent implements OnInit, OnDestroy {
   private readonly formBuilder = inject(FormBuilder);
   private readonly carService = inject(CarService);
@@ -174,11 +158,6 @@ export class VehicleFormComponent implements OnInit, OnDestroy {
     return this.statusLabels[status] ?? status;
   }
 
-  /**
-   * Valida el formulario y dirige la petición al servicio correspondiente,
-   * mostrando mensajes de estado y redirigiendo según si se trata de una
-   * creación o edición. La lógica centralizada evita duplicar flujos por tipo.
-   */
   onSubmit(): void {
     if (this.formGroup.invalid) {
       this.formGroup.markAllAsTouched();
@@ -201,11 +180,16 @@ export class VehicleFormComponent implements OnInit, OnDestroy {
               ? 'El vehículo fue actualizado correctamente.'
               : 'El vehículo fue registrado correctamente.',
           });
-          const redirect = this.isEditMode
-            ? this.isCar
-              ? ['/vehicles/cars/page', 0]
-              : ['/vehicles/motorcycles/page', 0]
-            : ['/purchase-sales/registrar'];
+          let redirect: any[];
+          if (this.isEditMode) {
+            if (this.isCar) {
+              redirect = ['/vehicles/cars/page', 0];
+            } else {
+              redirect = ['/vehicles/motorcycles/page', 0];
+            }
+          } else {
+            redirect = ['/purchase-sales/registrar'];
+          }
           const navigationExtras = this.isEditMode
             ? undefined
             : {
@@ -418,13 +402,6 @@ export class VehicleFormComponent implements OnInit, OnDestroy {
     });
   }
 
-  /**
-   * Construye el payload de automóvil reutilizando los campos comunes y
-   * decide si debe invocar `create` o `update` en función del modo actual.
-   * Regresa un observable para que el flujo principal maneje loading y errores.
-   *
-   * @returns Observable con la respuesta del servicio de automóviles.
-   */
   private submitCar() {
     const payload: CarPayload = {
       id: this.vehicleId ?? undefined,
@@ -438,13 +415,6 @@ export class VehicleFormComponent implements OnInit, OnDestroy {
       : this.carService.create(payload as Car);
   }
 
-  /**
-   * Equivalente a `submitCar` pero para motocicletas. Se asegura de enviar sólo
-   * los campos relevantes para este tipo y reutiliza la misma salida observable
-   * para simplificar la lógica de `onSubmit`.
-   *
-   * @returns Observable con la respuesta del servicio de motocicletas.
-   */
   private submitMotorcycle() {
     const payload: MotorcyclePayload = {
       id: this.vehicleId ?? undefined,
@@ -456,13 +426,6 @@ export class VehicleFormComponent implements OnInit, OnDestroy {
       : this.motorcycleService.create(payload as Motorcycle);
   }
 
-  /**
-   * Extrae y normaliza los campos que comparten autos y motos (trims,
-   * uppercases y conversiones numéricas) para que los payloads específicos no
-   * repitan esta lógica ni dependan del estado crudo del formulario reactivo.
-   *
-   * @returns Objeto con los campos comunes listo para componer los payloads.
-   */
   private pickCommonFields() {
     return {
       brand: (this.formGroup.get('brand')!.value ?? '').trim(),
@@ -490,11 +453,10 @@ export class VehicleFormComponent implements OnInit, OnDestroy {
 
   onPriceInput(
     field: 'purchasePrice' | 'salePrice',
-    rawValue: string | null | undefined,
+    rawValue: string | null | undefined = '',
   ): void {
-    const safeValue = rawValue ?? '';
     const { numericValue, displayValue } = normalizeMoneyInput(
-      safeValue,
+      rawValue ?? '',
       this.priceDecimals,
     );
 
@@ -508,20 +470,15 @@ export class VehicleFormComponent implements OnInit, OnDestroy {
     this.formGroup.get('salePrice')?.setValue(numericValue);
   }
 
-  onMileageInput(rawValue: string | null | undefined): void {
-    const safeValue = rawValue ?? '';
-    const { numericValue, displayValue } = normalizeMoneyInput(safeValue, 0);
+  onMileageInput(rawValue: string | null | undefined = ''): void {
+    const { numericValue, displayValue } = normalizeMoneyInput(
+      rawValue ?? '',
+      0,
+    );
     this.mileageInput = displayValue;
     this.formGroup.get('mileage')?.setValue(numericValue);
   }
 
-  /**
-   * Obtiene el vehículo correcto según el tipo actual y llena el formulario,
-   * manejando estados de carga y errores coherentes entre autos y motos.
-   * También dispara la carga de imágenes cuando el registro existe.
-   *
-   * @param id - Identificador del vehículo que se va a editar.
-   */
   private loadVehicle(id: number): void {
     this.loadingSignal.set(true);
     if (this.vehicleType === 'CAR') {
@@ -647,11 +604,6 @@ export class VehicleFormComponent implements OnInit, OnDestroy {
     });
   }
 
-  /**
-   * Reconfigura las validaciones cuando cambia el tipo de vehículo para evitar
-   * reglas inválidas. Se encarga de limpiar valores que no aplican y actualizar
-   * el estado de los controles implicados.
-   */
   private applyTypeSpecificValidators(): void {
     const bodyType = this.formGroup.get('bodyType')!;
     const fuelType = this.formGroup.get('fuelType')!;
@@ -715,7 +667,7 @@ export class VehicleFormComponent implements OnInit, OnDestroy {
       status?: number;
       error?: string;
     };
-    if (errWithCustomProps?.status === 0) return true; // preflight abortada o red bloqueada: se trata como fallo transitorio
+    if (errWithCustomProps?.status === 0) return true;
     const msg =
       typeof errWithCustomProps?.error === 'string'
         ? errWithCustomProps.error
@@ -728,13 +680,6 @@ export class VehicleFormComponent implements OnInit, OnDestroy {
     );
   }
 
-  /**
-   * Recupera las imágenes asociadas a un vehículo y las expone vía signal. Se
-   * trata como un helper porque la llamada se hace después de cargar los datos
-   * base y también tras operaciones como eliminar una imagen.
-   *
-   * @param vehicleId - Identificador del vehículo cuyas imágenes se consultan.
-   */
   private loadVehicleImages(vehicleId: number): void {
     this.vehicleImageService.getImages(vehicleId).subscribe({
       next: (images) => this.vehicleImages.set(images),

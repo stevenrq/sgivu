@@ -1,115 +1,87 @@
-# SGIVU - sgivu-client
+# sgivu-client - SGIVU
 
 ## Descripción
 
-Servicio para administrar la información de clientes (personas y compañías), centralizando datos de contacto y trazabilidad para el resto de microservicios.
+`sgivu-client` es el microservicio que gestiona información de clientes (personas y empresas) dentro del ecosistema SGIVU. Proporciona operaciones CRUD, búsqueda avanzada y contadores, exponiendo una API REST protegida por roles/permissions emitidas por el Authorization Server (`sgivu-auth`).
 
-## Arquitectura y Rol
+## Tecnologías y Dependencias
 
-- Microservicio Spring Boot / Spring Cloud.
-- Interactúa con `sgivu-config`, `sgivu-discovery`, `sgivu-gateway`, `sgivu-auth`.
-- APIs REST para personas y empresas; registro en Eureka; configuración desde Config Server.
-- Persistencia en PostgreSQL con herencia (clients, persons, companies, addresses).
+- Java 21
+- Spring Boot 4.0.1
+- Spring Security (Resource Server)
+- Spring Data JPA + PostgreSQL
+- Flyway (migrations en `src/main/resources/db/migration`)
+- Spring Boot Actuator, Micrometer Tracing, Zipkin
+- SpringDoc OpenAPI
+- MapStruct, Lombok
 
-## Tecnologías
+## Requisitos Previos
 
-- Lenguaje: Java 21
-- Framework: Spring Boot 3.5.8, Spring Cloud 2025.0.0
-- Seguridad: OAuth 2.1 Resource Server + JWT (claim `rolesAndPermissions`)
-- Persistencia: Spring Data JPA, PostgreSQL
-- Infraestructura: Docker, AWS (EC2, RDS, S3)
+- JDK 21
+- Maven 3.9+
+- PostgreSQL
+- `sgivu-config` y `sgivu-discovery` disponibles (o arrancados via docker-compose)
 
-## Configuración
+## Arranque y Ejecución
 
-- Variables clave: `SPRING_CONFIG_IMPORT`, `SPRING_PROFILES_ACTIVE`, `services.map.sgivu-auth.url`, propiedades de datasource, `EUREKA_CLIENT_SERVICEURL_DEFAULTZONE`.
-- `application-local.yml` sugerido para desarrollo con placeholders.
+### Desarrollo (docker-compose)
 
-## Ejecución Local
+Desde `infra/compose/sgivu-docker-compose`:
 
 ```bash
-SPRING_PROFILES_ACTIVE=dev ./mvnw spring-boot:run
+docker compose -f docker-compose.dev.yml up -d
 ```
 
-Requiere Config Server, Discovery, Gateway, Auth y PostgreSQL con `schema.sql` aplicado.
+### Ejecución Local
 
-## Endpoints Principales
-
-```text
-GET    /v1/persons
-GET    /v1/persons/{id}
-GET    /v1/persons/page/{page}
-GET    /v1/persons/count
-GET    /v1/persons/search?name=&email=&nationalId=&phoneNumber=&enabled=&city=
-GET    /v1/persons/search/page/{page}?name=&email=&nationalId=&phoneNumber=&enabled=&city=
-POST   /v1/persons
-PUT    /v1/persons/{id}
-PATCH  /v1/persons/{id}/status
-DELETE /v1/persons/{id}
-
-GET    /v1/companies
-GET    /v1/companies/{id}
-GET    /v1/companies/page/{page}
-GET    /v1/companies/count
-GET    /v1/companies/search?taxId=&companyName=&email=&phoneNumber=&enabled=&city=
-GET    /v1/companies/search/page/{page}?taxId=&companyName=&email=&phoneNumber=&enabled=&city=
-POST   /v1/companies
-PUT    /v1/companies/{id}
-PATCH  /v1/companies/{id}/status
-DELETE /v1/companies/{id}
+```bash
+./mvnw clean package
+./mvnw spring-boot:run
 ```
+
+### Docker
+
+```bash
+docker build -t stevenrq/sgivu-client:v1 .
+```
+
+### Puertos
+
+- `sgivu-client` por defecto escucha en el puerto `8082` (configurable via `PORT` o configserver).
 
 ## Seguridad
 
-- Resource Server validando JWT de `sgivu-auth` (`services.map.sgivu-auth.url`).
-- Permisos: `person:create|read|update|delete`, `company:create|read|update|delete`.
-- `/actuator/health` y `/actuator/info` públicos para chequeos.
+- `sgivu-client` actúa como **Resource Server**. Valida tokens JWT emitidos por `sgivu-auth`.
+- Requiere authorities/permissions para cada endpoint (`person:create`, `person:read`, `company:update`, etc.). Ver `@PreAuthorize` en controladores `PersonController` y `CompanyController`.
+- Asegurarse que el Gateway o los clientes envíen el token Bearer y que `sgivu-auth` sea la autoridad emisora.
 
-## Dependencias
+## Migraciones
 
-- `sgivu-config`, `sgivu-discovery`, `sgivu-gateway`, `sgivu-auth`, PostgreSQL.
+- Migraciones Flyway en `src/main/resources/db/migration/V1__initial_schema.sql` (crea tablas `addresses`, `clients`, `persons`, `companies` y sus índices).
+- Configuración de datasource y flyway en `sgivu-config-repo/sgivu-client-*.yml` (dev/prod).
 
-## Dockerización
+## Observabilidad
 
-- Imagen: `sgivu-client`
-- Puerto expuesto: 8082
+- **Actuator:** health/info y trazas con Zipkin (`http://sgivu-zipkin:9411`).
 
-Ejemplo:
+## Pruebas
 
 ```bash
-./mvnw clean package -DskipTests
-docker build -t sgivu-client .
-
+./mvnw test
 ```
 
-## Build y Push Docker
+- Tests básicos en `src/test/java/com/sgivu/client` (`SgivuClientApplicationTests`).
+- `spring-boot-starter-flyway-test` está incluido para soporte a migraciones en pruebas.
+- Recomendación: añadir tests de integración que validen seguridad (Resource Server + scopes) y comportamientos de búsqueda/paginación.
 
-- `./build-image.bash` limpia contenedores previos, empaqueta con Maven y publica `stevenrq/sgivu-client:v1`.
+## Solución de Problemas
 
-## Despliegue
+| Problema | Solución |
+| --- | --- |
+| `401`/`403` | Verificar token Bearer y que contenga las authorities requeridas |
+| Errores DB | Comprobar `DEV_CLIENT_DB_*`/`PROD_CLIENT_DB_*` y que Flyway haya aplicado migraciones |
 
-- Publica imagen en ECR y despliega en EC2/ECS/EKS con acceso a Config, Discovery y Auth.
-- Inyecta `SPRING_CONFIG_IMPORT`, `EUREKA_CLIENT_SERVICEURL_DEFAULTZONE`, `SPRING_DATASOURCE_*`, `services.map.sgivu-auth.url` vía Config Server o entorno.
-- Balanceo vía gateway con Auto Scaling.
+## Contribuciones
 
-## Monitoreo
-
-- Actuator (`/actuator/health`, `/actuator/metrics`, `/actuator/prometheus`).
-- Micrometer + Zipkin configurables vía Config Server.
-
-## Troubleshooting
-
-- 401/403: revisa issuer y permisos (`person:*`, `company:*`).
-- Búsquedas vacías: valida datos seed o registros en BD.
-- No registra en Eureka: confirma `EUREKA_CLIENT_SERVICEURL_DEFAULTZONE` y disponibilidad de discovery.
-
-## Buenas Prácticas y Convenciones
-
-- Código en inglés; documentación en español; commits en inglés con Conventional Commits.
-
-## Diagramas
-
-- Arquitectura general: ../../../docs/diagrams/01-system-architecture.puml
-
-## Autor
-
-- Steven Ricardo Quiñones (2025)
+1. Fork → branch → PR
+2. Añadir tests para cambios funcionales

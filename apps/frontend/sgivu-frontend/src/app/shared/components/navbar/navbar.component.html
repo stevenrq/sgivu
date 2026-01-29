@@ -92,9 +92,7 @@
           (click)="toggleTheme()"
           [attr.aria-pressed]="theme === 'dark'"
           [attr.aria-label]="
-            theme === 'dark'
-              ? 'Cambiar a modo claro'
-              : 'Cambiar a modo oscuro'
+            theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'
           "
         >
           <i
@@ -106,7 +104,7 @@
             "
           ></i>
           <span class="theme-toggle__label">
-            {{ theme === 'dark' ? "Modo claro" : "Modo oscuro" }}
+            {{ theme === "dark" ? "Modo claro" : "Modo oscuro" }}
           </span>
         </button>
       }
@@ -154,11 +152,15 @@
           </div>
         }
       } @else {
-        <div class="topbar__loading" role="status" aria-label="Cargando">
-          <span class="dot"></span>
-          <span class="dot"></span>
-          <span class="dot"></span>
-        </div>
+        <output
+          class="topbar__loading"
+          aria-live="polite"
+          aria-label="Cargando"
+        >
+          <span class="dot" aria-hidden="true"></span>
+          <span class="dot" aria-hidden="true"></span>
+          <span class="dot" aria-hidden="true"></span>
+        </output>
       }
     </div>
   </div>

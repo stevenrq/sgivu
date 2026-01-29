@@ -1,15 +1,5 @@
--- Migración inicial: Estructura de tablas para el servicio sgivu-purchase-sale
-
--- =============================================================================
--- SEQUENCE: purchase_sales_id_seq
--- Secuencia para generación de IDs de la tabla purchase_sales
--- =============================================================================
 CREATE SEQUENCE IF NOT EXISTS purchase_sales_id_seq START WITH 1 INCREMENT BY 1;
 
--- =============================================================================
--- TABLA: purchase_sales
--- Almacena información de compra-venta de vehículos
--- =============================================================================
 CREATE TABLE IF NOT EXISTS purchase_sales
 (
     id                  BIGINT PRIMARY KEY                DEFAULT nextval('purchase_sales_id_seq'),
@@ -28,7 +18,6 @@ CREATE TABLE IF NOT EXISTS purchase_sales
     updated_at          TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- Índices para mejorar el rendimiento de búsquedas y filtros
 CREATE INDEX IF NOT EXISTS idx_purchase_sales_client_id ON purchase_sales (client_id);
 CREATE INDEX IF NOT EXISTS idx_purchase_sales_user_id ON purchase_sales (user_id);
 CREATE INDEX IF NOT EXISTS idx_purchase_sales_vehicle_id ON purchase_sales (vehicle_id);

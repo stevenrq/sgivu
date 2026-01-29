@@ -19,9 +19,10 @@ import reactor.core.publisher.Mono;
 import reactor.core.publisher.SignalType;
 
 /**
- * Traza cada petición con Zipkin/Brave y propaga el `traceId` vía header `X-Trace-Id` para
- * correlacionar llamadas entre servicios SGIVU, incluidos rechazos tempranos de seguridad o
- * fallbacks.
+ * Filtro global para Spring Cloud Gateway que crea y finaliza spans de Zipkin (Brave) para las
+ * peticiones entrantes. Añade la cabecera de trazado `X-Trace-Id`, registra información básica de
+ * entrada y salida, y etiqueta los spans con información HTTP (código, texto) y duración. También
+ * etiqueta los errores producidos durante el procesamiento de la petición.
  */
 @Component
 public class ZipkinTracingGlobalFilter implements GlobalFilter, Ordered {
@@ -84,16 +85,16 @@ public class ZipkinTracingGlobalFilter implements GlobalFilter, Ordered {
     try {
       span.start();
     } catch (Exception e) {
-      throw new TracingException("Failed to start span", e);
+      throw new TracingException("Error al iniciar el span", e);
     }
 
     try {
       String traceId = (span.context() != null) ? span.context().traceIdString() : "no-trace";
       exchange.getResponse().getHeaders().add(TRACE_HEADER, traceId);
       MDC.put("traceId", traceId);
-      logger.info("Entering gateway request (traceId={}): {} {}", traceId, method, path);
+      logger.info("Entrando en la petición del gateway (traceId={}): {} {}", traceId, method, path);
     } catch (Exception e) {
-      throw new TracingException("Failed to set traceId header or MDC", e);
+      throw new TracingException("Error al establecer la cabecera traceId o el MDC", e);
     }
   }
 
@@ -107,7 +108,7 @@ public class ZipkinTracingGlobalFilter implements GlobalFilter, Ordered {
       span.tag("error", errorMsg);
       span.error(throwable);
     } catch (Exception e) {
-      logger.debug("Failed to tag span with error", e);
+      logger.debug("No se pudo etiquetar el span con el error", e);
     }
   }
 
@@ -135,7 +136,7 @@ public class ZipkinTracingGlobalFilter implements GlobalFilter, Ordered {
 
       String traceId = span.context() != null ? span.context().traceIdString() : null;
       logger.info(
-          "Leaving gateway request (traceId={}): {} {} -> status={} (signal={})",
+          "Saliendo de la petición del gateway (traceId={}): {} {} -> estado={} (señal={})",
           traceId,
           method,
           path,
@@ -143,12 +144,12 @@ public class ZipkinTracingGlobalFilter implements GlobalFilter, Ordered {
           signalType);
 
     } catch (Exception e) {
-      logger.warn("Error while finalizing span", e);
+      logger.warn("Error al finalizar el span", e);
     } finally {
       try {
         span.finish();
       } catch (Exception e) {
-        logger.debug("Failed to finish span", e);
+        logger.debug("No se pudo finalizar el span", e);
       }
       MDC.remove("traceId");
     }
@@ -159,7 +160,7 @@ public class ZipkinTracingGlobalFilter implements GlobalFilter, Ordered {
     try {
       span.tag(key, value);
     } catch (Exception e) {
-      throw new TracingException("Failed to tag span " + key + "=" + value, e);
+      throw new TracingException("Error al etiquetar el span " + key + "=" + value, e);
     }
   }
 
@@ -169,7 +170,7 @@ public class ZipkinTracingGlobalFilter implements GlobalFilter, Ordered {
       return v == null ? fallback : v;
     } catch (TracingException e) {
       LoggerFactory.getLogger(ZipkinTracingGlobalFilter.class)
-          .debug("Safe execution failed, returning fallback={}", fallback, e);
+          .debug("Ejecución segura fallida, devolviendo valor por defecto={}", fallback, e);
       return fallback;
     }
   }

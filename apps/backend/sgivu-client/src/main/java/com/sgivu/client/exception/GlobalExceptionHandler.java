@@ -12,11 +12,6 @@ import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 
-/**
- * Maneja excepciones transversales del microservicio de clientes, devolviendo respuestas coherentes
- * a otros servicios (inventario, contratos) y al front.
- * Centraliza mensajes para evitar exponer detalles internos en integraciones distribuidas.
- */
 @ControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -25,12 +20,6 @@ public class GlobalExceptionHandler {
   private static final String DETAILS_KEY = "details";
   private static final String STATUS_KEY = "status";
 
-  /**
-   * Manejo de violaciones de restricciones (únicos) típicas cuando se crean clientes duplicados.
-   *
-   * @param e excepción capturada
-   * @return respuesta con detalle de conflicto
-   */
   @ExceptionHandler(ConstraintViolationException.class)
   public ResponseEntity<Object> handleConstraintViolationException(ConstraintViolationException e) {
     logger.error("Ocurrió una violación de restricción: {}", e.getMessage(), e);
@@ -45,13 +34,6 @@ public class GlobalExceptionHandler {
     return new ResponseEntity<>(errorResponse, HttpStatus.CONFLICT);
   }
 
-  /**
-   * Captura errores de integridad de datos provenientes de la base (FK, únicos) al interactuar con
-   * el inventario o contratos.
-   *
-   * @param e excepción
-   * @return respuesta 409
-   */
   @ExceptionHandler(DataIntegrityViolationException.class)
   public ResponseEntity<Object> handleDataIntegrityViolationException(
       DataIntegrityViolationException e) {
@@ -67,13 +49,6 @@ public class GlobalExceptionHandler {
     return new ResponseEntity<>(errorResponse, HttpStatus.CONFLICT);
   }
 
-  /**
-   * Fallback para cualquier error no controlado, evitando que detalles técnicos escapen a
-   * consumidores externos.
-   *
-   * @param e excepción
-   * @return respuesta 500
-   */
   @ExceptionHandler(Exception.class)
   public ResponseEntity<Object> handleGeneralException(Exception e) {
     logger.error("Ocurrió un error inesperado: {}", e.getMessage(), e);
@@ -87,13 +62,6 @@ public class GlobalExceptionHandler {
     return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
   }
 
-  /**
-   * Respuesta estandarizada para accesos sin permisos, usada cuando roles/claims no contienen las
-   * autorizaciones requeridas.
-   *
-   * @param e excepción de autorización
-   * @return respuesta 403
-   */
   @ExceptionHandler(AuthorizationDeniedException.class)
   public ResponseEntity<Object> handleAuthorizationDeniedException(AuthorizationDeniedException e) {
     logger.warn("Acceso denegado: {}", e.getMessage());

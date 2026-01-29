@@ -4,10 +4,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 import lombok.Getter;
 
-/**
- * Criterios de filtrado para empresas, soportando búsquedas por datos fiscales y ubicación para
- * procesos de abastecimiento y contratos.
- */
 @Getter
 @Builder
 @Schema(description = "Criterios de búsqueda para empresas (todas las propiedades opcionales)")

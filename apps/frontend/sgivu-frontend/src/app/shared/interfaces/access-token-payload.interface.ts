@@ -1,7 +1,3 @@
-/**
- * Interfaz que representa la estructura del payload de un token de acceso (Access Token).
- * Contiene información estándar de JWT y claims personalizadas.
- */
 export interface AccessTokenPayload {
   aud: string;
   nbf: number;

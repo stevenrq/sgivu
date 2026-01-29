@@ -5,10 +5,6 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Usuario interno del ecosistema SGIVU. Se consulta en el microservicio de usuarios para validar
- * responsables de contratos y mostrar datos de contacto en la capa de presentación.
- */
 @Schema(
     description = "Usuario interno con datos de contacto y usuario para trazabilidad de contratos")
 @Data

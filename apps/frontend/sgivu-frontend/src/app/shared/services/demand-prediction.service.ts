@@ -45,10 +45,6 @@ interface LatestModelDto {
 @Injectable({
   providedIn: 'root',
 })
-/**
- * Servicio para consumir los endpoints del modelo de demanda (sgivu-ml) vía gateway.
- * Normaliza la carga útil a mayúsculas y mapea las respuestas a DTOs de frontend.
- */
 export class DemandPredictionService {
   private readonly http = inject(HttpClient);
 

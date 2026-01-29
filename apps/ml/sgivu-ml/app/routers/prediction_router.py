@@ -46,12 +46,6 @@ require_permissions_models = (
 async def predict(
     request: PredictionRequest, service=Depends(get_prediction_service)
 ) -> PredictionResponse:
-    """Endpoint de inferencia principal para demanda mensual.
-
-    Args:
-        request: Segmento y horizonte solicitados.
-        service: Servicio de predicción inyectado.
-    """
     payload = await service.predict(
         filters=request.model_dump(exclude={"horizon_months", "confidence"}),
         horizon=request.horizon_months,
@@ -69,7 +63,6 @@ async def predict(
 async def predict_with_history(
     request: PredictionRequest, service=Depends(get_prediction_service)
 ) -> PredictionWithHistoryResponse:
-    """Endpoint para frontend: pronóstico + serie histórica del segmento."""
     payload = await service.predict_with_history(
         filters=request.model_dump(exclude={"horizon_months", "confidence"}),
         horizon=request.horizon_months,
@@ -87,7 +80,6 @@ async def predict_with_history(
 async def retrain(
     body: RetrainRequest, service=Depends(get_prediction_service)
 ) -> RetrainResponse:
-    """Reentrena el modelo de demanda con el historial actualizado."""
     try:
         metadata = await service.retrain(
             start_date=body.start_date, end_date=body.end_date
@@ -116,7 +108,6 @@ async def retrain(
     summary="Obtiene metadata del ultimo modelo",
 )
 async def latest_model(service=Depends(get_prediction_service)):
-    """Devuelve la metadata del modelo activo en disco."""
     metadata = service.registry.latest_metadata()
     if not metadata:
         return {"detail": "No hay modelos disponibles"}

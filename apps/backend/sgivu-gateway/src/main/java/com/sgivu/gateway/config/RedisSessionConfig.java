@@ -9,8 +9,15 @@ import org.springframework.web.server.session.CookieWebSessionIdResolver;
 import org.springframework.web.server.session.WebSessionIdResolver;
 
 /**
- * Configuración de Spring Session con Redis para el Gateway BFF. Define cómo se manejan las cookies
- * de sesión para la autenticación.
+ * Configuración de Spring Session usando Redis para el Gateway (BFF).
+ *
+ * <p>Esta clase proporciona la configuración necesaria para el manejo de sesiones en el gateway y
+ * define un {@link WebSessionIdResolver} que utiliza cookies para almacenar el identificador de la
+ * sesión. La cookie se nombra "SESSION", se marca como HttpOnly y tiene ruta "/". Se establece
+ * <em>SameSite=Lax</em> para permitir flujos de redirección (por ejemplo OAuth2) sin bloquear la
+ * cookie. En entornos con HTTPS se recomienda marcar la cookie como <em>Secure</em>.
+ *
+ * @see org.springframework.web.server.session.CookieWebSessionIdResolver
  */
 @Configuration(proxyBeanMethods = false)
 public class RedisSessionConfig {
@@ -21,10 +28,6 @@ public class RedisSessionConfig {
     log.info("Spring Session Redis Configuration loaded");
   }
 
-  /**
-   * Configura el resolver de ID de sesión basado en cookies. Usa SameSite=Lax para permitir el
-   * envío de cookies en redirecciones OAuth2.
-   */
   @Bean
   WebSessionIdResolver webSessionIdResolver() {
     CookieWebSessionIdResolver resolver = new CookieWebSessionIdResolver();
@@ -33,8 +36,7 @@ public class RedisSessionConfig {
         builder -> {
           builder.path("/");
           builder.httpOnly(true);
-          builder.sameSite("Lax"); // Lax permite cookies en redirecciones top-level
-          // No usar Secure porque estamos en HTTP (sin HTTPS)
+          builder.sameSite("Lax");
         });
     log.info("WebSessionIdResolver configured with SameSite=Lax");
     return resolver;

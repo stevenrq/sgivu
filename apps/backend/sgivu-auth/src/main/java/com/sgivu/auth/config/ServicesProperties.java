@@ -6,7 +6,6 @@ import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
-/** Catálogo de endpoints de microservicios SGIVU para construir clientes REST balanceados. */
 @Setter
 @Getter
 @Configuration

@@ -8,13 +8,6 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
-/**
- * Cliente empresa para operaciones corporativas de SGIVU. Almacena identificador fiscal y razón
- * social usados en compras/ventas y contratos.
- *
- * <p>Se mantiene la relación con {@link Client} para reutilizar domicilio y contacto al integrar
- * con facturación y auditorías.
- */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

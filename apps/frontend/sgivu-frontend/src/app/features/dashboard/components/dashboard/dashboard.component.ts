@@ -62,10 +62,6 @@ interface SegmentOption {
   styleUrls: ['./dashboard.component.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-/**
- * Panel principal que reúne KPIs y visualizaciones del inventario y ventas.
- * Coordina la carga simultánea de métricas y prepara los datos para Chart.js.
- */
 export class DashboardComponent implements OnInit, OnDestroy {
   private readonly carService = inject(CarService);
   private readonly motorcycleService = inject(MotorcycleService);
@@ -203,10 +199,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
     return this.formatCurrency(this.monthlyRevenue);
   }
 
-  /**
-   * Orquesta la carga inicial de métricas y distribuye los resultados en el estado local.
-   * Maneja errores de red y notifica cambio al `ChangeDetectorRef` por `OnPush`.
-   */
   private loadDashboardData(): void {
     this.isLoading = true;
     this.loadError = null;
@@ -241,7 +233,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   private restoreSavedPrediction(): void {
     const savedState = this.dashboardStateService.getLastPrediction();
-    if (!savedState || !savedState.payload || !savedState.response) {
+    if (!savedState?.payload || !savedState?.response) {
       if (savedState) {
         this.dashboardStateService.clear();
       }
@@ -274,17 +266,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
       savedState.response.metrics ?? savedState.latestModel?.metrics ?? null;
     this.latestModel = savedState.latestModel ?? this.latestModel;
     if (savedState.response.trainedAt) {
-      this.latestModel = {
-        ...(this.latestModel ?? {}),
-        trainedAt: savedState.response.trainedAt,
-      };
+      this.latestModel = this.latestModel
+        ? { ...this.latestModel, trainedAt: savedState.response.trainedAt }
+        : { trainedAt: savedState.response.trainedAt };
     }
     this.cdr.markForCheck();
   }
 
-  /**
-   * Solicita en paralelo los contadores de vehículos por tipo.
-   */
   private loadVehicleCounts() {
     return forkJoin({
       cars: this.carService.getCounts(),
@@ -292,11 +280,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
     });
   }
 
-  /**
-   * Calcula inventario total y datos para el gráfico de distribución.
-   *
-   * @param counts Contadores de carros y motos.
-   */
   private applyVehicleCounts(counts: {
     cars: VehicleCount;
     motorcycles: VehicleCount;
@@ -338,11 +321,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
     };
   }
 
-  /**
-   * Deriva métricas de ventas (ingresos y unidades) a partir de los contratos cargados.
-   *
-   * @param contracts Lista completa de contratos recuperados.
-   */
   private applySalesMetrics(contracts: PurchaseSale[]): void {
     this.salesHistoryCount = contracts.filter(
       (contract) => contract.contractType === ContractType.SALE,
@@ -353,11 +331,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.monthlySales = monthlySalesCount;
   }
 
-  /**
-   * Agrupa ventas del mes en curso para obtener ingreso mensual y cantidad de ventas.
-   *
-   * @param contracts Contratos obtenidos del backend.
-   */
   private computeMonthlySales(contracts: PurchaseSale[]): {
     monthlyRevenue: number;
     monthlySalesCount: number;
@@ -397,11 +370,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
     };
   }
 
-  /**
-   * Aplica formato de moneda consistente para valores COP mostrados en tarjetas.
-   *
-   * @param value Valor numérico a formatear.
-   */
   private formatCurrency(value: number): string {
     return formatCopCurrency(value, {
       minimumFractionDigits: 0,
@@ -409,9 +377,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
     });
   }
 
-  /**
-   * Construye y valida el formulario de predicción de demanda.
-   */
   private buildPredictionForm(): FormGroup {
     return this.fb.group({
       vehicleType: [VehicleKind.CAR, [Validators.required]],
@@ -425,10 +390,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
     });
   }
 
-  /**
-   * Carga opciones de vehículos desde carros y motos para autocompletar búsqueda rápida.
-   * Usa el catálogo completo, pero las coincidencias se filtran al teclear.
-   */
   private loadVehicleOptions(): void {
     this.contractedVehiclesLoading = true;
     const cars$ = this.carService.getAll().pipe(
@@ -458,27 +419,17 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.subscriptions.push(loadSub);
   }
 
-  /**
-   * Construye segmentos sugeridos a partir de contratos recientes y dispara una predicción inicial.
-   */
   private seedPredictionForm(contracts: PurchaseSale[]): void {
     this.segmentSuggestions = this.buildSegmentSuggestions(contracts);
   }
 
-  /**
-   * Genera una lista de referencias únicas de vehículos (id y tipo) que tienen contratos.
-   */
-  /**
-   * Procesa los contratos para hallar combinaciones frecuentes marca/modelo/tipo.
-   */
   private buildSegmentSuggestions(contracts: PurchaseSale[]): SegmentOption[] {
     const counter = new Map<string, SegmentOption>();
 
     contracts.forEach((contract) => {
       const summary = contract.vehicleSummary;
       const vehicleType = this.normalizeVehicleType(
-        (summary?.type as string | undefined) ??
-          contract.vehicleData?.vehicleType,
+        summary?.type ?? contract.vehicleData?.vehicleType,
       );
       const brand = summary?.brand ?? contract.vehicleData?.brand;
       const model = summary?.model ?? contract.vehicleData?.model;
@@ -567,10 +518,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
           this.forecastMetrics =
             response.metrics ?? this.latestModel?.metrics ?? null;
           if (response.trainedAt) {
-            this.latestModel = {
-              ...(this.latestModel ?? {}),
-              trainedAt: response.trainedAt,
-            };
+            this.latestModel = this.latestModel
+              ? { ...this.latestModel, trainedAt: response.trainedAt }
+              : { trainedAt: response.trainedAt };
           }
           this.activeSegmentLabel = this.describeSegment(payload);
           if (!hasPredictions) {
@@ -753,8 +703,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     const suggestedMin = Math.min(0, Math.floor(minValue));
     const suggestedMax = Math.max(1, maxValue) * 1.2;
     const currentScales = this.demandOptions.scales ?? {};
-    const currentY =
-      (currentScales as NonNullable<ChartOptions<'line'>['scales']>)['y'] ?? {};
+    const currentY = this.demandOptions.scales?.['y'] ?? {};
 
     this.demandOptions = {
       ...this.demandOptions,
@@ -793,27 +742,25 @@ export class DashboardComponent implements OnInit, OnDestroy {
     if (months.length === 0) {
       return null;
     }
-    return months.sort((a, b) => b.getTime() - a.getTime())[0];
+    months.sort((a, b) => b.getTime() - a.getTime());
+    return months[0];
   }
 
   private maxDate(a: Date, b: Date): Date {
     return a.getTime() >= b.getTime() ? a : b;
   }
 
-  /**
-   * Normaliza texto como lo hace sgivu-ml: mayúsculas, sin acentos y solo A-Z/0-9.
-   */
   private canonicalizeLabel(value?: string | null): string {
     if (!value) {
       return '';
     }
     const withoutAccents = value
       .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '');
+      .replaceAll(/[\u0300-\u036f]/g, '');
     return withoutAccents
       .toUpperCase()
-      .replace(/[^A-Z0-9]+/g, ' ')
-      .replace(/\s+/g, ' ')
+      .replaceAll(/[^A-Z0-9]+/g, ' ')
+      .replaceAll(/\s+/g, ' ')
       .trim();
   }
 
@@ -839,7 +786,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
     if (monthInput instanceof Date) {
       return new Date(monthInput.getFullYear(), monthInput.getMonth(), 1);
     }
-    const match = monthInput.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    const re = /^(\d{4})-(\d{2})-(\d{2})/;
+    const match = re.exec(monthInput);
     if (match) {
       const [, y, m, d] = match;
       return new Date(Number(y), Number(m) - 1, Number(d));
@@ -849,7 +797,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   private parseMonthKey(monthKey: string): Date {
-    const [year, month] = monthKey.split('-').map((value) => Number(value));
+    const [year, month] = monthKey.split('-').map(Number);
     return new Date(year, month - 1, 1);
   }
 
@@ -885,10 +833,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
     return null;
   }
 
-  /**
-   * Filtra el catálogo de vehículos (cars + motos) por marca, modelo, placa o línea.
-   * Limita a 8 resultados para mantener el dropdown manejable.
-   */
   filterVehicleOptions(term: string | null): void {
     const normalized = (term ?? '').trim().toUpperCase();
     if (!normalized) {
@@ -908,10 +852,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
       .slice(0, 8);
   }
 
-  /**
-   * Al seleccionar un vehículo en la búsqueda rápida, recupera su detalle completo
-   * y rellena el formulario de predicción antes de lanzar la consulta.
-   */
   selectQuickVehicle(
     vehicle: VehicleOption & { contractsCount?: number },
   ): void {
@@ -931,10 +871,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.onSubmitPrediction();
   }
 
-  /**
-   * Cuenta cuántos contratos están asociados al vehículo indicado, considerando
-   * el id directo y el id presente en vehicleSummary.
-   */
   private countContractsForVehicle(vehicleId: number): number {
     return this.allContracts.filter(
       (contract) =>
@@ -943,10 +879,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
     ).length;
   }
 
-  /**
-   * Dispara un reentrenamiento manual del modelo sin bloquear el submit.
-   * Útil cuando no existe modelo entrenado todavía o se desea actualizarlo.
-   */
   onRetrain(): void {
     if (this.retrainLoading) {
       return;

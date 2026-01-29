@@ -26,9 +26,6 @@ import { KpiCardComponent } from '../../../../shared/components/kpi-card/kpi-car
 import { DataTableComponent } from '../../../../shared/components/data-table/data-table.component';
 import { RowNavigateDirective } from '../../../../shared/directives/row-navigate.directive';
 
-/**
- * @description Estado de la tabla de usuarios, incluyendo paginación y métricas activas/inactivas mostradas en los KPIs.
- */
 interface UserListState<T extends User> {
   items: T[];
   pager?: PaginatedResponse<T>;
@@ -39,9 +36,6 @@ interface UserListState<T extends User> {
   error: string | null;
 }
 
-/**
- * @description Configuración compartida para las rutinas de carga/paginación. Separa la lógica de orquestación del componente para facilitar pruebas y reutilización.
- */
 interface UserLoadConfig<T extends User> {
   page: number;
   state: UserListState<T>;
@@ -51,9 +45,6 @@ interface UserLoadConfig<T extends User> {
   errorMessage: string;
 }
 
-/**
- * @description Texto y rutas usadas por la cabecera y el paginador en el módulo de usuarios.
- */
 interface UserListMetadata {
   pagerUrl: string[];
   title: string;
@@ -81,9 +72,6 @@ interface UserListMetadata {
   templateUrl: './user-list.component.html',
   styleUrl: './user-list.component.css',
 })
-/**
- * @description Lista y pagina los usuarios de SGIVU, manteniendo sincronía entre filtros, URL y KPIs de estado (activos/inactivos). También ejecuta reacciones cuando cambian los parámetros de ruta.
- */
 export class UserListComponent implements OnInit, OnDestroy {
   private readonly userService = inject(UserService);
   private readonly route = inject(ActivatedRoute);
@@ -226,11 +214,6 @@ export class UserListComponent implements OnInit, OnDestroy {
     this.navigateToPage(0);
   }
 
-  /**
-   * @description Solicita cambio de estado y recarga la página actual para reflejar el resultado en conteos y listado.
-   * @param id Identificador del usuario.
-   * @param status Nuevo estado habilitado/inhabilitado.
-   */
   public updateStatus(id: number, status: boolean): void {
     this.userUiHelper.updateStatus(id, status, () => this.reloadCurrentPage());
   }
@@ -256,7 +239,6 @@ export class UserListComponent implements OnInit, OnDestroy {
     state.loading = true;
     state.error = null;
 
-    // Pager y contadores se resuelven juntos para evitar KPIs desfasadas respecto a la tabla.
     const loader$ = forkJoin({
       pager: fetchPager(page),
       counts: fetchCounts(),
@@ -311,10 +293,7 @@ export class UserListComponent implements OnInit, OnDestroy {
       username: this.filters.username?.trim(),
       email: this.filters.email?.trim(),
       role: this.filters.role || undefined,
-      enabled:
-        this.filters.enabled === null || this.filters.enabled === undefined
-          ? undefined
-          : this.filters.enabled,
+      enabled: this.filters.enabled ?? undefined,
     };
   }
 
@@ -353,12 +332,12 @@ export class UserListComponent implements OnInit, OnDestroy {
     assign('userRole', 'role');
 
     const enabledValue = map.get('userEnabled');
-    if (enabledValue !== null) {
+    if (enabledValue === null) {
+      uiState.enabled = null;
+    } else {
       const enabled = enabledValue === 'true';
       filters.enabled = enabled;
       uiState.enabled = enabled;
-    } else {
-      uiState.enabled = null;
     }
 
     const hasFilters = !this.areFiltersEmpty(filters);

@@ -24,16 +24,14 @@ import java.util.Objects;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.HttpClientErrorException;
 
 /**
- * Servicio que aplica las reglas de negocio del dominio de compras/ventas: valida inventario,
- * coordina dependencias con otros microservicios y evita transiciones inconsistentes entre compra y
- * venta de un mismo vehículo.
+ * Implementación del servicio de gestión de contratos de compra-venta, incluyendo creación,
+ * actualización, eliminación y búsqueda con validaciones de negocio específicas.
  */
 @Service
 @Transactional(readOnly = true)
@@ -58,11 +56,6 @@ public class PurchaseSaleServiceImpl implements PurchaseSaleService {
     this.userServiceClient = userServiceClient;
   }
 
-  /**
-   * Registra un contrato garantizando que los actores existan, el stock esté disponible y no haya
-   * otra operación incompatible sobre el mismo vehículo. También fija precios coherentes con los
-   * reportes contables.
-   */
   @Transactional
   @Override
   public PurchaseSale create(PurchaseSaleRequest purchaseSaleRequest) {
@@ -107,10 +100,6 @@ public class PurchaseSaleServiceImpl implements PurchaseSaleService {
         PurchaseSaleSpecifications.withFilters(criteria), requirePageable(pageable));
   }
 
-  /**
-   * Permite corregir un contrato sin alterar su naturaleza (una compra no puede volverse venta).
-   * Revalida el inventario y actualiza dependencias externas antes de persistir cambios.
-   */
   @Transactional
   @Override
   public Optional<PurchaseSale> update(Long id, PurchaseSaleRequest purchaseSaleRequest) {
@@ -171,11 +160,6 @@ public class PurchaseSaleServiceImpl implements PurchaseSaleService {
     return purchaseSaleRepository.findByVehicleId(resolvedVehicleId);
   }
 
-  /**
-   * Asegura que todos los contratos tengan valores deterministas cuando el cliente no los envía:
-   * por defecto tratamos la operación como compra y forzamos el estado PENDING para mantener el
-   * mismo flujo de aprobaciones.
-   */
   private ContractType normalizeContractType(PurchaseSaleRequest purchaseSaleRequest) {
     ContractType contractType =
         Optional.ofNullable(purchaseSaleRequest.getContractType()).orElse(ContractType.PURCHASE);
@@ -186,11 +170,6 @@ public class PurchaseSaleServiceImpl implements PurchaseSaleService {
     return contractType;
   }
 
-  /**
-   * Resuelve el vehículo según el tipo de operación: las compras permiten registrar el activo en el
-   * microservicio de vehículos, mientras que las ventas solo aceptan referencias existentes para no
-   * duplicar inventario.
-   */
   private Long resolveVehicleReference(
       ContractType contractType, PurchaseSaleRequest purchaseSaleRequest) {
     if (contractType == ContractType.PURCHASE) {
@@ -215,11 +194,6 @@ public class PurchaseSaleServiceImpl implements PurchaseSaleService {
     return resolveVehicleId(purchaseSaleRequest.getVehicleId());
   }
 
-  /**
-   * Alta controlada de vehículos provenientes de contratos de compra. Valida que todos los campos
-   * requeridos existan antes de delegar en el microservicio de vehículos para evitar registros
-   * incompletos.
-   */
   private Long registerVehicleForPurchase(PurchaseSaleRequest purchaseSaleRequest) {
     VehicleCreationRequest vehicleData = purchaseSaleRequest.getVehicleData();
     if (vehicleData == null) {
@@ -254,10 +228,6 @@ public class PurchaseSaleServiceImpl implements PurchaseSaleService {
     return vehicleServiceClient.createMotorcycle(motorcycle).getId();
   }
 
-  /**
-   * Copia atributos críticos de cualquier vehículo, asegurando consistencia (placa en mayúsculas,
-   * precios no negativos, metadatos de registro) antes de enviar la petición al servicio remoto.
-   */
   private <T extends Vehicle> T applyCommonVehicleAttributes(
       T target, VehicleCreationRequest vehicleData, PurchaseSaleRequest request) {
     target.setBrand(requireText(vehicleData.getBrand(), "La marca del vehículo es obligatoria."));
@@ -293,10 +263,6 @@ public class PurchaseSaleServiceImpl implements PurchaseSaleService {
     return target;
   }
 
-  /**
-   * Punto central de reglas: para compras evita duplicar adquisiciones pendientes; para ventas
-   * verifica que el vehículo tenga una compra consolidada y no esté comprometido en otra venta.
-   */
   private void applyBusinessRules(
       ContractType contractType,
       PurchaseSaleRequest purchaseSaleRequest,
@@ -316,10 +282,6 @@ public class PurchaseSaleServiceImpl implements PurchaseSaleService {
     }
   }
 
-  /**
-   * En compras se permite omitir el precio de venta futuro; si no llega, se inicializa en cero para
-   * que los reportes no queden con valores nulos.
-   */
   private void preparePurchaseRequest(PurchaseSaleRequest purchaseSaleRequest) {
     Double targetSalePrice = null;
     if (purchaseSaleRequest.getVehicleData() != null) {
@@ -331,10 +293,6 @@ public class PurchaseSaleServiceImpl implements PurchaseSaleService {
     purchaseSaleRequest.setSalePrice(targetSalePrice != null ? targetSalePrice : 0d);
   }
 
-  /**
-   * Las ventas deben respetar el precio de compra registrado previamente y fijar un precio de venta
-   * positivo; de lo contrario impactaría los márgenes y la disponibilidad del inventario.
-   */
   private void prepareSaleRequest(
       PurchaseSaleRequest purchaseSaleRequest, List<PurchaseSale> contractsByVehicle) {
     Double salePrice = purchaseSaleRequest.getSalePrice();
@@ -374,14 +332,6 @@ public class PurchaseSaleServiceImpl implements PurchaseSaleService {
     return year;
   }
 
-  /**
-   * Determina el precio de compra a utilizar al registrar un vehículo, priorizando el valor enviado
-   * en los datos del vehículo sobre el fallback del contrato.
-   *
-   * @param vehicleData datos detallados del vehículo
-   * @param fallbackPurchasePrice valor de compra enviado en el contrato
-   * @return precio de compra validado
-   */
   private Double resolveVehiclePurchasePrice(
       VehicleCreationRequest vehicleData, Double fallbackPurchasePrice) {
     Double value =
@@ -408,13 +358,6 @@ public class PurchaseSaleServiceImpl implements PurchaseSaleService {
     return StringUtils.hasText(value) ? value.trim() : null;
   }
 
-  /**
-   * Ajusta los campos del contrato según el tipo de operación, especialmente los precios permitidos
-   * en compras y ventas.
-   *
-   * @param purchaseSale entidad que se va a persistir
-   * @param purchaseSaleRequest datos crudos provenientes del request
-   */
   private void applyContractAdjustments(
       PurchaseSale purchaseSale, PurchaseSaleRequest purchaseSaleRequest) {
     purchaseSale.setContractType(purchaseSaleRequest.getContractType());
@@ -426,10 +369,6 @@ public class PurchaseSaleServiceImpl implements PurchaseSaleService {
     }
   }
 
-  /**
-   * Obtiene el precio de compra vigente para liquidar una venta. Solo considera compras activas o
-   * completadas y cae en el valor enviado si no existe historial.
-   */
   private Double findLatestPurchasePrice(
       List<PurchaseSale> contractsByVehicle, Double fallbackPurchasePrice) {
     return contractsByVehicle.stream()
@@ -452,10 +391,6 @@ public class PurchaseSaleServiceImpl implements PurchaseSaleService {
             });
   }
 
-  /**
-   * Regla para compras: un vehículo no puede tener más de una adquisición pendiente/activa, lo que
-   * evita duplicar capital inmovilizado en inventario.
-   */
   private void ensureNoActivePurchase(
       List<PurchaseSale> contractsByVehicle, Long excludedContractId, Long vehicleId) {
     boolean hasActiveOrPendingPurchase =
@@ -477,10 +412,6 @@ public class PurchaseSaleServiceImpl implements PurchaseSaleService {
     }
   }
 
-  /**
-   * Regla para ventas: solo se permiten cuando hay stock adquirido y ninguna otra venta en curso o
-   * completada que comprometa el mismo vehículo.
-   */
   private void ensureSalePrerequisites(
       List<PurchaseSale> contractsByVehicle,
       Long excludedContractId,
@@ -540,11 +471,6 @@ public class PurchaseSaleServiceImpl implements PurchaseSaleService {
     return userServiceClient.getUserById(userId).getId();
   }
 
-  /**
-   * Resuelve el identificador de cliente contra el microservicio de clientes, intentando primero
-   * persona y luego empresa. Permite que el contrato se mantenga referenciado aun cuando el tipo de
-   * cliente cambie en origen.
-   */
   private Long resolveClientId(Long clientId) {
     if (clientId == null) {
       throw new IllegalArgumentException("El ID del cliente debe ser proporcionado.");
@@ -599,7 +525,7 @@ public class PurchaseSaleServiceImpl implements PurchaseSaleService {
     return contractId;
   }
 
-  private @NonNull Pageable requirePageable(Pageable pageable) {
+  private Pageable requirePageable(Pageable pageable) {
     return Objects.requireNonNull(pageable, "La configuración de paginación es obligatoria.");
   }
 }

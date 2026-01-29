@@ -5,15 +5,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 import lombok.Getter;
 
-/**
- * Filtros para búsquedas de inventario de motocicletas.
- *
- * <p>Incluye atributos necesarios para segmentar por tipo y rango de precios en los flujos de
- * ventas y campañas de oferta.
- *
- * @apiNote Se consume por {@link com.sgivu.vehicle.specification.MotorcycleSpecifications} para
- *     generar predicados JPA seguros.
- */
 @Getter
 @Builder
 @Schema(description = "Filtros dinámicos para consultas de motocicletas")

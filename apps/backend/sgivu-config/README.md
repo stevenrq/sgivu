@@ -1,131 +1,95 @@
-# SGIVU - sgivu-config
+# sgivu-config - SGIVU
 
 ## Descripción
 
-Servicio Spring Cloud Config que centraliza y expone la configuración del ecosistema SGIVU. Provee archivos de configuración versionados en Git para que los microservicios consuman parámetros consistentes en cada ambiente.
+`sgivu-config` es el servidor de configuración central (Spring Cloud Config Server) del ecosistema **SGIVU**. Exponiendo configuración centralizada desde un repositorio Git o desde el sistema de archivos (modo *native*), el servicio permite que los microservicios obtengan propiedades según aplicación/perfil/label.
 
-## Arquitectura y Rol
+## Tecnologías y Dependencias
 
-- Microservicio Spring Boot 3 / Spring Cloud Config Server.
-- Interactúa con `sgivu-config-repo` (Git), `sgivu-discovery`, `sgivu-gateway` y los microservicios consumidores.
-- Expone endpoints REST para entregar propiedades externas; no persiste datos propios.
-- Puede registrarse en Eureka si se habilita el cliente Discovery.
+- Java 21
+- Spring Boot 3.5.8
+- Spring Cloud Config Server (2025.x)
+- Spring Boot Actuator
 
-## Tecnologías
+## Requisitos Previos
 
-- Lenguaje: Java 21
-- Framework: Spring Boot 3.5.8, Spring Cloud 2025.0.0 (Leyden)
-- Seguridad: Actuator sin autenticación por defecto
-- Infraestructura: Docker, AWS (EC2)
+- JDK 21
+- Maven 3.9+
+- Docker & docker-compose (opcional; `infra/compose/sgivu-docker-compose` ya incluye el servicio)
+- Acceso al repositorio de configuración `https://github.com/stevenrq/sgivu-config-repo.git` (o disponer de una copia local para `native`)
 
-## Configuración
+## Arranque y Ejecución
 
-- Variables clave: `SPRING_PROFILES_ACTIVE` (git por defecto, soporta `native`), `SPRING_CLOUD_CONFIG_SERVER_GIT_URI`, `SPRING_CLOUD_CONFIG_SERVER_GIT_DEFAULT_LABEL`, `SPRING_CLOUD_CONFIG_SERVER_NATIVE_SEARCH_LOCATIONS`.
-- Ajusta `src/main/resources/application.yml` o variables de entorno según el repositorio de configuración.
+### Desarrollo (docker-compose)
 
-### Perfil Native
+Desde `infra/compose/sgivu-docker-compose`:
 
-Para desarrollo local, puedes usar el perfil `native` para cargar configuraciones desde el sistema de archivos local en lugar de Git. Esto evita tener que hacer push al repositorio para probar cambios.
-
-Ejemplo de ejecución con perfil native:
 ```bash
-./mvnw spring-boot:run -Dspring-boot.run.profiles=native
+docker compose -f docker-compose.dev.yml up -d
 ```
 
-O usando una variable de entorno:
-```bash
-SPRING_PROFILES_ACTIVE=native ./mvnw spring-boot:run
-```
+Esto arranca `sgivu-config` en modo `native` con el repo local montado.
 
-Por defecto, busca en:
-1. `file:/config-repo` (recomendado para Docker)
-2. `./config-repo`
-3. `../sgivu-config-repo` (si se tiene clonado como hermano del proyecto)
-4. `../../sgivu-config-repo`
-5. `../../../sgivu-config-repo`
-
-### Perfil Native con Docker
-
-Cuando uses el perfil `native` dentro de Docker (vía `docker-compose.dev.yml`), es obligatorio montar el repositorio de configuración como un volumen. El `docker-compose.dev.yml` proporcionado ya mapea el directorio `sgivu-config-repo` (asumiendo que es hermano de la carpeta del proyecto) a `/config-repo` dentro del contenedor.
-
-Puedes personalizar la ubicación con `SPRING_CLOUD_CONFIG_SERVER_NATIVE_SEARCH_LOCATIONS`.
-
-## Ejecución Local
+### Ejecución Local
 
 ```bash
+./mvnw clean package
 ./mvnw spring-boot:run
 ```
 
-Accede a `http://localhost:8888` y consume los endpoints del Config Server.
+### Docker
+
+```bash
+./build-image.bash
+docker run -p 8888:8888 --env-file .env stevenrq/sgivu-config:v1
+```
+
+### Producción (modo `git`)
+
+Por defecto `src/main/resources/application.yml` configura `spring.profiles.active: git` y el `git.uri` apuntando a `https://github.com/stevenrq/sgivu-config-repo.git`.
 
 ## Endpoints Principales
 
-```text
-GET /{application}/{profile}
-GET /{application}/{profile}/{label}
-GET /actuator/health
-```
-
-- `/{application}/{profile}`: propiedades para la aplicación y perfil solicitados.
-- `/{application}/{profile}/{label}`: permite apuntar a una rama o etiqueta específica.
-- `/actuator/health`: estado básico del Config Server.
-
-## Seguridad
-
-- Expuesto sin autenticación por defecto. Se recomienda proteger vía `sgivu-gateway` o habilitar Spring Security integrado con `sgivu-auth` (OAuth2 + JWT).
-
-## Dependencias
-
-- `sgivu-config-repo` como backend Git.
-- `sgivu-discovery` opcional si se registra para descubrimiento.
-- `sgivu-gateway` como proxy que puede asegurar y enrutar el acceso.
-- Microservicios SGIVU consumidores de configuración externa.
-
-## Dockerización
-
-- Imagen: `sgivu-config`
-- Puerto expuesto: 8888
+| Endpoint | Descripción |
+| --- | --- |
+| `GET /{application}/{profile}` | Propiedades para una aplicación y perfil |
+| `GET /{application}/{profile}/{label}` | Propiedades con label específico (branch) |
+| `GET /{application}-{profile}.yml` | Archivo YAML de configuración |
+| `GET /actuator/health` | Estado de salud del servicio |
 
 Ejemplo:
 
 ```bash
-docker build -t sgivu-config .
-docker run -p 8888:8888 \
-  -e SPRING_CLOUD_CONFIG_SERVER_GIT_URI=https://github.com/stevenrq/sgivu-config-repo.git \
-  sgivu-config
+curl http://localhost:8888/sgivu-auth/dev
 ```
 
-## Build y Push Docker
+## Seguridad
 
-- `./build-image.bash` detiene/borrar contenedores previos, empaqueta con Maven y publica `stevenrq/sgivu-config:v1`.
-- Orquestadores externos (`build_push_all.bash`) pueden invocarlo automáticamente.
+- En desarrollo, se monta el repo local (native) para comodidad. En producción, se usa el repo Git remoto.
+- Asegurar que el repositorio Git es accesible y seguro (usar credenciales si es privado).
 
-## Despliegue
+## Observabilidad
 
-- Provisiona EC2 con acceso al repositorio Git, Java 21 y Docker.
-- Configura variables `SPRING_CLOUD_CONFIG_SERVER_GIT_URI` y credenciales si el repo es privado.
-- Ajusta `SERVER_PORT` si cambias el puerto expuesto.
+- **Actuator:** `health` en `http://localhost:8888/actuator/health`.
+- Monitorizar actividad de requests y acceso a endpoints `/env`, `/config` según necesidad.
 
-## Monitoreo
+## Pruebas
 
-- Actuator expone salud y métricas básicas (`/actuator/*`).
-- Puede integrarse con Micrometer hacia Prometheus.
-- Sleuth/Zipkin se habilita en los clientes que consumen configuración.
+```bash
+./mvnw test
+```
 
-## Troubleshooting
+- Test base: `src/test/java/com/sgivu/config/ConfigApplicationTests.java`
+- Recomendación: añadir tests que verifiquen carga desde Git y desde `native` para detectar fallos de parsing de propiedades.
 
-- No levanta en 8888: revisa `SPRING_CLOUD_CONFIG_SERVER_GIT_URI` y acceso al repositorio (credenciales, etiqueta).
-- Servicios sin propiedades: confirma `SPRING_CONFIG_IMPORT=configserver:http://sgivu-config:8888` y prueba `/{application}/{profile}` con curl.
+## Solución de Problemas
 
-## Buenas Prácticas y Convenciones
+| Problema | Solución |
+| --- | --- |
+| `git uri` inaccesible | Revisar `SPRING_CLOUD_CONFIG_SERVER_GIT_URI` y permisos/credenciales |
+| Cambios no reflejados | Verificar `label` y branch; usar `/?label=...` o reiniciar el servidor si se usa `native` |
 
-- Código en inglés; documentación en español; commits en inglés con Conventional Commits.
-- Usa el archivo base (sin sufijo de perfil) para valores comunes y sobrescribe solo lo necesario en `dev` o `prod`.
+## Contribuciones
 
-## Diagramas
-
-- Arquitectura general: ../../../docs/diagrams/01-system-architecture.puml
-
-## Autor
-
-- Steven Ricardo Quiñones (2025)
+1. Fork → branch → PR
+2. Añadir tests cuando cambies comportamiento

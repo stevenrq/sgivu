@@ -38,6 +38,6 @@ export function passwordStrengthValidator(): ValidatorFn {
     /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{6,}$/;
   return (control: AbstractControl): ValidationErrors | null => {
     const isValid: boolean = strongPassword.test(control.value);
-    return !isValid ? { weakPassword: { value: control.value } } : null;
+    return isValid ? null : { weakPassword: { value: control.value } };
   };
 }

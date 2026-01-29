@@ -86,16 +86,6 @@ interface VehicleFallbackResult<T extends VehicleEntity> {
   templateUrl: './vehicle-list.component.html',
   styleUrl: './vehicle-list.component.css',
 })
-/**
- * Administra el catálogo paginado de automóviles y motocicletas, sincronizando
- * los filtros con la URL y recomputando contadores cuando la API no entrega
- * valores consistentes. También define estrategias de fallback para recrear la
- * página y los totales utilizando datasets completos.
- *
- * @remarks
- * Se usa como contenedor principal del módulo, por lo que centraliza toda la
- * lógica de estado compartida entre automóviles y motocicletas.
- */
 export class VehicleListComponent implements OnInit, OnDestroy {
   private readonly carService = inject(CarService);
   private readonly motorcycleService = inject(MotorcycleService);
@@ -450,16 +440,6 @@ export class VehicleListComponent implements OnInit, OnDestroy {
     });
   }
 
-  /**
-   * Descarga una página y sus contadores para el tipo de vehículo indicado,
-   * normaliza los totales y, si la API no entrega datos consistentes, recurre a
-   * un fallback con la colección completa para reconstruir la página actual.
-   * Toda la lógica de merge se centraliza aquí para que autos y motos se
-   * comporten igual y no dupliquemos estados intermedios.
-   *
-   * @typeParam T - Tipo de entidad que se está consultando (auto o moto).
-   * @param config - Estrategia de carga, callbacks de resolución y fallback.
-   */
   private loadVehicles<T extends VehicleEntity>(
     config: VehicleLoadConfig<T>,
   ): void {
@@ -646,15 +626,6 @@ export class VehicleListComponent implements OnInit, OnDestroy {
     );
   }
 
-  /**
-   * Reconstruye los filtros de automóviles partiendo de los query params para
-   * rehidratar los formularios, los filtros activos y las etiquetas de precio.
-   * Devuelve tanto la versión “limpia” para enviar al backend como el estado
-   * que debe mostrarse en la UI.
-   *
-   * @param map - Conjunto de parámetros de consulta provenientes de la ruta.
-   * @returns Estados sincronizados para filtros efectivos, UI y etiquetas auxiliares.
-   */
   private extractCarFiltersFromQuery(map: ParamMap): {
     filters: CarSearchFilters | null;
     uiState: CarSearchFilters;
@@ -751,21 +722,21 @@ export class VehicleListComponent implements OnInit, OnDestroy {
     }
 
     const minSalePrice = this.toNumber(map.get('carMinSalePrice'));
-    if (minSalePrice !== null) {
+    if (minSalePrice == null) {
+      priceInputs.minSalePrice = '';
+    } else {
       filters.minSalePrice = minSalePrice;
       uiState.minSalePrice = minSalePrice;
       priceInputs.minSalePrice = String(minSalePrice);
-    } else {
-      priceInputs.minSalePrice = '';
     }
 
     const maxSalePrice = this.toNumber(map.get('carMaxSalePrice'));
-    if (maxSalePrice !== null) {
+    if (maxSalePrice == null) {
+      priceInputs.maxSalePrice = '';
+    } else {
       filters.maxSalePrice = maxSalePrice;
       uiState.maxSalePrice = maxSalePrice;
       priceInputs.maxSalePrice = String(maxSalePrice);
-    } else {
-      priceInputs.maxSalePrice = '';
     }
 
     const hasFilters = !this.areFiltersEmpty(
@@ -780,14 +751,6 @@ export class VehicleListComponent implements OnInit, OnDestroy {
     };
   }
 
-  /**
-   * Reconstruye los filtros de motocicletas desde la URL, aplicando la misma
-   * estrategia que en los autos para mantener sincronizados formulario, inputs
-   * monetarios y filtros efectivos que usará la búsqueda.
-   *
-   * @param map - Query params actuales usados para poblar el formulario.
-   * @returns Estados listos para backend, UI y campos monetarios.
-   */
   private extractMotorcycleFiltersFromQuery(map: ParamMap): {
     filters: MotorcycleSearchFilters | null;
     uiState: MotorcycleSearchFilters;
@@ -880,21 +843,21 @@ export class VehicleListComponent implements OnInit, OnDestroy {
     }
 
     const minSalePrice = this.toNumber(map.get('motorcycleMinSalePrice'));
-    if (minSalePrice !== null) {
+    if (minSalePrice == null) {
+      priceInputs.minSalePrice = '';
+    } else {
       filters.minSalePrice = minSalePrice;
       uiState.minSalePrice = minSalePrice;
       priceInputs.minSalePrice = String(minSalePrice);
-    } else {
-      priceInputs.minSalePrice = '';
     }
 
     const maxSalePrice = this.toNumber(map.get('motorcycleMaxSalePrice'));
-    if (maxSalePrice !== null) {
+    if (maxSalePrice == null) {
+      priceInputs.maxSalePrice = '';
+    } else {
       filters.maxSalePrice = maxSalePrice;
       uiState.maxSalePrice = maxSalePrice;
       priceInputs.maxSalePrice = String(maxSalePrice);
-    } else {
-      priceInputs.maxSalePrice = '';
     }
 
     const hasFilters = !this.areFiltersEmpty(
@@ -1141,15 +1104,6 @@ export class VehicleListComponent implements OnInit, OnDestroy {
     return { value: undefined, found: false };
   }
 
-  /**
-   * Decide si es necesario recalcular los totales usando todo el dataset cuando
-   * el backend devuelve conteos incompletos o inconsistentes. El chequeo valida
-   * la suma esperada, la información reportada y el contenido de la página
-   * actual para evitar mostrar totales irreales.
-   *
-   * @param context - Métricas derivadas de la página actual y de los contadores originales.
-   * @returns `true` cuando se debe reconstruir todo el dataset, `false` en caso contrario.
-   */
   private shouldFallbackToFullDataset(context: {
     hasCounts: boolean;
     expectedAvailable: number;
@@ -1233,20 +1187,6 @@ export class VehicleListComponent implements OnInit, OnDestroy {
     return items.slice(start, start + pageSize);
   }
 
-  /**
-   * Mezcla la información original de paginación con los elementos calculados
-   * a partir del dataset completo. Se usa cuando los totales deben ser
-   * reconstruidos, garantizando que el front conserve la semántica de
-   * `PaginatedResponse` aunque la fuente original estuviera incompleta.
-   *
-   * @typeParam T - Entidad usada por la tabla (auto o moto).
-   * @param pager - Respuesta original devuelta por la API.
-   * @param pageItems - Elementos corregidos para la página actual.
-   * @param totalElements - Total recalculado tras aplicar el fallback.
-   * @param pageSize - Tamaño efectivo de la página corregida.
-   * @param pageIndex - Índice actual de la página.
-   * @returns Nueva respuesta paginada consistente con los datos corregidos.
-   */
   private mergePagerWithFallback<T extends VehicleEntity>(
     pager: PaginatedResponse<T>,
     pageItems: T[],

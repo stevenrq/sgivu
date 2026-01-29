@@ -14,13 +14,8 @@ import software.amazon.awssdk.services.s3.model.PutBucketCorsRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 
 /**
- * Configura CORS en el bucket de S3 usado para almacenar las imágenes.
- *
- * <p>El frontend sube los archivos directamente al bucket mediante URLs prefirmadas, por lo que el
- * bucket debe permitir peticiones cross-origin desde el/los dominios del frontend.
- *
- * <p>Automatiza la política CORS en arranque para evitar fallos de carga en la vitrina y en los
- * clientes móviles que consumen URLs prefirmadas.
+ * Configuración automática de CORS para el bucket S3 de vehículos. Permite solicitudes desde los
+ * orígenes especificados en la configuración de la aplicación.
  */
 @Component
 public class S3BucketCorsConfig {
@@ -31,13 +26,6 @@ public class S3BucketCorsConfig {
   private final String bucket;
   private final List<String> allowedOrigins;
 
-  /**
-   * Construye el componente con dependencias externas y orígenes permitidos.
-   *
-   * @param s3Client cliente configurado para el bucket
-   * @param bucket nombre del bucket de imágenes de vehículos
-   * @param allowedOrigins lista separada por comas con orígenes autorizados
-   */
   public S3BucketCorsConfig(
       S3Client s3Client,
       @Value("${aws.s3.vehicles-bucket}") String bucket,
@@ -47,10 +35,6 @@ public class S3BucketCorsConfig {
     this.allowedOrigins = parseOrigins(allowedOrigins);
   }
 
-  /**
-   * Verifica al iniciar si el bucket ya tiene la regla CORS necesaria y, de no existir, la crea o
-   * actualiza. Protege la subida desde frontends mediante URLs prefirmadas.
-   */
   @PostConstruct
   public void ensureBucketCors() {
     CORSRule uploadRule =
@@ -101,13 +85,6 @@ public class S3BucketCorsConfig {
     }
   }
 
-  /**
-   * Revisa si la configuración actual del bucket ya incluye la regla objetivo para evitar
-   * sobreescrituras innecesarias.
-   *
-   * @param targetRule regla esperada
-   * @return {@code true} si la regla ya está configurada
-   */
   private boolean isRuleAlreadyPresent(CORSRule targetRule) {
     try {
       var existing = s3Client.getBucketCors(GetBucketCorsRequest.builder().bucket(bucket).build());
@@ -117,14 +94,6 @@ public class S3BucketCorsConfig {
     }
   }
 
-  /**
-   * Compara reglas CORS asegurando que métodos, orígenes y encabezados cumplan con la regla
-   * esperada.
-   *
-   * @param existing regla actual en el bucket
-   * @param expected regla deseada
-   * @return {@code true} si la regla actual cubre lo esperado
-   */
   private boolean matchesRule(CORSRule existing, CORSRule expected) {
     var expectedMethods =
         expected.allowedMethods().stream().map(m -> m.toUpperCase(Locale.ROOT)).toList();
@@ -140,12 +109,6 @@ public class S3BucketCorsConfig {
     return methodsOk && originsOk && headersOk;
   }
 
-  /**
-   * Normaliza la lista de orígenes permitidos a partir de la propiedad separada por comas.
-   *
-   * @param raw valor crudo de configuración
-   * @return lista de orígenes; si está vacía, retorna comodín
-   */
   private List<String> parseOrigins(String raw) {
     List<String> origins =
         Arrays.stream(raw.split(",")).map(String::trim).filter(s -> !s.isBlank()).toList();

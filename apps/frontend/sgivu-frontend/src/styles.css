@@ -1,4 +1,3 @@
-/* Tema claro: define tokens base para el modo luz y sirven como fallback global */
 :root {
   color-scheme: light;
   --bg-page: #fff;
@@ -47,7 +46,6 @@
   --bs-primary-rgb: var(--accent-rgb);
 }
 
-/* Tema oscuro: se activan al colocar data-theme="dark" en <html> y sobreescriben los tokens */
 :root[data-theme="dark"] {
   color-scheme: dark;
   --bg-page: #0b1220;
@@ -194,7 +192,6 @@ h6 {
   padding: 1.2rem;
 }
 
-/* Mantener el pie de página en blanco puro solo en el tema claro para separar las acciones del cuerpo */
 :root:not([data-theme="dark"]) .form-shell-main .card-footer {
   background-color: #ffffff;
 }

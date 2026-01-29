@@ -5,10 +5,6 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
-/**
- * Respuesta pública de una empresa. Usada para contratos corporativos y control de proveedores en
- * inventario.
- */
 @Data
 @NoArgsConstructor
 @EqualsAndHashCode(callSuper = true)

@@ -8,10 +8,6 @@ import java.time.Instant;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Entidad que persiste el estado completo de una autorización OAuth2/OIDC para permitir su
- * reconstrucción y revocación centralizada.
- */
 @Data
 @NoArgsConstructor
 @Entity

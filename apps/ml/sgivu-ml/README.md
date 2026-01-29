@@ -1,132 +1,108 @@
-# SGIVU - sgivu-ml
+# sgivu-ml - SGIVU
 
 ## Descripción
 
-Servicio FastAPI para estimar demanda mensual de vehículos usados por tipo/marca/línea/modelo, integrado con los microservicios SGIVU.
+**`sgivu-ml`** es el microservicio de modelado y predicción del ecosistema **SGIVU**. Expone APIs REST para realizar predicciones (por ejemplo: demanda estimada por segmento), consultar metadata del modelo y disparar reentrenamientos. Está implementado con FastAPI y se ejecuta con Uvicorn; los artefactos de modelo se versionan con `joblib` y pueden persistirse opcionalmente en PostgreSQL.
 
-## Arquitectura y Rol
+## Tecnologías y Dependencias
 
-- Servicio Python (FastAPI) que consume datos vía `sgivu-gateway` respetando OAuth2 y circuit breakers.
-- Usa contratos y datos de inventario para preparar dataset y generar predicciones de demanda.
-- Persiste modelos, snapshots de entrenamiento y predicciones en PostgreSQL cuando `DATABASE_URL` está configurada; fallback a disco en `models/` si no hay DB.
+- Python 3.12
+- FastAPI + Uvicorn
+- scikit-learn, XGBoost (opcional), joblib
+- pandas, numpy
+- SQLAlchemy + psycopg2 (PostgreSQL)
+- Authlib / PyJWT (validación de JWT)
+- Pydantic (configuración y validación)
 
-### Fuentes de datos
+(Revisar `requirements.txt` para la lista completa de paquetes.)
 
-- Gateway hacia `sgivu-purchase-sale` (`/v1/purchase-sales/search`, `/v1/purchase-sales/detailed`).
-- Gateway hacia inventario (`/v1/cars/{id}`, `/v1/motorcycles/{id}`) para atributos de vehículo.
-- Campos clave: contractType/status, precios, paymentMethod, fechas, vehicleId, clientId, userId, VehicleSummary.
+## Requisitos Previos
 
-### Diseño del dataset
+- Python 3.12 (o usar la imagen Docker proporcionada)
+- PostgreSQL si desea persistir modelos, snapshots o registros de predicción
+- `sgivu-config` / `sgivu-auth` operativos si se valida JWT vía OIDC
 
-- Objetivo: `sales_count` mensual por segmento (vehicle_type, brand, line, model).
-- Features: precios compra/venta, margen, días en inventario, rotación, estacionalidad (mes/año, seno/coseno), lags/rolling (1/3/6), estado de contrato y vehículo.
+## Arranque y Ejecución
 
-### Pipeline de entrenamiento
+### Desarrollo (local)
 
-1) Carga async de contratos vía gateway + enriquecimiento de inventario.
-2) Normalización de categorías/fechas y cálculo de margen/días en inventario.
-3) Agregación mensual por segmento.
-4) Features temporales (lags/rolling/estacionalidad/rotación).
-5) Split temporal 80/20 y evaluación de modelos (LinearRegression, RandomForestRegressor, XGBRegressor si disponible).
-6) Selección por RMSE y serialización en PostgreSQL (si `DATABASE_URL`) o en `models/{model_name}_{version}.joblib` + `models/latest.json`.
-7) `/v1/ml/retrain` dispara entrenamiento; `scripts/cron_retrain.sh` permite cron.
+1. Crear y exportar variables de entorno necesarias (ver sección "Variables de entorno" más abajo).
+2. Instalar dependencias:
 
-## Tecnologías
+   ```bash
+   python -m pip install -r requirements.txt
+   ```
 
-- Lenguaje: Python 3.12
-- Framework: FastAPI
-- ML: scikit-learn, joblib (opcional XGBoost)
-- Infraestructura: Docker, scripts Bash para cron/retrain
+3. Ejecutar servicio en modo dev:
 
-## Configuración
+   ```bash
+   uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+   ```
 
-- Variables clave: `DATABASE_URL`, `DATABASE_ENV`, `SGIVU_PURCHASE_SALE_URL`, `SGIVU_VEHICLE_URL`, `SGIVU_AUTH_DISCOVERY_URL`, `AUTH_JWKS_URL`, `AUTH_PUBLIC_KEY`, `SERVICE_INTERNAL_SECRET_KEY`.
-- `DATABASE_URL` tiene prioridad si se define; caso contrario usa `DEV_ML_DB_*` / `PROD_ML_DB_*`.
-- `DATABASE_AUTO_CREATE=true` crea tablas en arranque (solo dev) o ejecuta `scripts/schema.sql`.
+### Demo offline
 
-### Persistencia en PostgreSQL
+- Existen scripts de demo y entrenamiento en `tests/` para ejecutar pipelines de entrenamiento y generar predicciones de ejemplo sin depender de la DB.
 
-- Configura `DATABASE_URL` (por ejemplo `postgresql://user:pass@host:5432/sgivu_ml`) o usa `DEV_ML_DB_*` / `PROD_ML_DB_*` para construirla.
-- Selecciona el entorno con `DATABASE_ENV=dev|prod` (o usa `ENVIRONMENT`; `DATABASE_URL` tiene prioridad).
-- Se almacenan: modelos serializados, snapshots de features mensuales y solicitudes de predicción.
-
-## Ejecución Local
+### Docker
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-UVICORN_CMD="uvicorn app.main:app --reload --host 0.0.0.0 --port 8000" ./run.sh
+./build-image.bash
+docker run --env-file infra/compose/sgivu-docker-compose/.env -p 8000:8000 stevenrq/sgivu-ml:v1
 ```
 
-### Prueba offline con CSV
+### Producción
 
-- `tests/csv_offline_demo.py` permite entrenar y predecir sin microservicios.
+En producción el servicio normalmente se expone a través de `sgivu-gateway` que enruta `/v1/ml/**` a `http://sgivu-ml:8000`.
 
-```text
-python tests/csv_offline_demo.py --csv /ruta/datos.csv --horizon 6 --vehicle-type MOTORCYCLE --brand YAMAHA --model "MT-03" --line ABC-89F
-```
+## Puertos
 
-- Scripts rápidos:
-  - `tests/run_offline_demo_db.sh`: usa PostgreSQL si está configurado.
-  - `tests/run_offline_demo_memory.sh`: fuerza ejecución en memoria.
-- Datos sintéticos: `tests/generate_contracts.py`; los scripts generan `tests/data/forecast.png` y artefactos en `tests/models_offline/`.
+- Puerto por defecto: **8000** (Uvicorn)
 
-## Endpoints Principales
+## Endpoints principales
 
-```text
-GET  /health
-POST /v1/ml/predict
-POST /v1/ml/retrain
-GET  /v1/ml/models/latest
-```
+| Endpoint | Método | Descripción |
+| --- | ---: | --- |
+| `/actuator/health` ó `/health` | GET | Health check básico |
+| `/v1/ml/predict` | POST | Solicitar predicción (payload: features) |
+| `/v1/ml/predict-with-history` | POST | Predicción + historial para graficar |
+| `/v1/ml/retrain` | POST | Disparar reentrenamiento (opcional con rango de fechas) |
+| `/v1/ml/models/latest` | GET | Metadata del último modelo entrenado |
+| `/docs` | GET | Documentación OpenAPI (UI de FastAPI) |
 
-- `/v1/ml/predict`: cuerpo con `vehicle_type`, `brand`, `model`, `line`, `horizon_months` (1-24), `confidence`.
-- `/v1/ml/retrain`: opcional `start_date`, `end_date`; retorna versión y métricas.
-- `/v1/ml/models/latest`: metadata del modelo activo.
+> Consultar `app/main.py` y los routers en `app/routers/` para la definición exacta de rutas y payloads.
 
 ## Seguridad
 
-- Todas las rutas excepto `/health` requieren `Authorization: Bearer <JWT>`.
-- Valida JWT OIDC con JWKS (`AUTH_JWKS_URL` o `SGIVU_AUTH_DISCOVERY_URL`) o llave pública (`AUTH_PUBLIC_KEY`); verifica `exp`, `iss`, `aud` si se configuran `AUTH_ISSUER`/`AUTH_AUDIENCE`.
-- Permisos por claim `rolesAndPermissions`: `ml:predict`, `ml:retrain`, `ml:models` (ajustables vía `PERMISSIONS_*`).
-- Clave interna opcional con `SERVICE_INTERNAL_SECRET_KEY` para llamadas service-to-service.
+- Validación de tokens JWT mediante OIDC (configurable, `SGIVU_AUTH_DISCOVERY_URL` / parámetros relacionados).
+- Para llamadas internas entre servicios se soporta el encabezado `X-Internal-Service-Key` (clave compartida interna). **No exponer** esta clave públicamente.
+- Recomendación: el `sgivu-gateway` debe manejar el token y propagarlo hacia `sgivu-ml` si corresponde.
 
-## Dependencias
+## Base de datos
 
-- `sgivu-gateway` (fuente de datos), `sgivu-auth` (JWT), PostgreSQL para persistencia opcional, storage de artefactos en volumen `models/`.
+- Si se habilita persistencia en PostgreSQL, el esquema y scripts de creación se encuentran en `apps/ml/sgivu-ml/app/database/schema.sql`. El servicio puede persistir:
+  - Artefactos de modelo (`ml_model_artifacts`)
+  - Snapshots de features (`ml_training_features`)
+  - Registros de predicción (`ml_predictions`)
 
-## Dockerización
+## Observabilidad
 
-- Dockerfile basado en Python 3.12 slim; `run.sh` como entrypoint.
-- En Compose dev: servicio `sgivu-ml` en puerto 8000 con volumen `sgivu-ml-models`.
+- OpenAPI docs disponibles en `/docs` (FastAPI).
 
-## Build y Push Docker
+## Pruebas
 
-- `./build-image.bash` limpia contenedores previos y publica `stevenrq/sgivu-ml:v1` (sin Maven al ser Python).
+- Hay scripts de demo y tests de integración/discovery en `tests/` para ejecución local y pruebas de entrenamiento/predicción.
+- Recomendación: añadir tests unitarios e integración que validen el comportamiento de training/prediction y validaciones de payload.
 
-## Despliegue
+## Solución de Problemas
 
-- Montar volumen `models/` para persistir artefactos.
-- Configurar URLs a gateway (`SGIVU_PURCHASE_SALE_URL`, `SGIVU_VEHICLE_URL`) y validación OIDC (`SGIVU_AUTH_DISCOVERY_URL` o `AUTH_*`).
+| Problema | Posible causa | Acción |
+| --- | --- | --- |
+| Sin modelo disponible | No se ha entrenado o no hay artefactos en `MODEL_DIR` ni DB | Ejecutar pipeline de entrenamiento o cargar artefacto de modelo |
+| Error de conexión a BD | `DATABASE_URL` mal o DB inaccesible | Revisar variables de entorno y conectividad a PostgreSQL |
+| 401/403 en predicción | Token JWT inválido o falta `X-Internal-Service-Key` | Verificar issuer, scopes y header interno |
+| Predicciones inconsistentes | Data/features fuera de distribución esperada | Revisar preprocesamiento y reglas de features; reentrenar si es necesario |
 
-## Monitoreo
+## Contribuciones
 
-- `/health` para checks; logs estructurados. Agregar Prometheus/OTel según necesidad.
-
-## Troubleshooting
-
-- 401/invalid_token: revisa JWKS/issuer/`PERMISSIONS_*`.
-- Timeouts cargando datos: valida URLs de gateway y latencias.
-- Modelos no se guardan: confirma `DATABASE_URL` o volumen `models/` y permisos de escritura.
-
-## Buenas Prácticas y Convenciones
-
-- Código en inglés; docs en español; commits en inglés con Conventional Commits.
-
-## Diagramas
-
-- Arquitectura general: `../../../docs/diagrams/01-system-architecture.puml`.
-
-## Autor
-
-- Steven Ricardo Quiñones (2025)
+1. Fork → branch → PR
+2. Incluir tests para cambios funcionales (especialmente training/prediction)

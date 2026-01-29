@@ -5,15 +5,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 import lombok.Getter;
 
-/**
- * Filtros dinámicos para consultas de autos.
- *
- * <p>Permite al front y a otros microservicios filtrar inventario por atributos clave usados en
- * cotizaciones y predicción de demanda (rango de precios, año, combustible, etc.).
- *
- * @apiNote Se usa junto a {@link com.sgivu.vehicle.specification.CarSpecifications} para construir
- *     consultas JPA sin concatenar SQL manual.
- */
 @Getter
 @Builder
 @Schema(description = "Filtros dinámicos para consultas de autos")

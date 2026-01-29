@@ -1,36 +1,22 @@
--- Seed: Datos iniciales para desarrollo y pruebas
+-- Datos iniciales para desarrollo y pruebas
 -- Usa ON CONFLICT DO NOTHING para ser idempotente y compatible con datos de producción migrados.
 
--- =============================================================================
--- DATOS: addresses
--- =============================================================================
 INSERT INTO addresses (id, street, number, city, created_at, updated_at)
 VALUES (1, 'Carrera 22a', '23-60', 'Montería', NOW(), NOW()),
        (2, 'Main Street', '12-34', 'Anytown', NOW(), NOW())
 ON CONFLICT (id) DO NOTHING;
 
--- =============================================================================
--- DATOS: persons
--- =============================================================================
 INSERT INTO persons (id, national_id, first_name, last_name, phone_number, email, created_at, updated_at, address_id)
 VALUES (1, 1003395547, 'Steven', 'Ricardo Quiñones', 3207108160, 'stevenrq8@gmail.com', NOW(), NOW(), 1),
        (2, 9876543210, 'Jane', 'Smith', 9876543210, 'janesmith@gmail.com', NOW(), NOW(), 2)
 ON CONFLICT (email) DO NOTHING;
 
--- =============================================================================
--- DATOS: users
--- Contraseñas hasheadas con BCrypt
--- janesmith: Jane123#
--- =============================================================================
 INSERT INTO users (person_id, username, password, enabled, account_non_expired, account_non_locked,
                    credentials_non_expired)
 VALUES (1, 'steven', '$2a$12$Leo18wuk2P7KndFa3X3AperisbsMVJQ5WQE5JEB0DxM7FJPpiQn5q', true, true, true, true),
        (2, 'janesmith', '$2a$12$dflehQK6T6867eN73Fv0m.bvpgNgJy2v88s9L.6QAd.skoDCxdP/e', true, true, true, true)
 ON CONFLICT (person_id) DO NOTHING;
 
--- =============================================================================
--- DATOS: roles
--- =============================================================================
 INSERT INTO roles (id, name, description, created_at, updated_at)
 VALUES (1, 'ADMIN',
         'Rol con acceso total al sistema. Permite gestionar usuarios, roles, configuraciones, y supervisar todas las operaciones sin restricciones. Corresponde al ''Administrador General'' del sistema.',
@@ -40,10 +26,6 @@ VALUES (1, 'ADMIN',
         NOW(), NOW())
 ON CONFLICT (name) DO NOTHING;
 
--- =============================================================================
--- DATOS: permissions
--- Permisos CRUD por entidad del sistema
--- =============================================================================
 INSERT INTO permissions (id, name, description, created_at, updated_at)
 VALUES (1, 'user:create', 'Permite crear nuevos usuarios en el sistema', NOW(), NOW()),
        (2, 'user:read', 'Permite visualizar la información de los usuarios registrados.', NOW(), NOW()),
@@ -90,57 +72,49 @@ VALUES (1, 'user:create', 'Permite crear nuevos usuarios en el sistema', NOW(), 
        (39, 'ml:models', 'Permite gestionar los modelos de machine learning del sistema.', NOW(), NOW())
 ON CONFLICT (name) DO NOTHING;
 
--- =============================================================================
--- DATOS: roles_permissions
--- Asignación de permisos a roles (ADMIN tiene todos, USER solo lectura básica)
--- =============================================================================
 INSERT INTO roles_permissions (role_id, permission_id)
-VALUES (1, 1),  -- ADMIN: user:create
-       (1, 2),  -- ADMIN: user:read
-       (1, 3),  -- ADMIN: user:update
-       (1, 4),  -- ADMIN: user:delete
-       (1, 5),  -- ADMIN: role:create
-       (1, 6),  -- ADMIN: role:read
-       (1, 7),  -- ADMIN: role:update
-       (1, 8),  -- ADMIN: role:delete
-       (1, 9),  -- ADMIN: permission:create
-       (1, 10), -- ADMIN: permission:read
-       (1, 11), -- ADMIN: permission:update
-       (1, 12), -- ADMIN: permission:delete
-       (1, 13), -- ADMIN: person:create
-       (1, 14), -- ADMIN: person:read
-       (1, 15), -- ADMIN: person:update
-       (1, 16), -- ADMIN: person:delete
-       (1, 17), -- ADMIN: company:create
-       (1, 18), -- ADMIN: company:read
-       (1, 19), -- ADMIN: company:update
-       (1, 20), -- ADMIN: company:delete
-       (1, 21), -- ADMIN: vehicle:create
-       (1, 22), -- ADMIN: vehicle:read
-       (1, 23), -- ADMIN: vehicle:update
-       (1, 24), -- ADMIN: vehicle:delete
-       (1, 25), -- ADMIN: car:create
-       (1, 26), -- ADMIN: car:read
-       (1, 27), -- ADMIN: car:update
-       (1, 28), -- ADMIN: car:delete
-       (1, 29), -- ADMIN: motorcycle:create
-       (1, 30), -- ADMIN: motorcycle:read
-       (1, 31), -- ADMIN: motorcycle:update
-       (1, 32), -- ADMIN: motorcycle:delete
-       (1, 33), -- ADMIN: purchase_sale:create
-       (1, 34), -- ADMIN: purchase_sale:read
-       (1, 35), -- ADMIN: purchase_sale:update
-       (1, 36), -- ADMIN: purchase_sale:delete
-       (1, 37), -- ADMIN: ml:predict
-       (1, 38), -- ADMIN: ml:retrain
-       (1, 39), -- ADMIN: ml:models
-       (2, 2)   -- USER: user:read
+VALUES (1, 1),
+       (1, 2),
+       (1, 3),
+       (1, 4),
+       (1, 5),
+       (1, 6),
+       (1, 7),
+       (1, 8),
+       (1, 9),
+       (1, 10),
+       (1, 11),
+       (1, 12),
+       (1, 13),
+       (1, 14),
+       (1, 15),
+       (1, 16),
+       (1, 17),
+       (1, 18),
+       (1, 19),
+       (1, 20),
+       (1, 21),
+       (1, 22),
+       (1, 23),
+       (1, 24),
+       (1, 25),
+       (1, 26),
+       (1, 27),
+       (1, 28),
+       (1, 29),
+       (1, 30),
+       (1, 31),
+       (1, 32),
+       (1, 33),
+       (1, 34),
+       (1, 35),
+       (1, 36),
+       (1, 37),
+       (1, 38),
+       (1, 39),
+       (2, 2)
 ON CONFLICT (role_id, permission_id) DO NOTHING;
 
--- =============================================================================
--- DATOS: users_roles
--- Asignación de roles a usuarios
--- =============================================================================
 INSERT INTO users_roles (user_id, role_id)
 VALUES (1, 1), -- steven: ADMIN
        (1, 2), -- steven: USER

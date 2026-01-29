@@ -1,4 +1,3 @@
-<!-- eslint-disable @angular-eslint/template/prefer-control-flow -->
 <app-form-shell
   [loading]="formLoading || isLoadingLookups()"
   [title]="'Registrar contrato de compraventa'"
@@ -61,15 +60,15 @@
           <div class="col-12">
             <label
               for="contractTypePurchase"
+              id="contract-type-label"
               class="form-label d-flex align-items-center gap-2 mb-2"
             >
               <i class="bi bi-toggle2-on text-primary"></i>
               Tipo de contrato
             </label>
-            <div
+            <fieldset
               class="contract-type-toggle"
-              role="group"
-              aria-label="Tipo de contrato"
+              aria-labelledby="contract-type-label"
             >
               <input
                 type="radio"
@@ -123,7 +122,7 @@
                   >
                 </div>
               </label>
-            </div>
+            </fieldset>
             @if (showControlErrors(contractTypeCtrl)) {
               <div class="invalid-feedback d-block">
                 Selecciona el tipo de contrato.
@@ -277,18 +276,22 @@
               }
             } @else {
               <div class="price-field">
-                <label for="contractPurchasePrice">Precio de compra</label>
+                <label for="contractPurchasePriceReadonly"
+                  >Precio de compra</label
+                >
                 <div class="input-group price-group readonly">
                   <span class="input-group-text">$</span>
                   <input
                     type="text"
                     class="form-control"
-                    id="contractPurchasePrice"
-                    name="contractPurchasePrice"
+                    id="contractPurchasePriceReadonly"
+                    name="contractPurchasePriceReadonly"
                     [value]="
                       formatCurrency(contractForm.purchasePrice) || 'N/D'
                     "
                     readonly
+                    aria-readonly="true"
+                    tabindex="-1"
                     placeholder="Precio de compra"
                   />
                 </div>

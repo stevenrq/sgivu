@@ -14,15 +14,6 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 
-/**
- * Payload para actualizar datos de autos desde capas externas.
- *
- * <p>Valida campos críticos para el inventario (placas, números de serie/motor) evitando duplicados
- * que rompan auditorías de compras y contratos asociados.
- *
- * @apiNote Las validaciones se basan en anotaciones estándar y son reforzadas en la capa de
- *     servicio para mantener coherencia con PostgreSQL.
- */
 @Getter
 @Setter
 @ToString

@@ -7,19 +7,9 @@ import com.sgivu.client.entity.Person;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
-/**
- * Mapeos entre entidades y DTOs expuestos a otros microservicios SGIVU. Garantiza que se trasladen
- * solo los campos relevantes para contratos, inventario y predicción.
- */
 @Mapper(componentModel = "spring")
 public interface ClientMapper {
 
-  /**
-   * Convierte una empresa a respuesta pública conservando datos fiscales y de contacto.
-   *
-   * @param company entidad origen
-   * @return DTO de respuesta
-   */
   @Mapping(source = "id", target = "id")
   @Mapping(source = "address", target = "address")
   @Mapping(source = "phoneNumber", target = "phoneNumber")
@@ -29,12 +19,6 @@ public interface ClientMapper {
   @Mapping(source = "companyName", target = "companyName")
   CompanyResponse toCompanyResponse(Company company);
 
-  /**
-   * Convierte una persona a DTO de respuesta consumido por contratos y flujos de ventas.
-   *
-   * @param person entidad origen
-   * @return DTO de respuesta
-   */
   @Mapping(source = "id", target = "id")
   @Mapping(source = "address", target = "address")
   @Mapping(source = "phoneNumber", target = "phoneNumber")

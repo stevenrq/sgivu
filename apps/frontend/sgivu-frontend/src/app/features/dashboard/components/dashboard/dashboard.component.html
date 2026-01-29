@@ -1,4 +1,3 @@
-<!-- eslint-disable @angular-eslint/template/prefer-control-flow -->
 <div class="container-fluid dashboard-page">
   @if (loadError) {
     <div class="alert alert-danger mb-4" role="alert">{{ loadError }}</div>
@@ -176,10 +175,10 @@
                   [disabled]="predictionLoading || quickVehicleLoading"
                 >
                   @if (predictionLoading) {
-                    <span
+                    <output
                       class="spinner-border spinner-border-sm me-2"
-                      role="status"
-                    ></span>
+                      aria-live="polite"
+                    ></output>
                   }
                   Consultar
                 </button>
@@ -218,10 +217,10 @@
           <div class="chart-container position-relative">
             @if (predictionLoading) {
               <div class="chart-placeholder text-center text-muted">
-                <div
+                <output
                   class="spinner-border text-primary mb-2"
-                  role="status"
-                ></div>
+                  aria-live="polite"
+                ></output>
                 <div>Entrenando y calculando pronóstico...</div>
               </div>
             } @else if (demandData) {
@@ -275,9 +274,12 @@
         >
           @if (isLoading) {
             <div class="text-center text-muted py-4">
-              <div class="spinner-border text-primary mb-2" role="status">
+              <output
+                class="spinner-border text-primary mb-2"
+                aria-live="polite"
+              >
                 <span class="visually-hidden">Cargando gráficos...</span>
-              </div>
+              </output>
               <div>Preparando datos del inventario...</div>
             </div>
           } @else if (inventoryData) {

@@ -10,25 +10,10 @@ import java.util.List;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.util.StringUtils;
 
-/**
- * Construye especificaciones dinámicas para filtrar autos según múltiples criterios.
- *
- * <p>Permite combinar filtros complejos en consultas JPA sin perder la capacidad de usar índices de
- * PostgreSQL, clave para los listados del inventario y las integraciones con analítica de demanda.
- */
 public final class CarSpecifications {
 
   private CarSpecifications() {}
 
-  /**
-   * Genera un {@link Specification} a partir de los filtros recibidos.
-   *
-   * <p>Construye predicados solo cuando hay filtros presentes para evitar full scans innecesarios
-   * en PostgreSQL.
-   *
-   * @param criteria filtros opcionales
-   * @return especificación lista para el repositorio
-   */
   public static Specification<Car> withFilters(CarSearchCriteria criteria) {
     return (root, query, cb) -> {
       if (criteria == null) {
@@ -77,14 +62,6 @@ public final class CarSpecifications {
     };
   }
 
-  /**
-   * Agrega un predicado LIKE, ignorando mayúsculas, cuando hay texto válido.
-   *
-   * @param predicates lista donde se acumulan filtros
-   * @param cb builder de criterios
-   * @param path atributo de la entidad a filtrar
-   * @param value texto buscado
-   */
   private static void like(
       List<Predicate> predicates, CriteriaBuilder cb, Path<String> path, String value) {
     if (!StringUtils.hasText(value)) {
@@ -93,16 +70,6 @@ public final class CarSpecifications {
     predicates.add(cb.like(cb.lower(path), "%" + value.trim().toLowerCase() + "%"));
   }
 
-  /**
-   * Agrega límites mínimos y máximos para atributos numéricos.
-   *
-   * @param predicates predicados acumulados
-   * @param cb builder de criterios
-   * @param path ruta al atributo numérico
-   * @param min valor mínimo permitido
-   * @param max valor máximo permitido
-   * @param <N> tipo numérico comparable
-   */
   private static <N extends Number & Comparable<N>> void range(
       List<Predicate> predicates, CriteriaBuilder cb, Path<N> path, N min, N max) {
     if (min != null) {

@@ -14,7 +14,6 @@ import { RouterModule } from '@angular/router';
   templateUrl: './sidebar.component.html',
   styleUrl: './sidebar.component.css',
 })
-/** Barra lateral responsive que colapsa en vista móvil y controla su propio estado. */
 export class SidebarComponent implements OnInit {
   private readonly platformId = inject(PLATFORM_ID);
 

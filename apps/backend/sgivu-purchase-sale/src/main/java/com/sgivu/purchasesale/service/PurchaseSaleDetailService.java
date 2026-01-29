@@ -22,12 +22,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 
 /**
- * Servicio encargado de construir respuestas detalladas de compra-venta, enriqueciendo la
- * información del contrato con datos resumidos del cliente, usuario y vehículo asociados.
- *
- * <p>Este servicio consulta microservicios externos para obtener la información relacionada y
- * utiliza caché interna para evitar llamadas redundantes durante el procesamiento de múltiples
- * contratos.
+ * Servicio para transformar entidades de compra-venta en respuestas detalladas, enriqueciendo con
+ * datos de clientes, usuarios y vehículos desde servicios remotos.
  */
 @Service
 public class PurchaseSaleDetailService {
@@ -48,13 +44,6 @@ public class PurchaseSaleDetailService {
     this.vehicleServiceClient = vehicleServiceClient;
   }
 
-  /**
-   * Transforma una lista de entidades en DTOs detallados consultando servicios externos y
-   * utilizando caché en memoria para evitar llamadas repetidas dentro del mismo lote.
-   *
-   * @param contracts contratos crudos obtenidos desde la base de datos
-   * @return lista de respuestas enriquecidas
-   */
   public List<PurchaseSaleDetailResponse> toDetails(List<PurchaseSale> contracts) {
     Map<Long, ClientSummary> clientCache = new HashMap<>();
     Map<Long, UserSummary> userCache = new HashMap<>();
@@ -88,13 +77,6 @@ public class PurchaseSaleDetailService {
     return toDetails(List.of(contract)).stream().findFirst().orElse(null);
   }
 
-  /**
-   * Resuelve un cliente (persona o empresa) consultando el microservicio de clientes. Si no existe
-   * retorna un placeholder con tipo UNKNOWN.
-   *
-   * @param clientId identificador del cliente ligado al contrato
-   * @return resumen listo para usar en reportes/listados
-   */
   private ClientSummary resolveClientSummary(Long clientId) {
     try {
       Person person = clientServiceClient.getPersonById(clientId);
@@ -137,13 +119,6 @@ public class PurchaseSaleDetailService {
     }
   }
 
-  /**
-   * Resuelve la información básica del usuario responsable. Devuelve un registro genérico cuando el
-   * servicio remoto no encuentra al usuario.
-   *
-   * @param userId identificador del usuario
-   * @return resumen del usuario o datos neutralizados
-   */
   private UserSummary resolveUserSummary(Long userId) {
     try {
       User user = userServiceClient.getUserById(userId);
@@ -166,13 +141,6 @@ public class PurchaseSaleDetailService {
     }
   }
 
-  /**
-   * Obtiene los datos esenciales del vehículo. Intenta primero como carro, luego como motocicleta y
-   * finalmente retorna un placeholder si no existe en ninguno de los servicios.
-   *
-   * @param vehicleId identificador del vehículo
-   * @return resumen para mostrar en UI/reportes
-   */
   private VehicleSummary resolveVehicleSummary(Long vehicleId) {
     try {
       Car car = vehicleServiceClient.getCarById(vehicleId);

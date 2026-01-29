@@ -17,7 +17,6 @@ entorno de despliegue.
 En desarrollo local **no se usa Nginx**. Los puertos de los servicios se exponen directamente:
 
 - `sgivu-auth` → puerto 9000
-- `sgivu-gateway` → puerto 8080
 
 ### Configuración requerida
 
@@ -31,7 +30,6 @@ Agregar:
 
 ```text
 127.0.0.1 sgivu-auth
-127.0.0.1 sgivu-gateway
 ```
 
 ### Verificación

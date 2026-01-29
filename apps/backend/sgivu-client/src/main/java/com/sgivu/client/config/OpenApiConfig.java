@@ -48,7 +48,6 @@ public class OpenApiConfig {
                 .license(
                     new License().name("MIT License").url("https://opensource.org/license/MIT")))
         .servers(servers)
-        // Configuración para JWT (Authorization: Bearer <token>)
         .addSecurityItem(new SecurityRequirement().addList(BEARER_AUTH))
         .components(
             new Components()

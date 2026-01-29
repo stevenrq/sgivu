@@ -20,10 +20,6 @@ export interface SavedPredictionState {
   latestModel: ModelMetadata | null;
 }
 
-/**
- * Guarda el último estado de la predicción para que el gráfico permanezca visible
- * al navegar a otras secciones y volver al panel.
- */
 @Injectable({
   providedIn: 'root',
 })
@@ -57,9 +53,7 @@ export class DashboardStateService {
     }
     try {
       localStorage.setItem(this.storageKey, JSON.stringify(state));
-    } catch {
-      // Ignore storage errors
-    }
+    } catch {}
   }
 
   private readFromStorage(): SavedPredictionState | null {
@@ -84,9 +78,7 @@ export class DashboardStateService {
     }
     try {
       localStorage.removeItem(this.storageKey);
-    } catch {
-      // Swallow storage removal errors (e.g., quota or privacy mode)
-    }
+    } catch {}
   }
 
   private hasStorage(): boolean {
