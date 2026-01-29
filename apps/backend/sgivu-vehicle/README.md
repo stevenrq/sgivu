@@ -1,132 +1,105 @@
-# SGIVU - sgivu-vehicle
+# sgivu-vehicle - SGIVU
 
 ## Descripción
 
-Microservicio que centraliza el inventario de vehículos (autos y motocicletas) con operaciones CRUD, búsqueda y métricas
-rápidas.
+`sgivu-vehicle` gestiona el catálogo de vehículos (autos y motocicletas) y las imágenes asociadas. Soporta CRUD, búsquedas avanzadas, gestión de estado (available/unavailable), y subida/gestión de imágenes mediante S3 con URLs prefirmadas.
 
-## Arquitectura y Rol
+## Tecnologías y Dependencias
 
-- Microservicio Spring Boot / Spring Cloud orientado a catálogo vehicular.
-- Interactúa con `sgivu-config`, `sgivu-discovery`, `sgivu-gateway`, `sgivu-auth`.
-- Controladores REST `/v1/cars` y `/v1/motorcycles`; registro en Eureka; config desde Config Server.
-- Persistencia JOINED en PostgreSQL (vehicles/cars/motorcycles) con seeds opcionales (`schema.sql`).
+- Java 21
+- Spring Boot 4.0.1
+- Spring Security (Resource Server)
+- Spring Data JPA + PostgreSQL
+- Flyway
+- AWS SDK S3 (software.amazon.awssdk.s3)
+- Spring Cloud Config Client
+- Spring Cloud Eureka Client
+- SpringDoc OpenAPI (Swagger UI)
+- MapStruct, Lombok
 
-## Tecnologías
+## Requisitos Previos
 
-- Lenguaje: Java 21
-- Framework: Spring Boot 3.5.8, Spring Cloud 2025.0.0
-- Seguridad: Spring Security, OAuth 2.1 Resource Server, JWT (claim `rolesAndPermissions`)
-- Persistencia: Spring Data JPA, PostgreSQL
-- Infraestructura: Actuator, Lombok, Validation, Docker
+- JDK 21
+- Maven 3.9+
+- PostgreSQL
+- `sgivu-config` y `sgivu-discovery` disponibles (o arrancados via docker-compose)
 
-## Configuración
+## Arranque y Ejecución
 
-- Variables clave: `SPRING_CONFIG_IMPORT`, `SPRING_PROFILES_ACTIVE`, `services.map.sgivu-auth.url`, datasource,
-  `EUREKA_CLIENT_SERVICEURL_DEFAULTZONE`.
-- `application-local.yml` recomendado para desarrollo; controla `spring.sql.init.mode` si deseas aplicar seeds.
+### Desarrollo (docker-compose)
 
-## Ejecución Local
+Desde `infra/compose/sgivu-docker-compose`:
 
 ```bash
-SPRING_PROFILES_ACTIVE=dev ./mvnw spring-boot:run
+docker compose -f docker-compose.dev.yml up -d
 ```
 
-Requiere Config Server, Discovery, Auth y PostgreSQL (`database/schema.sql`). Acceso en `http://localhost:8083` o vía
-gateway.
+### Ejecución Local
 
-## Endpoints Principales
-
-```text
-POST   /v1/cars
-GET    /v1/cars/{id}
-GET    /v1/cars
-GET    /v1/cars/page/{page}
-PUT    /v1/cars/{id}
-DELETE /v1/cars/{id}
-PATCH  /v1/cars/{id}/status
-GET    /v1/cars/count
-GET    /v1/cars/search?... (plate, brand, line, model, fuelType, bodyType)
-
-POST   /v1/motorcycles
-GET    /v1/motorcycles/{id}
-GET    /v1/motorcycles
-GET    /v1/motorcycles/page/{page}
-PUT    /v1/motorcycles/{id}
-DELETE /v1/motorcycles/{id}
-PATCH  /v1/motorcycles/{id}/status
-GET    /v1/motorcycles/count
-GET    /v1/motorcycles/search?... (plate, brand, line, model, motorcycleType)
-
-POST   /v1/vehicles/{vehicleId}/images/presigned-upload
-POST   /v1/vehicles/{vehicleId}/images/confirm-upload
-GET    /v1/vehicles/{vehicleId}/images
-DELETE /v1/vehicles/{vehicleId}/images/{imageId}
-
-GET    /actuator/health|info
+```bash
+./mvnw clean install -DskipTests
+./mvnw spring-boot:run
 ```
+
+### Docker
+
+```bash
+./build-image.bash
+docker build -t sgivu-vehicle:local .
+```
+
+## Integraciones
+
+- **AWS S3:** generación de URLs prefirmadas para subir y descargar imágenes (`S3Service`, `S3Presigner`).
+- **CORS:** `S3BucketCorsConfig` asegura que el bucket permita los orígenes indicados en `aws.s3.allowed-origins`.
+- **Comunicación interna:** `InternalServiceAuthenticationFilter` permite autenticación entre servicios mediante `X-Internal-Service-Key`.
+
+### Flujo de Imágenes
+
+1. Solicitar URL prefirmada al backend
+2. Subir directamente a S3 con la URL
+3. Confirmar upload al backend (`confirm-upload`) que valida clave y registra metadatos
+
+> Solo se aceptan tipos `image/jpeg`, `image/png`, `image/webp`. Primera imagen registrada se marca como `is_primary=true`; al eliminar la primaria se promueve la siguiente más antigua.
 
 ## Seguridad
 
-- Resource Server validando JWT de `sgivu-auth` (`services.map.sgivu-auth.url`).
-- Permisos: `car:create|read|update|delete`, `motorcycle:create|read|update|delete`.
-- `GlobalExceptionHandler` entrega errores uniformes; `/actuator/health|info` son públicos.
+- **Autenticación:** JWT tokens emitidos por `sgivu-auth`. `JwtAuthenticationConverter` mapea claims a autoridades.
+- **Internal calls:** `X-Internal-Service-Key` permite solicitudes entre servicios; **no exponer** esta clave.
+- **Recomendaciones:**
+  - Mover claves AWS y otros secretos a un secret manager
+  - Aplicar políticas de acceso mínimo al bucket S3
+  - Limitar el tiempo de las URLs prefirmadas
 
-## Dependencias
+## Migraciones
 
-- `sgivu-config`, `sgivu-discovery`, `sgivu-gateway`, `sgivu-auth`, PostgreSQL.
+- Migraciones Flyway en `src/main/resources/db/migration`.
 
-## Dockerización
+## Observabilidad
 
-- Imagen: `sgivu-vehicle`
-- Puerto expuesto: 8083
+- **Actuator:** `/actuator/health`, `/actuator/info`
+- **OpenAPI / Swagger UI:** `/swagger-ui/index.html` (config en `OpenApiConfig`)
+- **Tracing:** Zipkin configurado via `sgivu-config`
 
-Ejemplo:
+## Pruebas
 
 ```bash
-./mvnw clean package -DskipTests
-docker build -t sgivu-vehicle .
-
-  -e SPRING_PROFILES_ACTIVE=prod \
-  -e SPRING_CONFIG_IMPORT=configserver:http://sgivu-config:8888 \
-  -e SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/sgivu_vehicle_db \
-  -e SPRING_DATASOURCE_USERNAME=sgivu \
-  -e SPRING_DATASOURCE_PASSWORD=sgivu \
-  -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://sgivu-discovery:8761/eureka \
-  -e SERVICES_MAP_SGIVU_AUTH_URL=http://sgivu-auth:9000 \
-  sgivu-vehicle
+./mvnw test
 ```
 
-## Build y Push Docker
+- `spring-boot-starter-flyway-test` puede ayudar a validar migraciones en tests.
+- Recomendación: añadir pruebas de integración que simulen el flujo completo de presigned upload + confirmación.
 
-- `./build-image.bash` limpia contenedores previos, empaqueta con Maven y publica `stevenrq/sgivu-vehicle:v1`.
+## Solución de Problemas
 
-## Despliegue
+| Problema | Solución |
+| --- | --- |
+| Errores de autorización (401/403) | Verificar token Bearer y authorities |
+| Fallas en S3 | Comprobar credenciales AWS y permisos del bucket |
+| Imágenes no se suben | Verificar tipo de contenido permitido y URL prefirmada |
+| CORS errors | Revisar `aws.s3.allowed-origins` y configuración del bucket |
 
-- Publica imagen en ECR; despliega en ECS/EKS/EC2 con conectividad privada a Config, Discovery y Auth.
-- Inyecta `SPRING_CONFIG_IMPORT`, `SPRING_DATASOURCE_*`, `EUREKA_CLIENT_SERVICEURL_DEFAULTZONE`,
-  `SERVICES_MAP_SGIVU_AUTH_URL` vía Secrets Manager/Parameter Store o Config Server.
-- Exponer solo vía gateway detrás de ALB/NLB.
+## Contribuciones
 
-## Monitoreo
-
-- Actuator (`health`, `info`, `metrics`, `prometheus` si se habilita).
-- Micrometer/Zipkin habilitables via Config Server (`management.tracing.*`).
-
-## Troubleshooting
-
-- 401/403: revisa URL de Auth y permisos (`car:*`, `motorcycle:*`).
-- Errores 409: valida integridad y relaciones JOINED.
-- No registra en Eureka: confirma `EUREKA_CLIENT_SERVICEURL_DEFAULTZONE` y discovery activo.
-
-## Buenas Prácticas y Convenciones
-
-- Código en inglés; documentación en español; commits en inglés con Conventional Commits.
-
-## Diagramas
-
-- Arquitectura general: ../../../docs/diagrams/01-system-architecture.puml
-
-## Autor
-
-- Steven Ricardo Quiñones (2025)
+1. Fork → branch → PR
+2. Añadir tests para cambios funcionales

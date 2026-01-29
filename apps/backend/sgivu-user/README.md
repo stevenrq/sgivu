@@ -1,129 +1,88 @@
-# SGIVU - sgivu-user
+# sgivu-user - SGIVU
 
 ## Descripción
 
-Microservicio para administrar el ciclo de vida de usuarios: creación, lectura, actualización, desactivación y
-asignación de roles/permisos. Expone APIs REST para el gateway y otros servicios internos.
+`sgivu-user` gestiona usuarios, roles y permisos del ecosistema SGIVU. Proporciona CRUD de usuarios y personas, gestión de roles y permisos, búsqueda multi-criterio y endpoints de apoyo para el Authorization Server (consulta por username para emisión de JWT).
 
-## Arquitectura y Rol
+## Tecnologías y Dependencias
 
-- Microservicio Spring Boot / Spring Cloud.
-- Interactúa con `sgivu-config`, `sgivu-discovery`, `sgivu-gateway`, `sgivu-auth`.
-- APIs RESTful para frontend y servicios (roles, permisos y usuarios); se registra en Eureka y se balancea vía gateway.
-- Configuración centralizada (datasource, JWT, Zipkin) desde Config Server; persistencia en PostgreSQL.
+- Java 21
+- Spring Boot 4.0.1
+- Spring Security (Resource Server)
+- Spring Data JPA + PostgreSQL
+- Flyway
+- Spring Cloud Config Client
+- Spring Cloud Eureka Client
+- SpringDoc OpenAPI (Swagger UI)
+- MapStruct, Lombok
 
-## Tecnologías
+## Requisitos Previos
 
-- Lenguaje: Java 21 (Amazon Corretto)
-- Framework: Spring Boot 3.5.8, Spring Cloud 2025.0.0
-- Seguridad: OAuth 2.1 Resource Server, JWT, autorización granular por roles/permisos
-- Persistencia: Spring Data JPA, PostgreSQL, scripts `schema.sql`
-- Observabilidad: Actuator, Micrometer Tracing + Zipkin
-- Utilitarios: MapStruct, Lombok, Validation API
+- JDK 21
+- Maven 3.9+
+- PostgreSQL
+- `sgivu-config` y `sgivu-discovery` disponibles (o arrancados via docker-compose)
 
-## Configuración
+## Arranque y Ejecución
 
-- Variables clave: `SPRING_CONFIG_IMPORT`, `SPRING_PROFILES_ACTIVE`, `SERVICE_INTERNAL_SECRET_KEY`,
-  `services.sgivu-auth.url`, propiedades de datasource.
-- `application-local.yml` recomendado para desarrollo si no se usa Config Server.
+### Desarrollo (docker-compose)
 
-## Ejecución Local
+Desde `infra/compose/sgivu-docker-compose`:
 
 ```bash
-./mvnw clean package
-SPRING_PROFILES_ACTIVE=dev ./mvnw spring-boot:run
+docker compose -f docker-compose.dev.yml up -d
 ```
 
-Requiere Config Server, Eureka, PostgreSQL y opcionalmente Zipkin. Endpoints accesibles vía gateway en
-`http://localhost:8080`.
+### Ejecución Local
 
-## Endpoints Principales
+```bash
+./mvnw clean install -DskipTests
+./mvnw spring-boot:run
+```
 
-```text
-POST   /v1/users
-GET    /v1/users/{id}
-GET    /v1/users/username/{user}
-GET    /v1/users
-GET    /v1/users/page/{page}
-PUT    /v1/users/{id}
-PATCH  /v1/users/{id}/status
-DELETE /v1/users/{id}
-GET    /v1/users/count
-GET    /v1/users/search?name=
-GET    /v1/users/search/page/{page}
-GET    /v1/roles
-POST   /v1/roles/{id}/add-permissions
-PUT    /v1/roles/{id}/permissions
-DELETE /v1/roles/{id}/remove-permissions
-GET    /v1/permissions
-GET    /actuator/health|info
+### Docker
+
+```bash
+./build-image.bash
+docker build -t sgivu-user:local .
 ```
 
 ## Seguridad
 
-- Resource Server validando JWT emitidos por `sgivu-auth` (issuer vía Config Server).
-- Claim `rolesAndPermissions` se transforma en autoridades mediante `JwtAuthenticationConverter` y `@PreAuthorize`.
-- Endpoints internos `/v1/users/username/**` exigen `X-Internal-Service-Key`; autoedición segura con `X-User-ID`.
-- Contraseñas cifradas con `BCryptPasswordEncoder`.
+- **Autenticación:** JWT tokens emitidos por `sgivu-auth`. La validación usa `NimbusJwtDecoder` apuntando al issuer.
+- **Claims:** `rolesAndPermissions` es usado para autorización granular en endpoints (`user:create`, `user:read`, etc.).
+- **Internal calls:** el header `X-Internal-Service-Key` permite que `sgivu-auth` consulte usuarios por username al emitir tokens; **no exponer** esta clave.
+- **Validaciones:** existen validadores personalizados para `PasswordStrength` y `NoSpecialCharacters` que se aplican en creación y actualización.
 
-## Dependencias
+## Migraciones
 
-- `sgivu-config` (configuración externa, issuer JWT, tracing)
-- `sgivu-discovery` (registro/balanceo)
-- `sgivu-gateway` (exposición al frontend)
-- `sgivu-auth` (emisión de tokens)
-- PostgreSQL (usuarios, roles, permisos, direcciones)
+- **Migración principal:** `src/main/resources/db/migration/V1__initial_schema.sql`
+  - Crea tablas `permissions`, `roles`, `persons`, `users`, `roles_permissions`, `users_roles`, `addresses` y los índices necesarios.
+- **Seed:** `src/main/resources/db/seed/R__seed_data.sql`
+  - Crea datos de ejemplo incluyendo el usuario `steven` con rol `ADMIN` y un catálogo completo de permisos.
 
-## Dockerización
+## Observabilidad
 
-- Imagen: `sgivu-user`
-- Puerto expuesto: 8081
+- **Actuator:** `/actuator/health`, `/actuator/info` (exposición configurable)
+- **OpenAPI UI:** `/swagger-ui/index.html` (con servers definidos en `OpenApiConfig`)
 
-Ejemplo:
+## Pruebas
 
 ```bash
-docker build -t sgivu-user .
-
-  -e SPRING_PROFILES_ACTIVE=prod \
-  -e SPRING_CONFIG_IMPORT=configserver:http://sgivu-config:8888 \
-  -e SERVICE_INTERNAL_SECRET_KEY=... \
-  -e SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/sgivu_user \
-  -e SPRING_DATASOURCE_USERNAME=sgivu \
-  -e SPRING_DATASOURCE_PASSWORD=sgivu \
-  sgivu-user
+./mvnw test
 ```
 
-## Build y Push Docker
+- `spring-boot-starter-flyway-test` se utiliza para validar migraciones en entorno de pruebas.
 
-- `./build-image.bash` limpia contenedores previos, empaqueta con Maven y publica `stevenrq/sgivu-user:v1`.
-- Orquestadores externos pueden invocarlo al construir todos los servicios.
+## Solución de Problemas
 
-## Despliegue
+| Problema | Solución |
+| --- | --- |
+| Errores de autorización (401/403) | Verificar token Bearer y authorities requeridas |
+| Endpoint interno falla | Comprobar `X-Internal-Service-Key` y que `sgivu-auth` tenga la clave correcta |
+| Errores de BD | Verificar conexión PostgreSQL y migraciones Flyway |
 
-- En EC2 o ECS/Fargate con Auto Scaling apuntando al gateway.
-- RDS PostgreSQL con `schema.sql` aplicados desde pipeline/migraciones.
-- Variables requeridas: `SPRING_CONFIG_IMPORT`, `SERVICE_INTERNAL_SECRET_KEY`, `SPRING_DATASOURCE_*`,
-  `SERVICES_SGIVU-AUTH_URL`, `EUREKA_CLIENT_SERVICEURL_DEFAULTZONE`, `ZIPKIN_BASE_URL`.
+## Contribuciones
 
-## Monitoreo
-
-- Actuator (`/actuator/health`, `/actuator/info`); Micrometer Tracing + Brave exporta spans a Zipkin.
-
-## Troubleshooting
-
-- 401/403: verifica issuer de `sgivu-auth` y claim `rolesAndPermissions`.
-- Endpoints internos: asegura `X-Internal-Service-Key` igual a `SERVICE_INTERNAL_SECRET_KEY`.
-- Tablas faltantes: aplica `database/schema.sql` si usas `ddl-auto: none`.
-- No registra en Eureka: revisa `EUREKA_CLIENT_SERVICEURL_DEFAULTZONE` y que Eureka esté activo.
-
-## Buenas Prácticas y Convenciones
-
-- Código en inglés; documentación en español; commits en inglés con Conventional Commits.
-
-## Diagramas
-
-- Arquitectura general: ../../../docs/diagrams/01-system-architecture.puml
-
-## Autor
-
-- Steven Ricardo Quiñones (2025)
+1. Fork → branch → PR
+2. Añadir tests para cambios funcionales
