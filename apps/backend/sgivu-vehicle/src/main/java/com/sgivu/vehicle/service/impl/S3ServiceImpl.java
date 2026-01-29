@@ -17,15 +17,6 @@ import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedPutObjectRequest;
 
-/**
- * Implementación de {@link S3Service} que encapsula toda la interacción con Amazon S3 (creación de
- * buckets, carga/descarga de archivos y generación de URLs prefirmadas). Este servicio es
- * reutilizado por la capa de imágenes de vehículos para delegar la complejidad de S3.
- *
- * <p>Centraliza las operaciones remotas para que la gestión de inventario y vitrinas de autos/motos
- * se mantenga agnóstica del proveedor cloud. Las URLs prefirmadas permiten que el frontend
- * suba/descargue imágenes sin exponer credenciales.
- */
 @Service
 public class S3ServiceImpl implements S3Service {
 

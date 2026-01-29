@@ -21,7 +21,7 @@ from app.database.database import Base
 
 
 class ModelArtifact(Base):
-    """Tabla de modelos serializados y su metadata asociada."""
+    """Modelo para almacenar artefactos de modelos de ML."""
 
     __tablename__ = "ml_model_artifacts"
 
@@ -36,7 +36,7 @@ class ModelArtifact(Base):
 
 
 class TrainingFeature(Base):
-    """Snapshot mensual de features agregadas para entrenamiento."""
+    """Modelo para almacenar características de entrenamiento de ML."""
 
     __tablename__ = "ml_training_features"
     __table_args__ = (
@@ -80,7 +80,7 @@ class TrainingFeature(Base):
 
 
 class PredictionRecord(Base):
-    """Registro histórico de solicitudes de predicción y sus respuestas."""
+    """Modelo para almacenar registros de predicciones de ML."""
 
     __tablename__ = "ml_predictions"
 

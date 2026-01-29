@@ -1,8 +1,8 @@
-# SGIVU - documentación del sistema
+# SGIVU
 
 ## Descripción
 
-Documentación central del sistema SGIVU (backend, frontend, ML e infraestructura) con guías de contribución, arquitectura, orquestación y scripts auxiliares.
+Documentación central del sistema SGIVU (backend, frontend, ML e infraestructura) con guías de arquitectura, orquestación y scripts auxiliares.
 
 ## Arquitectura y Rol
 
@@ -11,6 +11,12 @@ Documentación central del sistema SGIVU (backend, frontend, ML e infraestructur
 - Enlaces a documentación específica: `infra/compose/sgivu-docker-compose/README.md`, `apps/backend/*/README.md`, `apps/frontend/sgivu-frontend/README.md`, `apps/ml/sgivu-ml/README.md`.
 
 ![Arquitectura general de SGIVU](docs/diagrams/img/01-system-architecture.png)
+
+## Diagramas
+
+- [Pipeline de construcción](docs/diagrams/img/02-build-pipeline.png)
+
+- [Flujo BFF y Refresh Token](docs/diagrams/img/03-bff-refresh-token-flow.png)
 
 ## Tecnologías
 
@@ -31,7 +37,6 @@ Documentación central del sistema SGIVU (backend, frontend, ML e infraestructur
 
 - Stack completo con Docker Compose: `infra/compose/sgivu-docker-compose/run.bash --dev`.
 - Alternativa: ejecutar cada servicio siguiendo su README.
-- Validar versiones: `./scripts/check-readme-boot-version.sh`.
 
 ## Endpoints Principales
 
@@ -76,8 +81,6 @@ Documentación central del sistema SGIVU (backend, frontend, ML e infraestructur
 - [sgivu-docker-compose](infra/compose/sgivu-docker-compose/README.md) — Orquestación local con Docker Compose.
 - [sgivu-config-repo](https://github.com/stevenrq/sgivu-config-repo/blob/main/README.md) — Repositorio centralizado de configuración para todos los servicios (Git-based Config Server).
 
-## Dependencias
-
 ## Dockerización
 
 - Cada servicio cuenta con `Dockerfile` y scripts `build-image.bash` cuando aplica.
@@ -98,23 +101,13 @@ Documentación central del sistema SGIVU (backend, frontend, ML e infraestructur
 - Actuator en servicios Spring y health checks en FastAPI.
 - Trazas y métricas vía Zipkin/Prometheus si están habilitados.
 
-## Troubleshooting
+## Solución de Problemas
 
 - Puertos ocupados: revisa mapeos en Compose y detén procesos locales.
 - Config Server inaccesible: valida `SPRING_CONFIG_IMPORT` o `SPRING_CLOUD_CONFIG_URI`.
 - Mismatch de versiones: ejecuta `./scripts/check-readme-boot-version.sh`.
 
-## Buenas Prácticas y Convenciones
+## Contribuciones
 
-- Código en inglés; documentación en español; commits en inglés con Conventional Commits.
-- Mantener README y diagramas sincronizados con cambios de puertos o flujos.
-
-## Diagramas
-
-- Arquitectura general: `docs/diagrams/01-system-architecture.puml`.
-- Pipeline de build: `docs/diagrams/02-build-pipeline.puml`.
-- Flujo BFF y Refresh Token: `docs/diagrams/03-bff-refresh-token-flow.puml`.
-
-## Autor
-
-- Steven Ricardo Quiñones (2025)
+1. Fork → branch → PR
+2. Añadir tests para cambios funcionales

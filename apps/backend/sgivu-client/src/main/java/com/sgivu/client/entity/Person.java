@@ -10,12 +10,6 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
-/**
- * Cliente persona usado en SGIVU para representar compradores o vendedores de vehículos usados.
- * Extiende datos comunes y agrega identidad civil.
- *
- * <p>El {@code nationalId} se usa para deduplicar registros durante onboarding y contratos.
- */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

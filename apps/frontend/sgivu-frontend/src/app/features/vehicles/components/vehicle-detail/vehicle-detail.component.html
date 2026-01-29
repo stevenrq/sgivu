@@ -1,4 +1,3 @@
-<!-- eslint-disable @angular-eslint/template/prefer-control-flow -->
 <div class="container detail-container mt-5 mb-5">
   @if (isLoading) {
     <div class="text-center py-5">
@@ -37,7 +36,7 @@
     <div>
       <div class="detail-header text-center">
         <img
-          [alt]="'Imagen principal de ' + vehicle.brand"
+          [alt]="vehicle.brand + ' ' + vehicle.line + ' ' + vehicle.model"
           [src]="heroImageUrl"
           class="detail-avatar vehicle-avatar mb-3"
           loading="lazy"
@@ -76,7 +75,13 @@
                     >
                       <img
                         [src]="image.url"
-                        alt="Imagen del vehículo"
+                        [alt]="
+                          vehicle.brand +
+                          ' ' +
+                          vehicle.line +
+                          ' ' +
+                          vehicle.model
+                        "
                         loading="lazy"
                       />
                       @if (image.primary) {
@@ -323,13 +328,13 @@
             <div class="card-body detail-card-body">
               @if (historyLoading) {
                 <div class="text-center text-muted py-3">
-                  <div
+                  <output
                     class="spinner-border text-primary mb-3"
-                    role="status"
+                    aria-live="polite"
                     style="width: 2.5rem; height: 2.5rem"
                   >
                     <span class="visually-hidden">Loading...</span>
-                  </div>
+                  </output>
                   <div>Cargando historial de transacciones...</div>
                 </div>
               } @else if (historyError) {

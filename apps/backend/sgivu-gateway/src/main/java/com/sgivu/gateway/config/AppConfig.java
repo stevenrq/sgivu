@@ -8,10 +8,6 @@ import org.springframework.cloud.client.circuitbreaker.Customizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * Configura circuit breakers y timeouts transversales para proteger los microservicios SGIVU ante
- * latencias anómalas; la ventana de 10 peticiones y timeout de 3s priorizan UX del front.
- */
 @Configuration
 public class AppConfig {
 

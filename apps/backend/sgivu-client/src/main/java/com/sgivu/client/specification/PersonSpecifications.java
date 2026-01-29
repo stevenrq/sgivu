@@ -10,17 +10,8 @@ import org.springframework.util.StringUtils;
 
 public final class PersonSpecifications {
 
-  /** Utilidades para construir especificaciones dinámicas de búsqueda de personas. */
   private PersonSpecifications() {}
 
-  /**
-   * Construye filtros dinámicos para personas combinando criterios de identidad, contacto y
-   * ubicación.
-   * Permite búsquedas flexibles usadas por contratos e inventario para validar clientes.
-   *
-   * @param criteria criterios opcionales
-   * @return especificación JPA
-   */
   public static Specification<Person> withFilters(PersonSearchCriteria criteria) {
     Specification<Person> specification = Specification.unrestricted();
 
@@ -68,8 +59,6 @@ public final class PersonSpecifications {
       specification =
           specification.and(
               (root, query, cb) -> {
-                // LEFT JOIN preserva registros aunque no tengan domicilio asociado pero habilita
-                // filtrar por ciudad cuando está presente.
                 Join<Person, Address> address = root.join("address", JoinType.LEFT);
                 return cb.like(
                     cb.lower(address.get("city")), like(criteria.getCity().trim().toLowerCase()));

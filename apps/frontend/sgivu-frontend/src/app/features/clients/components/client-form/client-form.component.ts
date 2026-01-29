@@ -80,10 +80,6 @@ interface ViewCopy {
   templateUrl: './client-form.component.html',
   styleUrl: './client-form.component.css',
 })
-/**
- * Formulario reutilizable para crear o editar clientes (personas y empresas),
- * gestionando el estado de carga y los mensajes de envío.
- */
 export class ClientFormComponent implements OnInit, OnDestroy {
   private readonly formBuilder = inject(FormBuilder);
   private readonly personService = inject(PersonService);

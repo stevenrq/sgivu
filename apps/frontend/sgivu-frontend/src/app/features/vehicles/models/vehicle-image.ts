@@ -1,8 +1,5 @@
 import { Vehicle } from './vehicle.model';
 
-/**
- * Metadatos de una imagen asociada a un vehículo en almacenamiento externo.
- */
 export class VehicleImage {
   id!: number;
   vehicle!: Vehicle;

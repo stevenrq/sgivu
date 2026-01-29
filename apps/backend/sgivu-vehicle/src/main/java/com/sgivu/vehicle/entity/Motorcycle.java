@@ -11,12 +11,6 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
-/**
- * Representa una motocicleta en el inventario de usados.
- *
- * <p>Añade el tipo de motocicleta, usado por reglas comerciales (ej. scooters vs. alto cilindraje)
- * y por restricciones de aseguradora/contratos.
- */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

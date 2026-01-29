@@ -1,125 +1,103 @@
-# SGIVU - sgivu-auth
+# sgivu-auth - SGIVU
 
 ## Descripción
 
-Microservicio de autenticación centralizada. Expone un Authorization Server OAuth 2.1/OIDC, gestiona el formulario de inicio de sesión y emite tokens JWT con roles y permisos del servicio de usuarios.
+**`sgivu-auth`** es el Authorization Server (OpenID Connect / OAuth2) del ecosistema **SGIVU**. Emite JWT firmados con un keystore JKS, gestiona clientes OAuth2, autoriza usuarios y persiste autorizaciones y sesiones en PostgreSQL.
 
-## Arquitectura y Rol
+## Tecnologías y Dependencias
 
-- Microservicio Spring Boot / Spring Cloud.
-- Interactúa con `sgivu-config`, `sgivu-discovery`, `sgivu-gateway` y `sgivu-user` para validar credenciales.
-- Publica endpoints OAuth 2.1/OIDC (`/oauth2/*`, `/.well-known/*`) y vistas Thymeleaf de login.
-- Registra instancias en Eureka y se balancea vía gateway.
-- Obtiene configuración sensible (datasource, issuer, secretos) desde Config Server y persiste clientes/autorizaciones en PostgreSQL.
+- Java 21
+- Spring Boot 4.0.1
+- Spring Authorization Server (OAuth2 / OIDC), Spring Security
+- Spring Cloud Config (client), Eureka client
+- Spring Data JPA + PostgreSQL
+- Flyway
+- Spring Session (JDBC)
+- Spring Boot Actuator, Micrometer Tracing, Zipkin
+- SpringDoc OpenAPI (Swagger)
 
-## Tecnologías
+## Requisitos Previos
 
-- Lenguaje: Java 21 (Amazon Corretto)
-- Framework: Spring Boot 3.5.8, Spring Cloud 2025.0.0
-- Seguridad: Spring Authorization Server, OAuth 2.1, OIDC, JWT firmados con JKS
-- Persistencia: Spring Data JPA + PostgreSQL
-- Resiliencia y observabilidad: Resilience4J, Micrometer Tracing (Brave), Zipkin
-- Infraestructura: Docker, AWS (EC2, RDS, S3)
+- JDK 21
+- Maven 3.9+
+- Docker & docker-compose
+- PostgreSQL
+- `sgivu-config` y `sgivu-discovery` disponibles (o arrancados via docker-compose)
 
-## Configuración
+## Arranque y Ejecución
 
-- Variables clave: `SPRING_CONFIG_IMPORT`, `SPRING_PROFILES_ACTIVE`, `SERVICE_INTERNAL_SECRET_KEY`, `issuer.url`, `gateway-client.url`, `gateway-client.secret` y propiedades de datasource/keystore (`KEYSTORE_PASSWORD`, `KEY_PASSWORD`, `KEY_ALIAS`).
-- `application-local.yml` recomendado para desarrollo con placeholders y sin secretos versionados.
+### Desarrollo (docker-compose)
 
-## Ejecución Local
+1. Arrancar infra (desde `infra/compose/sgivu-docker-compose`):
+
+    ```bash
+    docker compose -f docker-compose.dev.yml up -d
+    ```
+
+2. Compilar y ejecutar la app (opción local):
+
+    ```bash
+    ./mvnw clean package
+    ./mvnw spring-boot:run
+    ```
+
+### Docker
 
 ```bash
-./mvnw clean package -DskipTests
-./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
+./build-image.bash
+docker build -t stevenrq/sgivu-auth:v1 .
+docker run --env-file infra/compose/sgivu-docker-compose/.env -p 9000:9000 stevenrq/sgivu-auth:v1
 ```
 
-Requiere `sgivu-config`, `sgivu-discovery`, `sgivu-user` y PostgreSQL disponibles (ej. `jdbc:postgresql://localhost:5432/sgivu_auth`). Accede a `http://localhost:9000/login`.
+### Producción
+
+En producción el acceso pasa normalmente por Nginx en EC2; Nginx rutea `/oauth2/*`, `/login`, `/.well-known/*` al contenedor `sgivu-auth` (puerto interno 9000). Configurar `ISSUER_URL` para que coincida con el hostname expuesto.
 
 ## Endpoints Principales
 
-```text
-GET  /.well-known/openid-configuration
-GET  /.well-known/jwks.json
-GET  /oauth2/authorize
-POST /oauth2/token
-GET  /oauth2/jwks
-GET  /login
-POST /api/validate-credentials
-GET  /actuator/health
-```
-
-- Descubrimiento OIDC y JWKS para clientes.
-- Authorization Code y Client Credentials en `/oauth2/*`.
-- Vista de login corporativo en `/login`.
-- Sondeo de salud en `/actuator/health`.
+| Endpoint | Descripción |
+| --- | --- |
+| `/.well-known/openid-configuration` | Metadatos del issuer OIDC |
+| `/oauth2/authorize` | Endpoint de autorización OAuth2 |
+| `/oauth2/token` | Endpoint de token OAuth2 |
+| `/oauth2/jwks` | JWKS para verificación de tokens |
+| `/login` | Página de login |
 
 ## Seguridad
 
-- **Integración con BFF:** Emite tokens (`access_token`, `refresh_token`) destinados al cliente confidencial del gateway. `sgivu-gateway` actúa como BFF encargado de almacenar y servir estos tokens a la aplicación Angular.
-- OAuth 2.1 Authorization Code y Client Credentials con Spring Authorization Server.
-- Emite refresh tokens rotativos para el cliente confidencial del gateway (BFF).
-- Los clientes públicos (Angular) usan Authorization Code + PKCE sin refresh tokens.
-- Llama a `sgivu-user` con `X-Internal-Service-Key` para validar credenciales y roles/permisos.
-- JWT con claims `sub`, `username`, `rolesAndPermissions`, `isAdmin`; firmados con la clave RSA definida en `sgivu.jwt`.
+- **Keystore / JWT:** La clave para firmar JWT se carga desde `sgivu.jwt.keystore.location` y `sgivu.jwt.keystore.password`. No incluir `keystore.jks` en el repo (está en `.gitignore`); debe proveerse desde un secret manager o pipeline.
+- **Clientes por defecto:** En arranque `ClientRegistrationRunner` registra: `sgivu-gateway` (usa `gateway-client.secret`), `postman-client` (secret `postman-secret`), `oauth2-debugger-client` (secret `oauth2-debugger-secret`). Los secrets por defecto **no** son seguros para producción.
 
-## Dependencias
+## Migraciones
 
-- `sgivu-config` (configuración externa, secretos JWT, credenciales JDBC).
-- `sgivu-discovery` (registro/balanceo).
-- `sgivu-gateway` (punto público para `/oauth2/*`).
-- `sgivu-user` (autenticación y claims).
-- PostgreSQL (local o RDS) para clientes y tokens.
+- Flyway está habilitado y las migraciones se encuentran en `src/main/resources/db/migration`.
+- `V1__initial_schema.sql` crea tablas `clients`, `authorizations`, `authorization_consents` y `SPRING_SESSION` (usada por Spring Session JDBC).
+- Propiedades de datasource y Flyway se definen en `sgivu-config-repo/sgivu-auth-*.yml`.
 
-## Dockerización
+## Observabilidad
 
-- Imagen: `sgivu-auth`
-- Puerto expuesto: 9000/tcp
+- **Actuator:** health/info (exposición depende del profile: dev expone más endpoints).
+- **Tracing:** Zipkin endpoint configurado (`http://sgivu-zipkin:9411/api/v2/spans`). Hay spans en servicios clave (`CredentialsValidationService`, `JpaUserDetailsService`).
 
-Ejemplo:
+## Pruebas
 
 ```bash
-docker build -t sgivu-auth .
-
-  -p 9000:9000 \
-  --env SPRING_PROFILES_ACTIVE=prod \
-  --env SPRING_CONFIG_IMPORT=configserver:http://sgivu-config:8888 \
-  sgivu-auth
+./mvnw test
 ```
 
-## Build y Push Docker
+- Test base: `src/test/java/.../AuthApplicationTests.java`
+- Dependencia `spring-boot-starter-flyway-test` incluida para pruebas con migraciones.
+- Recomendación: añadir tests de integración que verifiquen flows OIDC (authorization code + token issuance + JWKS validation).
 
-- `./build-image.bash` limpia contenedores previos, empaqueta con Maven y publica `stevenrq/sgivu-auth:v1`.
-- Orquestadores externos pueden invocarlo al construir todos los servicios.
+## Solución de Problemas
 
-## Despliegue
+| Problema | Solución |
+| --- | --- |
+| Issuer mismatch | Verificar `ISSUER_URL` vs URL real usada por el navegador/Nginx |
+| Keystore missing | Asegurar `keystore.jks` disponible en runtime o proveer `sgivu.jwt.keystore.location` correcto |
+| Servicio de usuarios inaccesible | `CredentialsValidationService` fallará; revisar red y `SERVICE_INTERNAL_SECRET_KEY` |
 
-- Publica la imagen en ECR y despliega en EC2/ECS dentro de la VPC SGIVU.
-- Inyecta secretos (`service.internal.secret-key`, credenciales JDBC, propiedades JWT) vía Secrets Manager/Parameter Store.
-- Conecta a RDS PostgreSQL con TLS y enruta vía ALB hacia el gateway; evita exponer directamente el puerto 9000.
+## Contribuciones
 
-## Monitoreo
-
-- Actuator expone `health`, `metrics`, `prometheus`.
-- Micrometer Tracing + Brave envía spans a Zipkin (`spring.zipkin.*`).
-- Circuito `userServiceCircuitBreaker` emite métricas `resilience4j.circuitbreaker.*`.
-
-## Troubleshooting
-
-- Error JDBC: revisa `spring.datasource.*` y conectividad a PostgreSQL.
-- JWT inválido: verifica issuer y sincronización de reloj.
-- Keystore no encontrado/contraseña inválida: valida `KEYSTORE_PASSWORD`, `KEY_PASSWORD`, `KEY_ALIAS` y ruta `keystore.jks`.
-- Llamada a sgivu-user rechazada: confirma header `X-Internal-Service-Key` y valor de `SERVICE_INTERNAL_SECRET_KEY`.
-- No aparece en Eureka: revisa `EUREKA_CLIENT_SERVICEURL_DEFAULTZONE` y `SPRING_CONFIG_IMPORT`.
-- Acceso desde host: si el navegador no resuelve `sgivu-auth`, revisa `sgivu-auth-access.md`.
-
-## Buenas Prácticas y Convenciones
-
-- Código en inglés; documentación en español; commits en inglés con Conventional Commits.
-
-## Diagramas
-
-- Arquitectura general: ../../../docs/diagrams/01-system-architecture.puml
-
-## Autor
-
-- Steven Ricardo Quiñones (2025)
+1. Fork → branch → PR
+2. Para cambios funcionales abrir PR con tests

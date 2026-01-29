@@ -8,10 +8,6 @@ import java.io.Serializable;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Domicilio asociado a un cliente. Permite segmentar clientes por ciudad para predicción de demanda
- * y ruteo de inspecciones de vehículos usados.
- */
 @Data
 @NoArgsConstructor
 @Entity

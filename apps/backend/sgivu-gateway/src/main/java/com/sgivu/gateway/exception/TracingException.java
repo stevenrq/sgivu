@@ -1,9 +1,6 @@
 package com.sgivu.gateway.exception;
 
-/**
- * Excepción controlada para fallos de trazabilidad distribuida en el Gateway. Permite capturar
- * problemas al crear spans o propagar el traceId sin silenciar errores de negocio.
- */
+/** Excepción personalizada para errores relacionados con el trazado (tracing) en la aplicación. */
 public class TracingException extends RuntimeException {
 
   public TracingException(String message, Throwable cause) {

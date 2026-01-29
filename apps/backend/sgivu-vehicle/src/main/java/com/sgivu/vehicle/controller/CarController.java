@@ -19,26 +19,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.util.StringUtils;
 import org.springframework.validation.BindingResult;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PatchMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Endpoints REST para gestionar autos usados.
- *
- * <p>sExpone operaciones CRUD, conteos y búsquedas avanzadas consumidas por front y otros
- * microservicios SGIVU (ventas, contratos). Las autorizaciones se delegan a Spring Security con JWT
- * emitidos por el Authorization Server.
- */
 @RestController
-@RequestMapping("/v1/cars")
 public class CarController implements CarApi {
 
   private final CarService carService;
@@ -49,16 +32,9 @@ public class CarController implements CarApi {
     this.vehicleMapper = vehicleMapper;
   }
 
-  /**
-   * Registra un nuevo auto en inventario.
-   *
-   * @param car entidad recibida desde el frontend/servicio de compras
-   * @param bindingResult validaciones de entrada
-   * @return auto persistido como {@link CarResponse}
-   */
-  @PostMapping
+  @Override
   @PreAuthorize("hasAuthority('car:create')")
-  public ResponseEntity<CarResponse> create(@RequestBody Car car, BindingResult bindingResult) {
+  public ResponseEntity<CarResponse> create(Car car, BindingResult bindingResult) {
     if (bindingResult.hasErrors()) {
       return ResponseEntity.badRequest().build();
     }
@@ -66,23 +42,16 @@ public class CarController implements CarApi {
     return ResponseEntity.status(HttpStatus.CREATED).body(carResponse);
   }
 
-  /**
-   * Obtiene detalle de un auto.
-   *
-   * @param id identificador interno
-   * @return {@link CarResponse} o 404
-   */
-  @GetMapping("/{id}")
+  @Override
   @PreAuthorize("hasAuthority('car:read')")
-  public ResponseEntity<CarResponse> getById(@PathVariable Long id) {
+  public ResponseEntity<CarResponse> getById(Long id) {
     return carService
         .findById(id)
         .map(car -> ResponseEntity.ok(vehicleMapper.toCarResponse(car)))
         .orElse(ResponseEntity.notFound().build());
   }
 
-  /** Lista completa de autos (uso interno o sincronizaciones pequeñas). */
-  @GetMapping
+  @Override
   @PreAuthorize("hasAuthority('car:read')")
   public ResponseEntity<List<CarResponse>> getAll() {
     List<CarResponse> carResponses =
@@ -90,29 +59,16 @@ public class CarController implements CarApi {
     return ResponseEntity.ok(carResponses);
   }
 
-  /**
-   * Devuelve autos paginados para catálogos públicos.
-   *
-   * @param page índice solicitado
-   */
-  @GetMapping("/page/{page}")
+  @Override
   @PreAuthorize("hasAuthority('car:read')")
-  public ResponseEntity<Page<CarResponse>> getAllPaginated(@PathVariable Integer page) {
+  public ResponseEntity<Page<CarResponse>> getAllPaginated(Integer page) {
     return ResponseEntity.ok(
         carService.findAll(PageRequest.of(page, 10)).map(vehicleMapper::toCarResponse));
   }
 
-  /**
-   * Reemplaza datos del auto preservando integridad de campos únicos.
-   *
-   * @param id identificador del auto a actualizar
-   * @param car payload recibido
-   * @return {@link CarResponse} actualizado o 404
-   */
-  @PutMapping("/{id}")
+  @Override
   @PreAuthorize("hasAuthority('car:update')")
-  public ResponseEntity<CarResponse> update(
-      @PathVariable Long id, @RequestBody Car car, BindingResult bindingResult) {
+  public ResponseEntity<CarResponse> update(Long id, Car car, BindingResult bindingResult) {
     if (bindingResult.hasErrors()) {
       return ResponseEntity.badRequest().build();
     }
@@ -122,14 +78,9 @@ public class CarController implements CarApi {
         .orElse(ResponseEntity.notFound().build());
   }
 
-  /**
-   * Elimina un auto del inventario.
-   *
-   * @param id identificador del auto
-   */
-  @DeleteMapping("/{id}")
+  @Override
   @PreAuthorize("hasAuthority('car:delete')")
-  public ResponseEntity<Void> deleteById(@PathVariable Long id) {
+  public ResponseEntity<Void> deleteById(Long id) {
     Optional<Car> carOptional = carService.findById(id);
 
     if (carOptional.isPresent()) {
@@ -140,29 +91,16 @@ public class CarController implements CarApi {
     return ResponseEntity.notFound().build();
   }
 
-  /**
-   * Cambia el estado operativo del auto (ej. disponible → vendido).
-   *
-   * @param id identificador del auto
-   * @param status nuevo estado de negocio
-   * @return estado aplicado
-   */
-  @PatchMapping("/{id}/status")
+  @Override
   @PreAuthorize("hasAuthority('car:update')")
-  public ResponseEntity<Map<String, String>> changeStatus(
-      @PathVariable Long id, @RequestBody VehicleStatus status) {
+  public ResponseEntity<Map<String, String>> changeStatus(Long id, VehicleStatus status) {
     if (carService.changeStatus(id, status).isPresent()) {
       return ResponseEntity.ok(Collections.singletonMap("status", status.name()));
     }
     return ResponseEntity.notFound().build();
   }
 
-  /**
-   * Resumen de disponibilidad de autos.
-   *
-   * @return totales y disponibles, usado para tableros de inventario
-   */
-  @GetMapping("/count")
+  @Override
   @PreAuthorize("hasAuthority('car:read')")
   public ResponseEntity<Map<String, Long>> getCarCounts() {
     long totalCars = carService.findAll().size();
@@ -176,51 +114,26 @@ public class CarController implements CarApi {
     return ResponseEntity.ok(counts);
   }
 
-  /**
-   * Busca autos aplicando múltiples filtros opcionales (placa, marca, rangos numéricos, etc.).
-   *
-   * <p>Combinación flexible pensada para catálogos y predicción de demanda sin necesidad de
-   * endpoints adicionales.
-   *
-   * @param plate placa parcial o completa
-   * @param brand marca
-   * @param line línea
-   * @param model modelo
-   * @param fuelType combustible
-   * @param bodyType carrocería
-   * @param transmission transmisión
-   * @param city ciudad de registro
-   * @param status estado de negocio
-   * @param minYear año mínimo
-   * @param maxYear año máximo
-   * @param minCapacity capacidad mínima
-   * @param maxCapacity capacidad máxima
-   * @param minMileage kilometraje mínimo
-   * @param maxMileage kilometraje máximo
-   * @param minSalePrice precio mínimo
-   * @param maxSalePrice precio máximo
-   * @return lista de autos que cumplen los filtros
-   */
-  @GetMapping("/search")
+  @Override
   @PreAuthorize("hasAuthority('car:read')")
   public ResponseEntity<List<CarResponse>> searchCars(
-      @RequestParam(required = false) String plate,
-      @RequestParam(required = false) String brand,
-      @RequestParam(required = false) String line,
-      @RequestParam(required = false) String model,
-      @RequestParam(required = false) String fuelType,
-      @RequestParam(required = false) String bodyType,
-      @RequestParam(required = false) String transmission,
-      @RequestParam(required = false) String city,
-      @RequestParam(required = false) VehicleStatus status,
-      @RequestParam(required = false) Integer minYear,
-      @RequestParam(required = false) Integer maxYear,
-      @RequestParam(required = false) Integer minCapacity,
-      @RequestParam(required = false) Integer maxCapacity,
-      @RequestParam(required = false) Integer minMileage,
-      @RequestParam(required = false) Integer maxMileage,
-      @RequestParam(required = false) Double minSalePrice,
-      @RequestParam(required = false) Double maxSalePrice) {
+      String plate,
+      String brand,
+      String line,
+      String model,
+      String fuelType,
+      String bodyType,
+      String transmission,
+      String city,
+      VehicleStatus status,
+      Integer minYear,
+      Integer maxYear,
+      Integer minCapacity,
+      Integer maxCapacity,
+      Integer minMileage,
+      Integer maxMileage,
+      Double minSalePrice,
+      Double maxSalePrice) {
 
     CarSearchCriteria criteria =
         CarSearchCriteria.builder()
@@ -248,35 +161,28 @@ public class CarController implements CarApi {
     return ResponseEntity.ok(carResponses);
   }
 
-  /**
-   * Variante paginada de {@link #searchCars}.
-   *
-   * @param page índice de página
-   * @param size tamaño de página
-   * @return página de resultados
-   */
-  @GetMapping("/search/page/{page}")
+  @Override
   @PreAuthorize("hasAuthority('car:read')")
   public ResponseEntity<Page<CarResponse>> searchCarsPaginated(
-      @PathVariable Integer page,
-      @RequestParam(defaultValue = "10") Integer size,
-      @RequestParam(required = false) String plate,
-      @RequestParam(required = false) String brand,
-      @RequestParam(required = false) String line,
-      @RequestParam(required = false) String model,
-      @RequestParam(required = false) String fuelType,
-      @RequestParam(required = false) String bodyType,
-      @RequestParam(required = false) String transmission,
-      @RequestParam(required = false) String city,
-      @RequestParam(required = false) VehicleStatus status,
-      @RequestParam(required = false) Integer minYear,
-      @RequestParam(required = false) Integer maxYear,
-      @RequestParam(required = false) Integer minCapacity,
-      @RequestParam(required = false) Integer maxCapacity,
-      @RequestParam(required = false) Integer minMileage,
-      @RequestParam(required = false) Integer maxMileage,
-      @RequestParam(required = false) Double minSalePrice,
-      @RequestParam(required = false) Double maxSalePrice) {
+      Integer page,
+      Integer size,
+      String plate,
+      String brand,
+      String line,
+      String model,
+      String fuelType,
+      String bodyType,
+      String transmission,
+      String city,
+      VehicleStatus status,
+      Integer minYear,
+      Integer maxYear,
+      Integer minCapacity,
+      Integer maxCapacity,
+      Integer minMileage,
+      Integer maxMileage,
+      Double minSalePrice,
+      Double maxSalePrice) {
 
     CarSearchCriteria criteria =
         CarSearchCriteria.builder()
@@ -304,12 +210,6 @@ public class CarController implements CarApi {
     return ResponseEntity.ok(pageResponse);
   }
 
-  /**
-   * Normaliza texto opcional eliminando espacios y devolviendo null si queda vacío.
-   *
-   * @param value valor recibido en query params
-   * @return texto limpio o null
-   */
   private String trimToNull(String value) {
     if (!StringUtils.hasText(value)) {
       return null;

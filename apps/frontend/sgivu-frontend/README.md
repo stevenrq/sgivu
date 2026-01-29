@@ -1,98 +1,75 @@
-# SGIVU - sgivu-frontend
+# sgivu-frontend - SGIVU
 
 ## Descripción
 
-Frontend Angular que provee vistas para gestión de usuarios, roles, clientes, vehículos y dashboard. Integra autenticación OAuth 2.0/OIDC y consume APIs vía SGIVU Gateway.
+**`sgivu-frontend`** es la aplicación Single Page (SPA) cliente del ecosistema **SGIVU**, implementada en Angular. Proporciona la interfaz de usuario para administración (dashboards, gestión de clientes, usuarios, vehículos y contratos de compra/venta) y delega la autenticación y APIs al gateway (`sgivu-gateway`).
 
-## Arquitectura y Rol
+## Tecnologías y Dependencias
 
-- Aplicación Angular standalone (sin NgModules) con rutas en `app.routes.ts` y configuración en `app.config.ts`.
-- Features en `src/app/features` (auth, dashboard, users, clients, vehicles, purchase-sales) y `shared` para layout, directivas, servicios y validadores.
-- Se integra con `sgivu-gateway` bajo el patrón BFF para la gestión segura de tokens.
-- Configuración de entornos en `src/environments` (`environment.ts`, `environment.development.ts`).
+- Angular 21
+- TypeScript
+- Bootstrap 5 + Bootstrap Icons
+- Chart.js + ng2-charts
+- RxJS
+- Herramientas de desarrollo: `@angular/cli`, `karma`/`jasmine` (tests), `eslint`, `prettier`
 
-## Tecnologías
+## Requisitos Previos
 
-- Angular 21, TypeScript, CSS3.
+- Node.js (versión compatible con Angular 21)
+- npm 8+ (se usa `package-lock.json`)
+- `sgivu-config`, `sgivu-discovery`, `sgivu-gateway` y `sgivu-auth` disponibles (o arrancados via `infra/compose/sgivu-docker-compose`)
 
-## Configuración
+## Arranque y Ejecución
 
-- Variables de entorno (archivos): `apiUrl` (gateway), `issuer` (auth), `clientId` (cliente OAuth), scopes si aplica.
-- Copia base: `cp src/environments/environment.ts src/environments/environment.development.ts` y ajusta valores.
+### Desarrollo
 
-## Ejecución Local
+1. Instalar dependencias y arrancar el servidor de desarrollo:
 
-```bash
-npm install
-npm start
-# http://localhost:4200
-```
+   `npm install`
+   `npm run start`  (dev server - por defecto en el puerto 4200)
 
-Scripts útiles:
+2. Durante el desarrollo la configuración de entorno usada por defecto es `src/environments/environment.development.ts`.
 
-- `npm run build` (build prod en `dist/sgivu-frontend/browser`)
-- `npm run watch` (recompila en cambios)
-- `npm test` (pruebas unitarias)
-- `npm run lint` (ESLint)
-- `npx prettier --check "src/**/*.{ts,html,css}"`
+### Ejecución Local (build)
 
-## Endpoints Principales
-
-- Base API: `apiUrl` apunta al gateway (por defecto `http://localhost:8080`).
-- Issuer OIDC: `issuer` apunta a Auth (por defecto `http://localhost:9000`).
-- Todo el tráfico HTTP pasa por SGIVU Gateway.
-
-## Seguridad
-
-- **Patrón BFF (Backend For Frontend):** `sgivu-gateway` actúa como BFF encargado de almacenar y servir el `access_token` y el `refresh_token` necesarios para la aplicación Angular. Aunque los tokens son creados por `sgivu-auth`, el gateway es el punto central de gestión para el frontend.
-- `auth.guard` protege rutas; `auth.interceptor` adjunta `Authorization`.
-- No hardcodear secretos; definirlos en `src/environments/*`.
-
-## Dependencias
-
-- Node.js 20+, npm 10+, Angular CLI opcional.
-- Servicios SGIVU: gateway y auth para autenticación y APIs.
-
-## Dockerización
-
-- Imagen: `sgivu-frontend`.
-
-Ejemplo:
-
-```bash
-docker build -t sgivu-frontend .
-docker run -d -p 4200:80 -e API_URL=http://sgivu-gateway:8080 sgivu-frontend
-```
-
-## Build y Push Docker
-
-- No hay script dedicado; usa `docker build` y publica la imagen en tu registry.
+`npm run build` — genera los assets en `dist/sgivu-frontend`.
 
 ## Despliegue
 
-- Contenedor Nginx sirviendo el build de Angular; configura `API_URL` según entorno.
-- Exponer la app detrás de un Load Balancer o CDN y mantener `issuer` consistente con `sgivu-auth`.
+- Recomendación de despliegue: compilar la SPA (`npm run build`) y servir los archivos estáticos desde S3 + CloudFront (o un Nginx) como se hace en `infra/nginx` (actualmente la infra apunta a `sgivu-frontend.s3-website-us-east-1.amazonaws.com`).
 
-## Monitoreo
+## Producción
 
-- Logs del contenedor/Nginx y herramientas del navegador (Network/Console).
+- Build optimizado: `npm run build -- --configuration production` (o usar la configuración por defecto para producción del builder de Angular).
+- Servir `dist/sgivu-frontend` desde un CDN o un servidor estático (S3 + CloudFront es la opción utilizada por la infraestructura). Asegurar que `base href` y `routing` funcionan correctamente detrás del proxy.
 
-## Troubleshooting
+## Endpoints / Integraciones
 
-- CORS bloqueado: ajusta `angular-client.url` en Config Server y `apiUrl` en el frontend.
-- Login en loop: valida `issuer`, `clientId` y relojes sincronizados.
-- 401/403: revisa scopes/roles en el JWT emitido por `sgivu-auth`.
+- BFF / Gateway: la app comunica con el backend a través de la URL configurada en `environment.apiUrl` (el gateway expone `/auth/session`, `/oauth2/authorization/sgivu-gateway` y proxifica las APIs `/v1/*`).
+- Autenticación: el flujo de login se delega al gateway (OAuth2/OIDC, flow PKCE manejado por el gateway). La app consulta `/auth/session` para comprobar la sesión.
 
-## Buenas Prácticas y Convenciones
+## Seguridad
 
-- TypeScript estricto, sin `any` salvo necesidad justificada.
-- Componentes en PascalCase, archivos kebab-case; observables sufijo `$`, señales sufijo `Signal`.
-- Evitar `ngClass/ngStyle` cuando un binding simple baste; usa `NgOptimizedImage` para estáticos.
+- La aplicación no maneja directamente secretos; la autenticación es delegada a `sgivu-gateway` / `sgivu-auth`.
+- Variables de entorno leídas desde `src/environments/*.ts`: `apiUrl`, `issuer`, `clientId` (configuración por entorno). No incluir valores secretos en el repositorio.
 
-## Diagramas
+## Observabilidad
 
-- Arquitectura general: `../../../docs/diagrams/01-system-architecture.puml`.
+- El servicio BFF (`sgivu-gateway`) proporciona trazabilidad y endpoints que la UI consume (p. ej. `/auth/session`).
 
-## Autor
+## Pruebas
 
-- Steven Ricardo Quiñones (2025)
+- Unit tests: `npm run test` (Karma + Jasmine)
+- Lint: `npm run lint`
+- No hay tests E2E (Cypress/Playwright) configurados por defecto.
+
+## Solución de Problemas
+
+- Problema: 401/403 en peticiones XHR -> Verificar que `apiUrl` apunta al `sgivu-gateway` correcto y que la sesión está creada (`/auth/session`).
+- Problema: Issuer / redirect mismatch -> revisar configuración de `issuer` y la configuración de `ISSUER_URL` en `sgivu-auth` / Nginx.
+- Problema: Rutas no encontradas tras deploy estático -> comprobar `base href` en `index.html` y reglas de reescritura del servidor (serve index.html para rutas SPA).
+
+## Contribuciones
+
+1. Fork → branch → PR
+2. Añadir tests para cambios funcionales y describir el cambio en el PR

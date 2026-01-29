@@ -12,12 +12,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Implementación de servicio para motocicletas.
- *
- * <p>Extiende la lógica común de vehículos y añade filtros por tipo de moto, usados para segmentar
- * inventario y controlar restricciones de aseguradora.
- */
 @Service
 @Transactional(readOnly = true)
 public class MotorcycleServiceImpl

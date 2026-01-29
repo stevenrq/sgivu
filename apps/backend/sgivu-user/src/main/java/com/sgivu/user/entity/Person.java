@@ -63,7 +63,6 @@ public abstract class Person implements Serializable {
     this.updatedAt = LocalDateTime.now();
 
     if (this instanceof User user) {
-      // Mantiene estados de seguridad alineados al crear la persona/usuario.
       user.prePersistUser();
     }
   }

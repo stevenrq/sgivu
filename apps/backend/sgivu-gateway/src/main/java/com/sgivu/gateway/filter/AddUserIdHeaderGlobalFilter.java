@@ -12,8 +12,17 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 /**
- * Propaga el `X-User-ID` desde el `sub` del JWT o el claim `userId` del ID token OIDC cuando el
- * gateway actúa como BFF, para auditar y correlacionar peticiones sin revalidar el token.
+ * Filtro global que añade el header "X-User-ID" a las peticiones que provienen de usuarios
+ * autenticados. Detecta el identificador de usuario a partir de:
+ *
+ * <ul>
+ *   <li>{@link JwtAuthenticationToken}: se usa el subject del token JWT.
+ *   <li>{@link OAuth2AuthenticationToken} con {@link OidcUser}: se busca la claim "userId" (String
+ *       o Number) y en su defecto se usa el subject del OIDC.
+ * </ul>
+ *
+ * El filtro es reactivo y no bloqueante: si no hay principal disponible deja la petición sin
+ * modificar. Añade el header "X-User-ID" a la petición mutada cuando se resuelve un id válido.
  */
 @Component
 public class AddUserIdHeaderGlobalFilter implements GlobalFilter, Ordered {

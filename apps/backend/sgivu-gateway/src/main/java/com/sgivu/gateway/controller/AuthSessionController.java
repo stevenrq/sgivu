@@ -1,10 +1,7 @@
 package com.sgivu.gateway.controller;
 
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.tags.Tag;
+import com.sgivu.gateway.controller.api.AuthSessionApi;
+import com.sgivu.gateway.dto.AuthSessionResponse;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -15,20 +12,12 @@ import org.springframework.security.oauth2.client.authentication.OAuth2Authentic
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
-/**
- * Expone la sesión autenticada del gateway (BFF) para que la SPA consulte estado y claims sin
- * manejar tokens en el navegador.
- */
-@Tag(name = "Auth (BFF)", description = "Estado de sesión expuesto por el BFF para la SPA")
 @RestController
-@RequestMapping("/auth")
-public class AuthSessionController {
+public class AuthSessionController implements AuthSessionApi {
 
   private final ReactiveJwtDecoder jwtDecoder;
   private final ReactiveOAuth2AuthorizedClientManager authorizedClientManager;
@@ -40,17 +29,7 @@ public class AuthSessionController {
     this.authorizedClientManager = authorizedClientManager;
   }
 
-  @Operation(
-      summary = "Obtener estado de sesión autenticada",
-      description =
-          "Devuelve información de la sesión del usuario autenticado (claims) expuesta por el BFF"
-              + " para la SPA.")
-  @ApiResponse(
-      responseCode = "200",
-      description = "Sesión autenticada",
-      content = @Content(schema = @Schema(implementation = AuthSessionResponse.class)))
-  @ApiResponse(responseCode = "401", description = "No autenticado")
-  @GetMapping("/session")
+  @Override
   public Mono<ResponseEntity<AuthSessionResponse>> session(
       Authentication authentication, ServerWebExchange exchange) {
     if (authentication == null || !authentication.isAuthenticated()) {
@@ -97,11 +76,4 @@ public class AuthSessionController {
         rolesAndPermissions == null ? List.of() : rolesAndPermissions,
         Boolean.TRUE.equals(isAdmin));
   }
-
-  public record AuthSessionResponse(
-      boolean authenticated,
-      String userId,
-      String username,
-      List<String> rolesAndPermissions,
-      boolean isAdmin) {}
 }

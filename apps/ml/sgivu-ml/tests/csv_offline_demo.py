@@ -1,35 +1,11 @@
-"""
-Script de prueba offline para entrenar y predecir usando un CSV local de compras/ventas.
-
-Uso:
-  python tests/csv_offline_demo.py --csv path/al/archivo.csv --horizon 6 \
-      --vehicle-type MOTORCYCLE --brand YAMAHA --model "FZ 2.0" --line TDS-57D
-
-Campos esperados en el CSV (ejemplo suministrado):
-- "Tipo de contrato" (Compra/Venta)
-- "Estado del contrato" (Activa/Pendiente/Completado/Cancelado)
-- "Marca del vehículo"
-- "Modelo del vehículo"
-- "Placa del vehículo"
-- "Tipo de vehículo" (Automóvil/Motocicleta)
-- "Estado del vehículo"
-- "Precio de compra"
-- "Precio de venta"
-- "Método de pago"
-- "Fecha de creación"
-- "Última actualización"
-
-El script evita llamadas HTTP; crea un modelo en el directorio indicado y muestra
-metricas + pronostico para el segmento solicitado.
-"""
+"""Prueba offline del modelo de demanda con un CSV local."""
 
 from __future__ import annotations
-
 import argparse
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, cast
 
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
@@ -84,7 +60,6 @@ DT64 = "datetime64[ns]"
 
 
 def _parse_datetime(value: str) -> str:
-    """Convierte 'dd/mm/yyyy HH:MM' a ISO8601."""
     try:
         dt = datetime.strptime(value.strip(), "%d/%m/%Y %H:%M")
         return dt.isoformat()
@@ -99,9 +74,7 @@ def _normalize(value: Any) -> str:
 def load_csv(path: Path) -> pd.DataFrame:
     df = pd.read_csv(path)
 
-    # Cuando el reporte exporta una cabecera de periodo en las dos primeras filas.
     if df.columns.tolist() == ["Periodo", "Periodo: todos los registros disponibles"]:
-        # El archivo trae una fila de encabezado de periodo y luego el encabezado real.
         df = pd.read_csv(path, skiprows=1)
 
     # Normaliza nombres quitando comillas.
@@ -155,7 +128,6 @@ def load_csv(path: Path) -> pd.DataFrame:
                 ),
                 "brand": _normalize(row.get("Marca del vehículo")),
                 "model": _normalize(row.get("Modelo del vehículo")),
-                # La línea proviene de la columna específica; la placa se mantiene aparte.
                 "line": line_value,
                 "plate": plate,
                 "year": None,
@@ -174,12 +146,9 @@ def plot_forecast(
     horizon: int,
     output_path: Path,
 ) -> None:
-    """Dibuja historia + forecast con intervalos y metadata."""
-
-    # Historia agregada por mes (ventas observadas)
     hist = history.copy()
     if not hist.empty:
-        ref_month = hist["event_month"].max()  # mes más reciente del CSV
+        ref_month = hist["event_month"].max()
         cutoff = (ref_month - pd.DateOffset(months=11)).to_period("M").to_timestamp()
         hist = hist[
             (hist["event_month"] >= cutoff) & (hist["event_month"] <= ref_month)
@@ -269,10 +238,7 @@ def plot_forecast(
     plt.xticks(all_months_np, labels, rotation=45)
     ax.yaxis.set_major_locator(MaxNLocator(integer=True))
     all_y_values = (
-        list(y_hist.values if hasattr(y_hist, "values") else y_hist)
-        + y
-        + upper
-        + lower
+        list(y_hist.values if hasattr(y_hist, "values") else y_hist) + y + upper + lower
     )
     if all_y_values:
         max_y = max(all_y_values)
@@ -313,7 +279,7 @@ def run(
     feature_store = None
     prediction_store = None
     if database_enabled(settings):
-        registry = DatabaseModelRegistry(settings=settings)
+        registry = cast(ModelRegistry, DatabaseModelRegistry(settings=settings))
         feature_store = FeatureStore(settings=settings)
         prediction_store = PredictionStore(settings=settings)
     else:
@@ -328,7 +294,7 @@ def run(
         settings=settings,
     )
     service = PredictionService(
-        loader=None,  # no se usa en este flujo offline
+        loader=None,
         trainer=trainer,
         registry=registry,
         feature_store=feature_store,
@@ -388,7 +354,7 @@ def run(
         return
 
     model, latest_metadata = registry.load_latest()
-    forecast = service._forecast(  # pylint: disable=protected-access
+    forecast = service._forecast(
         model=model,
         metadata=latest_metadata,
         history=history,

@@ -19,10 +19,6 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 
-/**
- * Recupera usuarios desde {@link UserClient}, añade trazabilidad y aplica circuit breaker para
- * degradar el login con un mensaje controlado cuando sgivu-user no responde.
- */
 @Service
 public class JpaUserDetailsService implements UserDetailsService {
 
@@ -68,7 +64,6 @@ public class JpaUserDetailsService implements UserDetailsService {
         });
   }
 
-  @SuppressWarnings("unused")
   private <T> T executeWithSpan(String spanName, SpanCallable<T> callable) {
     Span span = tracer.nextSpan().name(spanName).start();
     try (Tracer.SpanInScope spanScope = tracer.withSpan(span)) {
@@ -78,7 +73,6 @@ public class JpaUserDetailsService implements UserDetailsService {
     }
   }
 
-  @SuppressWarnings("unused")
   @CircuitBreaker(name = "userServiceCircuitBreaker", fallbackMethod = "fallbackFetchUser")
   private User fetchUser(String username) {
     Span span = tracer.nextSpan().name("fetchUser").start();

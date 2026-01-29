@@ -22,10 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 
-/**
- * Implementación JPA de {@link RegisteredClientRepository} que serializa la configuración de
- * clientes OIDC a JSON para reconstruirlos tal como los usa Spring Authorization Server.
- */
 @Component
 public class JpaRegisteredClientRepository implements RegisteredClientRepository {
 

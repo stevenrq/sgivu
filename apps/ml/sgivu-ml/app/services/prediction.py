@@ -22,11 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 class PredictionService:
-    """Orquesta reentrenamiento e inferencia de demanda mensual.
-
-    Integra carga de datos desde purchase-sale/inventario, construcción de
-    features temporales y ejecución del modelo versionado.
-    """
+    """Servicio de predicción y reentrenamiento de modelos de demanda.""" ""
 
     def __init__(
         self,
@@ -37,14 +33,7 @@ class PredictionService:
         prediction_store: PredictionStore | None = None,
         settings: Settings | None = None,
     ) -> None:
-        """Crear el orquestador de predicción.
 
-        Args:
-            loader: Cliente de datos; puede ser None en flujos offline donde no se llama predict.
-            trainer: Servicio de entrenamiento/feature engineering.
-            registry: Repositorio de modelos versionados.
-            settings: Configuración global.
-        """
         self.loader = loader
         self.trainer = trainer
         self.registry = registry
@@ -53,7 +42,6 @@ class PredictionService:
         self.settings = settings or get_settings()
 
     def _normalize_filters(self, filters: Dict[str, Any]) -> Dict[str, Any]:
-        """Normaliza los filtros del segmento para consultas consistentes."""
         normalized_filters: Dict[str, Any] = {}
         normalized_filters["vehicle_type"] = canonicalize_label(
             filters.get("vehicle_type")
@@ -74,7 +62,6 @@ class PredictionService:
     def _filter_history(
         self, feature_df: pd.DataFrame, filters: Dict[str, Any]
     ) -> pd.DataFrame:
-        """Filtra el historial mensual según el segmento solicitado."""
         mask_base = (
             (feature_df["vehicle_type"] == filters.get("vehicle_type"))
             & (feature_df["brand"] == filters.get("brand"))
@@ -86,7 +73,6 @@ class PredictionService:
     async def _load_history(
         self, filters: Dict[str, Any], model_version: str
     ) -> pd.DataFrame:
-        """Carga historial desde DB si existe; fallback a gateway + snapshot."""
         history = pd.DataFrame()
         if self.feature_store:
             history = self.feature_store.load_segment_history(model_version, filters)
@@ -114,7 +100,6 @@ class PredictionService:
         confidence: float,
         with_history: bool,
     ) -> None:
-        """Persiste la predicción cuando hay almacenamiento configurado."""
         if not self.prediction_store:
             return
         try:
@@ -133,18 +118,6 @@ class PredictionService:
     async def retrain(
         self, start_date: Optional[date] = None, end_date: Optional[date] = None
     ) -> Dict[str, Any]:
-        """Reentrena usando el historial más reciente disponible.
-
-        Args:
-            start_date: Fecha mínima (opcional) para acotar el rango.
-            end_date: Fecha máxima (opcional).
-
-        Raises:
-            HTTPException: Si no hay datos en el rango solicitado.
-
-        Returns:
-            Metadata del modelo entrenado (métricas, versión, muestras).
-        """
         if not self.loader:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -163,19 +136,7 @@ class PredictionService:
     async def predict(
         self, filters: Dict[str, Any], horizon: int, confidence: float = 0.95
     ) -> Dict[str, Any]:
-        """Genera pronóstico para un segmento de vehículos.
 
-        Args:
-            filters: Segmento solicitado (vehicle_type, brand, model, opcional line).
-            horizon: Meses hacia adelante a pronosticar.
-            confidence: Nivel de confianza (para IC gaussiano).
-
-        Raises:
-            HTTPException: Si no existe modelo entrenado o no hay historial del segmento.
-
-        Returns:
-            Dict con predicciones, versión del modelo y métricas de entrenamiento.
-        """
         if not self.loader and not self.feature_store:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -190,9 +151,7 @@ class PredictionService:
             ) from exc
 
         normalized_filters = self._normalize_filters(filters)
-        history = await self._load_history(
-            normalized_filters, metadata["version"]
-        )
+        history = await self._load_history(normalized_filters, metadata["version"])
 
         if history.empty:
             raise HTTPException(
@@ -229,7 +188,6 @@ class PredictionService:
     async def predict_with_history(
         self, filters: Dict[str, Any], horizon: int, confidence: float = 0.95
     ) -> Dict[str, Any]:
-        """Pronóstico + historial mensual para graficar en frontend."""
         if not self.loader and not self.feature_store:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -244,9 +202,7 @@ class PredictionService:
             ) from exc
 
         normalized_filters = self._normalize_filters(filters)
-        history = await self._load_history(
-            normalized_filters, metadata["version"]
-        )
+        history = await self._load_history(normalized_filters, metadata["version"])
 
         if history.empty:
             raise HTTPException(
@@ -304,11 +260,6 @@ class PredictionService:
         horizon: int,
         confidence: float,
     ) -> List[Dict[str, Any]]:
-        """Pronóstico iterativo mes a mes propagando los lags calculados.
-
-        Se usa la desviación estándar de residuales del set de prueba para
-        construir bandas de confianza (aprox. normal).
-        """
         residual_std = metadata.get("metrics", {}).get("residual_std", 1.0)
         z_value = self._z_value(confidence)
 
@@ -347,7 +298,6 @@ class PredictionService:
         return results
 
     def _z_value(self, confidence: float) -> float:
-        """Aproxima el valor-z para un nivel de confianza (distribución normal)."""
         conf = min(max(confidence, 0.5), 0.99)
         if conf >= 0.99:
             return 2.58

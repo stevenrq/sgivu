@@ -18,7 +18,6 @@ import { UserUiHelperService } from '../../../../shared/services/user-ui-helper.
     './user-profile.component.css',
   ],
 })
-/** Perfil de usuario que muestra datos personales, permisos y opciones de administración. */
 export class UserProfileComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly authService = inject(AuthService);

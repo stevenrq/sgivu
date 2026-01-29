@@ -6,12 +6,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/**
- * Metadatos de imágenes asociadas a un vehículo.
- *
- * <p>Se persiste solo la referencia al objeto en S3, permitiendo auditoría de uploads y control de
- * imagen principal usada por los portales de venta SGIVU.
- */
 @Getter
 @Setter
 @NoArgsConstructor
@@ -52,7 +46,6 @@ public class VehicleImage {
   @Column(nullable = false)
   private LocalDateTime createdAt;
 
-  /** Registra fecha de creación al guardar por primera vez. */
   @PrePersist
   void prePersist() {
     this.createdAt = LocalDateTime.now();

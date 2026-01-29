@@ -12,12 +12,6 @@ import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 
-/**
- * Normaliza las respuestas de error del microservicio.
- *
- * <p>Captura excepciones frecuentes (validaciones, integridad, autorización) para entregar mensajes
- * consistentes a los consumidores del inventario y facilitar auditoría.
- */
 @ControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -26,12 +20,6 @@ public class GlobalExceptionHandler {
   private static final String DETAILS_KEY = "details";
   private static final String STATUS_KEY = "status";
 
-  /**
-   * Maneja violaciones de restricciones de validación (javax/jakarta) devolviendo 409.
-   *
-   * @param e excepción capturada
-   * @return respuesta con detalles de la violación
-   */
   @ExceptionHandler(ConstraintViolationException.class)
   public ResponseEntity<Object> handleConstraintViolationException(ConstraintViolationException e) {
     logger.error("Ocurrió una violación de restricción: {}", e.getMessage(), e);
@@ -46,12 +34,6 @@ public class GlobalExceptionHandler {
     return new ResponseEntity<>(errorResponse, HttpStatus.CONFLICT);
   }
 
-  /**
-   * Maneja errores de integridad de datos a nivel de base de datos.
-   *
-   * @param e excepción de integridad
-   * @return respuesta con código 409
-   */
   @ExceptionHandler(DataIntegrityViolationException.class)
   public ResponseEntity<Object> handleDataIntegrityViolationException(
       DataIntegrityViolationException e) {
@@ -67,12 +49,6 @@ public class GlobalExceptionHandler {
     return new ResponseEntity<>(errorResponse, HttpStatus.CONFLICT);
   }
 
-  /**
-   * Captura errores genéricos no manejados devolviendo 500.
-   *
-   * @param e excepción inesperada
-   * @return payload con detalles mínimos
-   */
   @ExceptionHandler(Exception.class)
   public ResponseEntity<Object> handleGeneralException(Exception e) {
     logger.error("Ocurrió un error inesperado: {}", e.getMessage(), e);
@@ -86,12 +62,6 @@ public class GlobalExceptionHandler {
     return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
   }
 
-  /**
-   * Devuelve 403 cuando el usuario autenticado no tiene los permisos necesarios.
-   *
-   * @param e excepción lanzada por la capa de seguridad
-   * @return mensaje estándar de acceso denegado
-   */
   @ExceptionHandler(AuthorizationDeniedException.class)
   public ResponseEntity<Object> handleAuthorizationDeniedException(AuthorizationDeniedException e) {
     logger.warn("Acceso denegado: {}", e.getMessage());

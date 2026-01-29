@@ -10,10 +10,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.context.request.WebRequest;
 
-/**
- * Reemplaza la página HTML de Spring Boot en {@code /error} por una respuesta JSON consistente
- * consumible por el portal Angular y otros microservicios.
- */
+/** Controlador personalizado para manejar errores y retornar detalles en formato JSON. */
 @Hidden
 @RestController
 public class CustomErrorController implements ErrorController {

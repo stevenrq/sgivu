@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, cast
 
 import numpy as np
 import pandas as pd
@@ -29,24 +29,16 @@ from app.services.model_registry import ModelRegistry
 
 try:
     from xgboost import XGBRegressor
-except Exception:  # pragma: no cover - opcional
+except Exception:
     XGBRegressor = None
 
 logger = logging.getLogger(__name__)
 
 
 class TrainingService:
-    """Construye el dataset temporal y entrena el mejor modelo de demanda.
+    """Servicio de entrenamiento y versionado de modelos de demanda."""
 
-    - Agrega contratos por mes y segmento (tipo + marca + modelo + línea).
-    - Genera lags y rolling windows para capturar tendencia/estacionalidad.
-    - Preprocesa categorías con OneHotEncoder y escala numéricos.
-    - Evalúa candidatos (LR, RF, XGB) y selecciona por menor RMSE temporal.
-    """
-
-    # Agrupamos por tipo+marca+modelo+línea para que el modelo sea específico del segmento exacto.
     category_cols = ["vehicle_type", "brand", "model", "line"]
-    # Sin categorías opcionales: la línea se volvió obligatoria tras normalizar el segmento.
     optional_category_cols: list[str] = []
     numeric_cols = [
         "purchases_count",
@@ -77,7 +69,6 @@ class TrainingService:
         self.settings = settings or get_settings()
 
     def build_feature_table(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Crea la tabla mensual agregada con variables derivadas y lags."""
         if df.empty:
             return df
 
@@ -107,7 +98,7 @@ class TrainingService:
             work_df["updated_at"].fillna(work_df["created_at"]), utc=True
         ).dt.tz_localize(None)
         work_df["event_month"] = (
-            work_df["event_date"].dt.to_period("M").dt.to_timestamp()
+            pd.DatetimeIndex(work_df["event_date"]).to_period("M").to_timestamp()
         )
         work_df["is_sale"] = work_df["contract_type"] == "SALE"
         work_df["is_purchase"] = work_df["contract_type"] == "PURCHASE"
@@ -124,7 +115,8 @@ class TrainingService:
         work_df["purchase_date"] = work_df["vehicle_id"].map(purchase_dates)
         work_df["days_in_inventory"] = np.where(
             work_df["is_sale"] & work_df["purchase_date"].notna(),
-            (work_df["event_date"] - work_df["purchase_date"]).dt.days,
+            (work_df["event_date"].to_numpy() - work_df["purchase_date"].to_numpy())
+            / np.timedelta64(1, "D"),
             np.nan,
         )
 
@@ -166,7 +158,6 @@ class TrainingService:
         return monthly
 
     def _add_lags(self, group: pd.DataFrame) -> pd.DataFrame:
-        """Genera lags y promedios rodantes dentro de cada segmento."""
         group = group.sort_values("event_month")
         group["lag_1"] = group["sales_count"].shift(1)
         group["lag_3"] = group["sales_count"].shift(3)
@@ -180,9 +171,8 @@ class TrainingService:
         return group
 
     def _add_time_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Añade estacionalidad con seno/coseno y marcadores de mes/año."""
-        df["month"] = df["event_month"].dt.month
-        df["year"] = df["event_month"].dt.year
+        df["month"] = pd.DatetimeIndex(df["event_month"]).month
+        df["year"] = pd.DatetimeIndex(df["event_month"]).year
         df["month_sin"] = np.sin(2 * np.pi * df["month"] / 12)
         df["month_cos"] = np.cos(2 * np.pi * df["month"] / 12)
         return df
@@ -206,7 +196,6 @@ class TrainingService:
         return train, test
 
     def _build_preprocessor(self, optional_cols: List[str]) -> ColumnTransformer:
-        """Pipeline de preprocesamiento: one-hot para categorías y escalado numérico."""
         categorical = OneHotEncoder(handle_unknown="ignore")
         numeric = Pipeline(
             steps=[
@@ -224,7 +213,6 @@ class TrainingService:
         )
 
     def _candidate_models(self) -> List[Tuple[str, Any]]:
-        """Modelos candidatos para series cortas de demanda."""
         models: List[Tuple[str, Any]] = [
             ("linear_regression", LinearRegression()),
             (
@@ -250,7 +238,6 @@ class TrainingService:
         return models
 
     def train(self, df: pd.DataFrame) -> Dict[str, Any]:
-        """Entrena y versiona el mejor modelo según RMSE temporal."""
         dataset = self.build_feature_table(df)
         if dataset.empty:
             raise ValueError("No hay datos historicos para entrenar.")
@@ -275,7 +262,6 @@ class TrainingService:
         sample_count = len(y_test)
 
         def _safe_metric(value: float) -> float:
-            """Evita NaN/inf en métricas (r2 puede ser indefinido con pocos datos)."""
             return float(value) if np.isfinite(value) else 0.0
 
         for name, estimator in candidates:
@@ -345,8 +331,6 @@ class TrainingService:
     def build_future_row(
         self, history: pd.DataFrame, target_month: pd.Timestamp
     ) -> pd.DataFrame:
-        """Genera una fila futura con lags recalculados para predicción."""
-
         if history.empty:
             raise ValueError("No hay historial para calcular predicciones.")
 

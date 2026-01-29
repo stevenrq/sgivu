@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+
+"""Genera un CSV sintético de contratos de compra/venta de vehículos"""
+
 import csv
 import random
 from datetime import datetime, timedelta, date
@@ -437,7 +440,9 @@ def generate_target_segment_sales(writer):
     """Garantiza ventas altas para la Yamaha MT-03 (línea MT) cada mes."""
     for months_back in range(0, 12):  # últimos 12 meses
         month_date = subtract_months(TODAY, months_back)
-        sales_this_month = random.randint(MIN_TARGET_SALES_PER_MONTH, MIN_TARGET_SALES_PER_MONTH + 3)
+        sales_this_month = random.randint(
+            MIN_TARGET_SALES_PER_MONTH, MIN_TARGET_SALES_PER_MONTH + 3
+        )
         for _ in range(sales_this_month):
             day = random.randint(1, 28)
             creation = datetime(

@@ -15,7 +15,6 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
@@ -24,13 +23,6 @@ import org.springframework.security.oauth2.server.resource.web.authentication.Be
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.RequestAuthorizationContext;
 
-/**
- * Configuración de seguridad del microservicio de vehículos.
- *
- * <p>Actúa como recurso protegido OAuth2 validando JWT emitidos por el Authorization Server de
- * SGIVU. Combina autenticación estándar con autorización basada en clave interna para permitir
- * integraciones servicio-a-servicio.
- */
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
@@ -49,13 +41,6 @@ public class SecurityConfig {
     this.internalServiceAuthenticationFilter = internalServiceAuthenticationFilter;
   }
 
-  /**
-   * Define la cadena de filtros, habilita el Resource Server JWT y autoriza endpoints de inventario
-   * combinando claves internas y JWT.
-   *
-   * @param http configurador de seguridad HTTP
-   * @return {@link SecurityFilterChain} listo para Spring Security
-   */
   @Bean
   SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
     http.oauth2ResourceServer(
@@ -71,20 +56,18 @@ public class SecurityConfig {
                         "/v3/api-docs/**",
                         "/webjars/**")
                     .permitAll()
-                    // Servicios internos (clave) o clientes autenticados pueden acceder
+                    // Solo los servicios internos o clientes autenticados pueden acceder
                     .requestMatchers("/v1/cars/**", "/v1/motorcycles/**")
                     .access(internalOrAuthenticatedAuthorizationManager())
                     .anyRequest()
                     .authenticated())
         .csrf(AbstractHttpConfigurer::disable)
-        // Inyecta Authentication con permisos cuando se usa la clave interna
         .addFilterBefore(
             internalServiceAuthenticationFilter, BearerTokenAuthenticationFilter.class);
 
     return http.build();
   }
 
-  /** Autoriza llamadas provenientes de servicios internos confiables o de clientes autenticados. */
   @Bean
   AuthorizationManager<RequestAuthorizationContext> internalOrAuthenticatedAuthorizationManager() {
     AuthorizationManager<RequestAuthorizationContext> authenticatedManager =
@@ -100,11 +83,6 @@ public class SecurityConfig {
     return AuthorizationManagers.anyOf(internalServiceAuthManager, authenticatedManager);
   }
 
-  /**
-   * Decoder JWT usando el issuer configurado en {@link ServicesProperties}.
-   *
-   * @return decodificador Nimbus
-   */
   @Bean
   JwtDecoder jwtDecoder() {
     return NimbusJwtDecoder.withIssuerLocation(
@@ -112,18 +90,6 @@ public class SecurityConfig {
         .build();
   }
 
-  /**
-   * Convierte el claim rolesAndPermissions en una lista de SimpleGrantedAuthority
-   *
-   * <p>Extrae roles/permisos emitidos por el Authorization Server para aplicar autorizaciones en
-   * controladores (vía @PreAuthorize).
-   *
-   * @return un {@link JwtAuthenticationConverter} configurado que extrae las autoridades del claim
-   *     JWT "rolesAndPermissions" para ser utilizadas por Spring Security para la autorización.
-   * @see JwtAuthenticationConverter
-   * @see SimpleGrantedAuthority
-   * @see GrantedAuthority
-   */
   @Bean
   JwtAuthenticationConverter convert() {
     JwtAuthenticationConverter jwtAuthenticationConverter = new JwtAuthenticationConverter();

@@ -23,10 +23,6 @@ interface AuthSessionResponse {
   isAdmin: boolean;
 }
 
-/**
- * Encapsula la integración BFF: valida la sesión en el gateway, gestiona el estado local
- * de autenticación y obtiene el usuario actual sin exponer tokens al navegador.
- */
 @Injectable({
   providedIn: 'root',
 })
@@ -54,19 +50,6 @@ export class AuthService {
   public readonly currentAuthenticatedUser$: Observable<User | null> =
     this.userSubject$.asObservable();
 
-  /**
-   * Un observable que emite `true` cuando la aplicación está lista para interactuar con rutas protegidas.
-   *
-   * Combina dos estados clave:
-   * 1. La autenticación del usuario (`isAuthenticated$`).
-   * 2. La finalización de los procesos de carga inicial de la aplicación (`isDoneLoading$`).
-   *
-   * Este observable es útil no solo para guardas de ruta, sino también para cualquier componente
-   * que necesite determinar si debe mostrar el contenido principal de la aplicación o una pantalla de carga.
-   *
-   * @returns Un `Observable<boolean>` que es `true` si la aplicación está lista y el usuario está autenticado,
-   * de lo contrario, `false`.
-   */
   public readonly isReadyAndAuthenticated$: Observable<boolean> = combineLatest(
     [this.isAuthenticated$, this.isDoneLoading$],
   ).pipe(
@@ -74,7 +57,7 @@ export class AuthService {
   );
 
   /**
-   * Consulta el estado de sesión en el gateway para decidir si el usuario está autenticado.
+   * Consulta el estado de sesión en el gateway (BFF) para decidir si el usuario está autenticado.
    * Si existe sesión, carga los datos del usuario y aplica la navegación post-login.
    */
   public async initializeAuthentication(): Promise<void> {
@@ -107,7 +90,7 @@ export class AuthService {
   }
 
   /**
-   * Inicia el flujo OAuth 2.0 delegando el login al gateway BFF.
+   * Inicia el flujo OAuth 2.0 delegando el login al gateway.
    *
    * @param redirectUrl - Ruta a la que se redirige después de autenticarse.
    */
@@ -175,8 +158,15 @@ export class AuthService {
   }
 
   /**
-   * Recupera la ruta almacenada antes de iniciar sesión y navega hacia ella
-   * al completar el callback del gateway.
+   * Determina si la ruta actual es el callback. Lo que significa que el usuario acaba de autenticarse.
+   * @returns `true` si la ruta actual es el callback de login, `false` en caso contrario.
+   */
+  private isLoginCallback(): boolean {
+    return window.location.pathname.includes('/callback');
+  }
+
+  /**
+   * Navega a la URL almacenada en sesión después del login, o al dashboard por defecto.
    */
   private navigateAfterLogin(): void {
     const redirectUrl =
@@ -185,15 +175,11 @@ export class AuthService {
     this.router.navigateByUrl(redirectUrl, { replaceUrl: true });
   }
 
-  private isLoginCallback(): boolean {
-    return window.location.pathname.includes('/callback');
-  }
-
   /**
    * Obtiene el usuario autenticado desde el backend y lo almacena en el Subject
-   * para exponerlo como observable. Regresa una promesa para facilitar awaits.
+   * para exponerlo como observable.
    *
-   * @returns Promesa resuelta cuando finaliza la llamada al backend.
+   * @returns Una promesa que se resuelve cuando la operación finaliza.
    */
   private fetchAndStoreCurrentAuthenticatedUser(): Promise<void> {
     return new Promise((resolve) => {

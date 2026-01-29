@@ -1,6 +1,3 @@
-/*
- * Reglas de validación para los campos del formulario.
- */
 const ValidationRules = {
   username: [
     (value) => {
@@ -26,9 +23,6 @@ const ValidationRules = {
   ],
 };
 
-/*
- * Mapeo de códigos de error a mensajes de usuario.
- */
 const ErrorMessageMap = {
   invalid_credentials:
     "Credenciales inválidas. Verifique su nombre de usuario y contraseña.",
@@ -147,28 +141,10 @@ class LoginFormHandler {
       return;
     }
 
-    // Validar credenciales con el servidor antes de enviar el formulario
     const credentialsValid = await this.validateCredentials();
     if (credentialsValid) {
-      // Si las credenciales son válidas, enviar el formulario
       this.loginForm.submit();
     }
-  }
-
-  handleUsernameInput() {
-    // No validar en tiempo real - solo al enviar el formulario
-  }
-
-  handleUsernameBlur() {
-    // No validar en tiempo real - solo al enviar el formulario
-  }
-
-  handlePasswordInput() {
-    // No validar en tiempo real - solo al enviar el formulario
-  }
-
-  handlePasswordBlur() {
-    // No validar en tiempo real - solo al enviar el formulario
   }
 
   togglePasswordVisibility() {
@@ -178,16 +154,10 @@ class LoginFormHandler {
     this.togglePassword.classList.toggle("bi-eye-slash");
   }
 
-  /*
-   * Valida las credenciales llamando al endpoint /api/validate-credentials.
-   * Muestra mensajes de error específicos basados en la razón del fallo.
-   * Retorna true si las credenciales son válidas, false en caso contrario.
-   */
   async validateCredentials() {
     const username = this.usernameInput.value.trim();
     const password = this.passwordInput.value;
 
-    // No validar si alguno de los campos está vacío (validación local ya lo cubre)
     if (!username || !password) {
       return false;
     }
@@ -219,21 +189,14 @@ class LoginFormHandler {
     }
   }
 
-  /*
-   * Procesa la respuesta de validación de credenciales del servidor.
-   * Retorna true si las credenciales son válidas, false en caso contrario.
-   */
   handleCredentialsValidationResponse(response) {
     if (response.valid) {
-      // Las credenciales son válidas
       this.usernameValidator.setBootstrapValidation(true, "");
       this.passwordValidator.setBootstrapValidation(true, "");
       return true;
     } else {
-      // Las credenciales no son válidas - mostrar mensaje específico
       const errorMessage =
         ErrorMessageMap[response.reason] || ErrorMessageMap.unexpected_error;
-      // Marcar ambos campos como inválidos, pero mostrar mensaje solo en contraseña
       this.usernameValidator.setBootstrapValidation(false, "");
       if (this.usernameError) {
         this.usernameError.textContent = "";

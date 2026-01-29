@@ -11,13 +11,6 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.client.ResourceAccessException;
 
-/**
- * Manejo centralizado de excepciones expuestas por el Authorization Server.
- *
- * <p>Devuelve respuestas JSON consistentes hacia los clientes front (Angular) y otros
- * microservicios, evitando páginas HTML y explicitando si el problema es de validación de datos o
- * de disponibilidad del servicio de usuarios.
- */
 @ControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -30,10 +23,6 @@ public class GlobalExceptionHandler {
 
   private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-  /**
-   * Captura violaciones de constraints (ej. claves únicas de clientes OIDC) y responde de forma
-   * determinística para el portal de ventas.
-   */
   @ExceptionHandler(ConstraintViolationException.class)
   public ResponseEntity<Object> handleConstraintViolationException(
       ConstraintViolationException ex) {
@@ -50,10 +39,6 @@ public class GlobalExceptionHandler {
     return new ResponseEntity<>(response, HttpStatus.CONFLICT);
   }
 
-  /**
-   * Responde cuando el Authorization Server no puede comunicarse con servicios satélite (ej.
-   * sgivu-user). Se mantiene el mismo cuerpo para que Angular pueda mostrar mensajes claros.
-   */
   @ExceptionHandler(ServiceUnavailableException.class)
   public ResponseEntity<Map<String, Object>> handleServiceUnavailableException(
       ServiceUnavailableException ex) {
@@ -70,10 +55,6 @@ public class GlobalExceptionHandler {
     return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response);
   }
 
-  /**
-   * Captura fallos de red (timeouts, DNS) hacia otros microservicios, preservando la semántica de
-   * servicio no disponible para que los clientes apliquen reintentos o fallback.
-   */
   @ExceptionHandler(ResourceAccessException.class)
   public ResponseEntity<Map<String, Object>> handleResourceAccessException(
       ResourceAccessException ex) {

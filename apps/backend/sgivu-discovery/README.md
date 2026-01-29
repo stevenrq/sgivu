@@ -1,106 +1,94 @@
-# SGIVU - sgivu-discovery
+# sgivu-discovery - SGIVU
 
 ## Descripción
 
-Eureka Server que centraliza el registro y la ubicación dinámica de los microservicios SGIVU, facilitando balanceo, alta disponibilidad y evitando endpoints estáticos.
+`sgivu-discovery` es el servidor de descubrimiento de servicios (Eureka Server) del ecosistema **SGIVU**. Su función es registrar y mostrar las instancias de los microservicios, permitir la resolución de nombres de servicio y servir como fuente central para balanceo simple entre servicios.
 
-## Arquitectura y Rol
+## Tecnologías y Dependencias
 
-- Microservicio Spring Boot 3 / Spring Cloud Netflix Eureka Server.
-- Interactúa con `sgivu-config`, `sgivu-gateway` y clientes Eureka (`sgivu-auth`, `sgivu-user`, etc.).
-- UI en `http://localhost:8761/` y endpoints REST `/eureka/apps/**` para registro de instancias.
-- Obtiene configuración desde Config Server (`configserver:http://sgivu-config:8888`) con perfil `prod`.
-- Estado en memoria; sin persistencia.
+- Java 21
+- Spring Boot 3.5.8
+- Spring Cloud Netflix Eureka Server
+- Spring Cloud Config (cliente)
+- Spring Boot Devtools (desarrollo)
 
-## Tecnologías
+## Requisitos Previos
 
-- Lenguaje: Java 21 (Amazon Corretto en Docker)
-- Framework: Spring Boot 3.5.8, Spring Cloud 2025.0.0, Netflix Eureka Server
-- Seguridad: sin autenticación integrada; operación en red privada detrás de `sgivu-gateway`
-- Infraestructura: Docker, AWS (EC2)
+- JDK 21
+- Maven 3.9+
+- Docker & docker-compose
+- Para entorno local, se recomienda lanzar la stack completa (`infra/compose/sgivu-docker-compose/docker-compose.dev.yml`) que incluye `sgivu-config` y otros servicios.
 
-## Configuración
+## Arranque y Ejecución
 
-- Variables frecuentes: `SPRING_PROFILES_ACTIVE`, `SPRING_CONFIG_IMPORT`, `EUREKA_CLIENT_SERVICEURL_DEFAULTZONE` en clientes.
-- Ajusta `SPRING_CONFIG_IMPORT` si el Config Server corre fuera de localhost.
+### Desarrollo (docker-compose)
 
-## Ejecución Local
+Desde `infra/compose/sgivu-docker-compose`:
 
 ```bash
-export SPRING_PROFILES_ACTIVE=prod
-export SPRING_CONFIG_IMPORT=configserver:http://localhost:8888
+docker compose -f docker-compose.dev.yml up -d
+```
+
+Esto arranca `sgivu-config` en modo `native` y `sgivu-discovery` entre otros servicios.
+
+### Ejecución Local
+
+```bash
+./mvnw clean package
 ./mvnw spring-boot:run
 ```
 
-Accede al dashboard en `http://localhost:8761`.
+### Docker
+
+```bash
+./build-image.bash
+docker build -t stevenrq/sgivu-discovery:v1 .
+docker run -p 8761:8761 stevenrq/sgivu-discovery:v1
+```
 
 ## Endpoints Principales
 
-```text
-GET /
-GET /eureka/apps
-GET /eureka/apps/{applicationName}
-```
-
-- `/`: Panel web de Eureka.
-- `/eureka/apps`: catálogo completo de instancias registradas.
-- `/eureka/apps/{applicationName}`: detalle de instancias por servicio.
-
-## Seguridad
-
-- Actualmente sin OAuth2; corre en red interna. Planificada integración con `sgivu-auth` para asegurar `/eureka/**` mediante JWT y roles de servicio.
-
-## Dependencias
-
-- `sgivu-config` (configuración centralizada).
-- `sgivu-gateway` (enrutamiento y protección perimetral).
-- Microservicios clientes que se registran en Eureka.
-
-## Dockerización
-
-- Imagen: `sgivu-discovery`
-- Puerto expuesto: 8761
+| Endpoint | Descripción |
+| --- | --- |
+| `http://<host>:8761/` | Eureka UI (dashboard) - lista todas las aplicaciones registradas |
+| `GET /eureka/apps` | Lista todas las apps registradas (API REST) |
+| `GET /eureka/apps/{appName}` | Información de una aplicación específica |
+| `GET /eureka/apps/{appName}/{instanceId}` | Información de una instancia específica |
+| `GET /actuator/health` | Estado de salud del servicio (si Actuator está habilitado) |
 
 Ejemplo:
 
 ```bash
-./mvnw clean package -DskipTests
-docker build -t sgivu-discovery .
-docker run --rm -p 8761:8761 \
-  -e SPRING_CONFIG_IMPORT=configserver:http://host.docker.internal:8888 \
-  sgivu-discovery
+curl http://localhost:8761/eureka/apps
 ```
 
-## Build y Push Docker
+## Seguridad
 
-- `./build-image.bash` limpia contenedores previos, empaqueta con Maven y publica `stevenrq/sgivu-discovery:v1`.
-- Orquestadores externos pueden llamarlo al construir todos los servicios.
+- Asegurar que los clientes Eureka (los microservicios) están configurados para apuntar a la URL correcta (`EUREKA_URL` / `eureka.client.service-url.defaultZone`) y que `spring.application.name` sea único por servicio.
 
-## Despliegue
+## Observabilidad
 
-- Despliega en EC2 dentro de VPC privada.
-- Configura `SPRING_CONFIG_IMPORT` hacia el Config Server gestionado.
-- Expón puerto 8761 solo a la subred interna o al balanceador.
+- El servicio no incluye dependencias de tracing por defecto, pero su funcionamiento puede observarse mediante logs y (si se habilita) Actuator.
+- Para trazas distribuidas habilitar Micrometer/Zipkin en los demás servicios y revisar las dependencias/registro en `sgivu-config-repo`.
 
-## Monitoreo
+## Pruebas
 
-- Integrable con Micrometer + Prometheus vía Actuator.
-- Puede enviar trazas a Zipkin habilitando `spring.zipkin.baseUrl` desde Config Server.
-- Salud mínima con `GET /actuator/health` si se incluye Actuator.
+```bash
+./mvnw test
+```
 
-## Troubleshooting
+- Test base: `src/test/java/com/sgivu/discovery/DiscoveryApplicationTests.java`
+- Recomendación: añadir pruebas de integración que simulen la inscripción de instancias y verifiquen la visibilidad en `/eureka/apps`.
 
-- Sin servicios registrados: revisa `EUREKA_CLIENT_SERVICEURL_DEFAULTZONE` en clientes y acceso a `http://localhost:8761/eureka`.
-- UI vacía intermitente: verifica tiempos de lease y sincronización NTP.
+## Solución de Problemas
 
-## Buenas Prácticas y Convenciones
+| Problema | Solución |
+| --- | --- |
+| Ningún servicio aparece en el dashboard | Verificar que los clientes tengan `eureka.client.service-url.defaultZone` apuntando a `http://sgivu-discovery:8761/eureka/` |
+| Error de red | Revisar docker networks y que `sgivu-config` esté accesible |
+| Puerto en uso | Comprobar si otro proceso está usando el puerto 8761 |
 
-- Código en inglés; documentación en español; commits en inglés con Conventional Commits.
+## Contribuciones
 
-## Diagramas
-
-- Arquitectura general: ../../../docs/diagrams/01-system-architecture.puml
-
-## Autor
-
-- Steven Ricardo Quiñones (2025)
+1. Fork → branch → PR
+2. Añadir tests para cambios funcionales

@@ -8,10 +8,6 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 
-/**
- * Payload de actualización para empresas; utilizado por backoffice al ajustar datos fiscales o de
- * contacto que impactan contratos y facturación.
- */
 @Getter
 @Setter
 @ToString

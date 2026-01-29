@@ -10,10 +10,9 @@ from pydantic_settings.sources import EnvSettingsSource
 
 
 class LenientEnvSettingsSource(EnvSettingsSource):
-    """Evita fallar en listas vacías o valores no JSON para scopes."""
+    """Fuente de configuración de entorno que maneja valores complejos de forma leniente."""
 
     def decode_complex_value(self, field_name: str, field: Any, value: Any) -> Any:
-        """Interpreta valores compuestos tolerando strings vacíos o inválidos."""
         if value is None:
             return value
         if isinstance(value, (bytes, bytearray)):
@@ -27,12 +26,7 @@ class LenientEnvSettingsSource(EnvSettingsSource):
 
 
 class Settings(BaseSettings):
-    """Parámetros globales del microservicio de predicción SGIVU-ML.
-
-    Incluye endpoints de origen de datos (gateway), configuración de seguridad
-    JWT/JWKS, ubicación de artefactos de modelo y ajustes de ventana temporal
-    para el pipeline de demanda.
-    """
+    """Configuración de la aplicación sgivu-ml."""
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -41,8 +35,8 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "sgivu-ml"
-    app_version: str = "0.1.0"
-    environment: str = "dev"
+    app_version: str = "1.0.0"
+    environment: str = "prod"
 
     sgivu_purchase_sale_url: str = "http://sgivu-vehicle"
     sgivu_vehicle_url: str = "http://sgivu-purchase-sale"
@@ -84,7 +78,6 @@ class Settings(BaseSettings):
     )
     @classmethod
     def _split_permissions(cls, value):
-        """Normaliza listas de scopes leídas desde variables de entorno."""
         if isinstance(value, str):
             return [
                 scope.strip()
@@ -94,13 +87,11 @@ class Settings(BaseSettings):
         return value
 
     def model_path(self) -> Path:
-        """Crea (si no existe) y devuelve la ruta al directorio de modelos."""
         path = Path(self.model_dir)
         path.mkdir(parents=True, exist_ok=True)
         return path
 
     def _database_env(self) -> str:
-        """Determina si se usa la DB de dev o prod segun DATABASE_ENV/ENVIRONMENT."""
         raw = (self.database_env or self.environment or "").strip().lower()
         if raw in ("prod", "production", "prd"):
             return "prod"
@@ -111,7 +102,6 @@ class Settings(BaseSettings):
     def _database_fields(
         self,
     ) -> tuple[str | None, int | None, str | None, str | None, str | None]:
-        """Selecciona las variables segun el entorno activo."""
         if self._database_env() == "prod":
             return (
                 self.prod_ml_db_host,
@@ -129,7 +119,6 @@ class Settings(BaseSettings):
         )
 
     def database_dsn(self) -> str | None:
-        """Construye la URL de base de datos usando DATABASE_URL o *_ML_DB_*."""
         if self.database_url:
             return self.database_url
         host, port, name, user, password = self._database_fields()
@@ -151,7 +140,6 @@ class Settings(BaseSettings):
         dotenv_settings,
         file_secret_settings,
     ):
-        """Inserta la fuente leniente antes de dotenv y secretos en disco."""
         return (
             init_settings,
             LenientEnvSettingsSource(settings_cls),
@@ -162,5 +150,4 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    """Devuelve la configuración cacheada (singleton)."""
     return Settings()

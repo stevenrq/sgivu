@@ -4,10 +4,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 import lombok.Getter;
 
-/**
- * Criterios combinables para filtrar personas en búsquedas utilizadas por inventario, contratos y
- * predicción de demanda.
- */
 @Getter
 @Builder
 @Schema(description = "Criterios de búsqueda para personas (todas las propiedades opcionales)")

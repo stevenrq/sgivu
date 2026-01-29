@@ -6,11 +6,6 @@ import com.sgivu.auth.dto.CredentialsValidationResponse;
 import com.sgivu.auth.service.CredentialsValidationService;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Valida credenciales en tiempo real durante el proceso de login. Permite mostrar al usuario
- * retroalimentación inmediata sobre la validez de sus credenciales sin necesidad de enviar el
- * formulario completo.
- */
 @RestController
 public class CredentialsValidationController implements CredentialsValidationApi {
 

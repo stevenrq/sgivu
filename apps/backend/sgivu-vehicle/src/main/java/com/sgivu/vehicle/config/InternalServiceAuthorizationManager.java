@@ -9,10 +9,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.web.access.intercept.RequestAuthorizationContext;
 import org.springframework.stereotype.Component;
 
-/**
- * AuthorizationManager para comunicación interna entre microservicios. Implementa el método
- * authorize con el wildcard genérico requerido.
- */
 @Component
 public class InternalServiceAuthorizationManager
     implements AuthorizationManager<RequestAuthorizationContext> {
@@ -32,7 +28,6 @@ public class InternalServiceAuthorizationManager
     HttpServletRequest request = context.getRequest();
     String providedKey = request.getHeader(INTERNAL_KEY_HEADER);
 
-    // Validación de seguridad para el canal interno
     boolean isKeyValid = internalServiceKey != null && internalServiceKey.equals(providedKey);
 
     return new AuthorizationDecision(isKeyValid);

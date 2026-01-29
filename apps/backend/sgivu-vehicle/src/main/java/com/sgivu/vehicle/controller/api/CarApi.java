@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
@@ -28,7 +29,8 @@ public interface CarApi {
   @ApiResponse(responseCode = "400", description = "Datos inválidos")
   @PostMapping
   ResponseEntity<CarResponse> create(
-      @RequestBody @Parameter(description = "Entidad Car") Car car, BindingResult bindingResult);
+      @Valid @RequestBody @Parameter(description = "Entidad Car") Car car,
+      BindingResult bindingResult);
 
   @Operation(summary = "Obtiene detalle de un auto")
   @GetMapping("/{id}")
@@ -48,7 +50,7 @@ public interface CarApi {
   @PutMapping("/{id}")
   ResponseEntity<CarResponse> update(
       @PathVariable @Parameter(description = "ID del auto") Long id,
-      @RequestBody @Parameter(description = "Entidad Car") Car car,
+      @Valid @RequestBody @Parameter(description = "Entidad Car") Car car,
       BindingResult bindingResult);
 
   @Operation(summary = "Elimina un auto por id")

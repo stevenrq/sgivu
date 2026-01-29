@@ -8,10 +8,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Controlador para manejar las respuestas de fallback cuando los servicios downstream no están
- * disponibles.
- */
 @Hidden
 @RestController
 @RequestMapping("/fallback")

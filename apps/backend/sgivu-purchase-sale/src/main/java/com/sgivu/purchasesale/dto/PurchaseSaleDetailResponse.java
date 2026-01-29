@@ -5,11 +5,6 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
-/**
- * DTO que extiende {@link PurchaseSaleResponse} para incluir detalles de entidades relacionadas
- * como el cliente, el usuario y el vehículo, facilitando la visualización completa de un contrato
- * de compra/venta.
- */
 @Schema(
     description =
         "Detalle completo de un contrato de compra/venta con datos relacionados de cliente, usuario"

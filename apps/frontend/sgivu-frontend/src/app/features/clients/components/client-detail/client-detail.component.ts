@@ -28,11 +28,6 @@ interface ChecklistItem {
   ],
   imports: [CommonModule, RouterLink, HasPermissionDirective],
 })
-/**
- * Pantalla de detalle que muestra la información completa de un cliente,
- * permitiendo activar/desactivar y navegar hacia edición según su tipo
- * (persona o empresa).
- */
 export class ClientDetailComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -119,7 +114,7 @@ export class ClientDetailComponent implements OnInit, OnDestroy {
       return `${first}${last}`.toUpperCase() || 'PN';
     }
     if (!this.isPerson && this.company?.companyName) {
-      const name = this.company.companyName.replace(/[^A-Za-z0-9]/g, '');
+      const name = this.company.companyName.replaceAll(/[^A-Za-z0-9]/g, '');
       return name.substring(0, 2).toUpperCase() || 'EM';
     }
     return this.isPerson ? 'PN' : 'EM';
@@ -136,11 +131,11 @@ export class ClientDetailComponent implements OnInit, OnDestroy {
 
   get documentValue(): string | null {
     if (this.isPerson) {
-      return this.person?.nationalId != null
-        ? String(this.person.nationalId)
-        : null;
+      const nationalId = this.person?.nationalId;
+      return nationalId == null ? null : String(nationalId);
     }
-    return this.company?.taxId != null ? String(this.company.taxId) : null;
+    const taxId = this.company?.taxId;
+    return taxId == null ? null : String(taxId);
   }
 
   get statusLabel(): string {
@@ -254,10 +249,6 @@ export class ClientDetailComponent implements OnInit, OnDestroy {
     }
   }
 
-  /**
-   * Alterna el estado activo del cliente actual y, tras la operación,
-   * recarga los datos para reflejar el cambio.
-   */
   toggleStatus(): void {
     const entity = this.entity;
     if (!entity || this.currentClientId == null) {
@@ -284,12 +275,6 @@ export class ClientDetailComponent implements OnInit, OnDestroy {
     }
   }
 
-  /**
-   * Recupera los datos del cliente según el tipo (persona/empresa) y
-   * actualiza el estado de la vista manejando los estados de carga y error.
-   *
-   * @param id Identificador del cliente a consultar.
-   */
   private loadClient(id: number): void {
     this.isLoading = true;
     this.errorMessage = null;

@@ -12,15 +12,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Implementación de dominio para autos usados.
- *
- * <p>Reutiliza la lógica base de vehículos y aplica filtros específicos (combustible, carrocería)
- * para alimentar listados y procesos de compra/venta.
- *
- * @apiNote Usa Specifications para combinar filtros sin escribir SQL dinámico y mantener los
- *     índices de PostgreSQL efectivos.
- */
 @Service
 @Transactional(readOnly = true)
 public class CarServiceImpl extends AbstractVehicleServiceImpl<Car, CarRepository>

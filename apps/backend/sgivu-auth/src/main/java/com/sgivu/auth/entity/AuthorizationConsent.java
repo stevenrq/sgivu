@@ -5,10 +5,6 @@ import java.io.Serializable;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Registra los consentimientos (scopes) otorgados por un usuario a un cliente OIDC usando clave
- * compuesta cliente/usuario.
- */
 @Data
 @NoArgsConstructor
 @Entity

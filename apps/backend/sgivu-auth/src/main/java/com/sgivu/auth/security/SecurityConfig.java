@@ -62,11 +62,6 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-/**
- * Configuración central del Authorization Server: expone endpoints OIDC, firma JWT y aplica las
- * reglas de sesión/form-login consumidas por el portal Angular. Los claims y el CORS deben seguir
- * alineados con los microservicios que validan los tokens.
- */
 @Configuration
 @EnableWebSecurity
 @EnableConfigurationProperties(JwtProperties.class)
@@ -250,8 +245,6 @@ public class SecurityConfig {
 
       } else if (context.getTokenType().getValue().equals(OidcParameterNames.ID_TOKEN)) {
         claims.claim("userId", userId);
-
-        // Expiración corta para alinear con access tokens rotativos.
         claims.expiresAt(Instant.now().plus(Duration.ofMinutes(15)));
       }
     };
@@ -274,8 +267,8 @@ public class SecurityConfig {
   }
 
   /**
-   * Mapea excepciones de autenticación a un query param para que la página de login muestre el
-   * mensaje correspondiente.
+   * Manejador personalizado para fallos de autenticación en el form-login, que redirige a la página
+   * de login con un parámetro de error específico según el tipo de excepción lanzada.
    */
   @Bean
   SimpleUrlAuthenticationFailureHandler customAuthenticationFailureHandler() {
