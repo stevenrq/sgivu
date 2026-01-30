@@ -4,11 +4,7 @@
 
 Documentación central del sistema SGIVU (backend, frontend, ML e infraestructura) con guías de arquitectura, orquestación y scripts auxiliares.
 
-## Arquitectura y Rol
-
-- Índice general de documentación para todos los componentes del sistema.
-- Referencia a diagramas PlantUML y scripts de validación.
-- Enlaces a documentación específica: `infra/compose/sgivu-docker-compose/README.md`, `apps/backend/*/README.md`, `apps/frontend/sgivu-frontend/README.md`, `apps/ml/sgivu-ml/README.md`.
+## Arquitectura
 
 ![Arquitectura general de SGIVU](docs/diagrams/img/01-system-architecture.png)
 
