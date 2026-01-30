@@ -40,8 +40,8 @@ public class UserServiceImpl extends AbstractPersonServiceImpl<User, UserReposit
   @Transactional
   public User save(User user) {
     user.setRoles(getRoles(user, roleRepository));
-    if (user.getPassword() == null) {
-      throw new NullPointerException("La contraseña no puede ser nula");
+    if (user.getPassword() == null || user.getPassword().isEmpty()) {
+      throw new NullPointerException("La contraseña no puede ser nula o vacía");
     }
     user.setPassword(passwordEncoder.encode(user.getPassword()));
     return userRepository.save(user);
