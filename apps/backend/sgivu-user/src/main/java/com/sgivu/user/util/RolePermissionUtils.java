@@ -54,7 +54,7 @@ public class RolePermissionUtils {
     } catch (IllegalArgumentException e) {
       throw new RoleRetrievalException("Nombre de rol no válido", e);
     } catch (Exception e) {
-      throw new RoleRetrievalException("Se produjo un error inesperado", e);
+      throw new RoleRetrievalException("Se produjo un error inesperado: " + e.getMessage(), e);
     }
     return roles;
   }
