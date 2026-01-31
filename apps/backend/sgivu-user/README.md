@@ -69,8 +69,20 @@ docker build -t sgivu-user:local .
 ## Pruebas
 
 ```bash
+# Ejecutar todos los tests (unitarios e de integración)
 ./mvnw test
 ```
+
+### Pruebas unitarias
+
+- Se han añadido pruebas unitarias para la capa de servicio:
+  - `UserServiceImplTest` (guardar, actualizar, cambio de estado, búsqueda, manejo de errores)
+  - `RoleServiceImplTest` (gestión de permisos: añadir, quitar, actualizar)
+- Ejecutar solo las pruebas unitarias:
+  - `./mvnw -Dtest=*Test test` (ejecuta todos los tests que terminen en `*Test`)
+  - `./mvnw -Dtest=com.sgivu.user.service.impl.UserServiceImplTest test` (ejecuta una prueba específica)
+- Tecnologías: JUnit 5, Mockito y Spring Test (mocks)
+- Cobertura: si desea generar informe de cobertura con JaCoCo: `./mvnw test jacoco:report` (añada el plugin si no está configurado)
 
 - `spring-boot-starter-flyway-test` se utiliza para validar migraciones en entorno de pruebas.
 
