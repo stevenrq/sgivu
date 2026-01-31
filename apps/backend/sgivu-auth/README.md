@@ -85,10 +85,6 @@ En producción el acceso pasa normalmente por Nginx en EC2; Nginx rutea `/oauth2
 ./mvnw test
 ```
 
-- Test base: `src/test/java/.../AuthApplicationTests.java`
-- Dependencia `spring-boot-starter-flyway-test` incluida para pruebas con migraciones.
-- Recomendación: añadir tests de integración que verifiquen flows OIDC (authorization code + token issuance + JWKS validation).
-
 ## Solución de Problemas
 
 | Problema | Solución |
