@@ -70,10 +70,6 @@ docker build -t stevenrq/sgivu-client:v1 .
 ./mvnw test
 ```
 
-- Tests básicos en `src/test/java/com/sgivu/client` (`SgivuClientApplicationTests`).
-- `spring-boot-starter-flyway-test` está incluido para soporte a migraciones en pruebas.
-- Recomendación: añadir tests de integración que validen seguridad (Resource Server + scopes) y comportamientos de búsqueda/paginación.
-
 ## Solución de Problemas
 
 | Problema | Solución |
