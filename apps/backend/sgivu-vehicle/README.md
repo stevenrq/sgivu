@@ -87,9 +87,6 @@ docker build -t sgivu-vehicle:local .
 ./mvnw test
 ```
 
-- `spring-boot-starter-flyway-test` puede ayudar a validar migraciones en tests.
-- Recomendación: añadir pruebas de integración que simulen el flujo completo de presigned upload + confirmación.
-
 ## Solución de Problemas
 
 | Problema | Solución |
