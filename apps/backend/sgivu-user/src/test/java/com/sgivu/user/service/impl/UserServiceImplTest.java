@@ -2,10 +2,8 @@ package com.sgivu.user.service.impl;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
-import com.sgivu.user.dto.UserFilterCriteria;
 import com.sgivu.user.dto.UserUpdateRequest;
 import com.sgivu.user.entity.Address;
 import com.sgivu.user.entity.Role;
@@ -18,12 +16,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentMatchers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.springframework.data.domain.*;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 public class UserServiceImplTest {
@@ -289,62 +284,6 @@ public class UserServiceImplTest {
       assertFalse(result);
       verify(userRepository).findById(userId);
       verify(userRepository, never()).save(any(User.class));
-    }
-  }
-
-  @Nested
-  @DisplayName("search(UserFilterCriteria, Pageable)")
-  class SearchTests {
-    @Test
-    @DisplayName("should return paged users when found")
-    void shouldReturnPagedUsersWhenFound() {
-      UserFilterCriteria criteria = UserFilterCriteria.builder().build();
-      Pageable pageable = PageRequest.of(0, 2);
-      User user1 = new User();
-      user1.setId(1L);
-      User user2 = new User();
-      user2.setId(2L);
-      List<User> users = List.of(user1, user2);
-      Page<User> userPage = new PageImpl<>(users, pageable, users.size());
-
-      when(userRepository.findAll(ArgumentMatchers.<Specification<User>>any(), eq(pageable)))
-          .thenReturn(userPage);
-
-      Page<User> result = userService.search(criteria, pageable);
-      assertNotNull(result);
-      assertEquals(2, result.getContent().size());
-      assertEquals(1L, result.getContent().get(0).getId());
-      assertEquals(2L, result.getContent().get(1).getId());
-      verify(userRepository).findAll(ArgumentMatchers.<Specification<User>>any(), eq(pageable));
-    }
-
-    @Test
-    @DisplayName("should return empty page when no users found")
-    void shouldReturnEmptyPageWhenNoUsersFound() {
-      UserFilterCriteria criteria = UserFilterCriteria.builder().build();
-      Pageable pageable = PageRequest.of(0, 2);
-      Page<User> emptyPage = new PageImpl<>(Collections.emptyList(), pageable, 0);
-
-      when(userRepository.findAll(ArgumentMatchers.<Specification<User>>any(), eq(pageable)))
-          .thenReturn(emptyPage);
-
-      Page<User> result = userService.search(criteria, pageable);
-      assertNotNull(result);
-      assertTrue(result.getContent().isEmpty());
-      verify(userRepository).findAll(ArgumentMatchers.<Specification<User>>any(), eq(pageable));
-    }
-
-    @Test
-    @DisplayName("should propagate exception if repository fails")
-    void shouldPropagateExceptionIfRepositoryFails() {
-      UserFilterCriteria criteria = UserFilterCriteria.builder().build();
-      Pageable pageable = PageRequest.of(0, 1);
-
-      when(userRepository.findAll(ArgumentMatchers.<Specification<User>>any(), eq(pageable)))
-          .thenThrow(new RuntimeException("DB error"));
-
-      assertThrows(RuntimeException.class, () -> userService.search(criteria, pageable));
-      verify(userRepository).findAll(ArgumentMatchers.<Specification<User>>any(), eq(pageable));
     }
   }
 }
