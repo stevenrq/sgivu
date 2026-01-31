@@ -50,11 +50,11 @@ public class RolePermissionUtils {
         }
       }
     } catch (NoSuchElementException e) {
-      throw new RoleRetrievalException("Error al recuperar roles", e);
+      throw new RoleRetrievalException("Error al recuperar roles: " + e.getMessage(), e);
     } catch (IllegalArgumentException e) {
-      throw new RoleRetrievalException("Nombre de rol no válido", e);
+      throw new RoleRetrievalException("Nombre de rol no válido: " + e.getMessage(), e);
     } catch (Exception e) {
-      throw new RoleRetrievalException("Se produjo un error inesperado", e);
+      throw new RoleRetrievalException("Se produjo un error inesperado: " + e.getMessage(), e);
     }
     return roles;
   }
