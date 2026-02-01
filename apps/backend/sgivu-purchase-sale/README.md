@@ -69,8 +69,6 @@ docker build -t sgivu-purchase-sale:local .
 ./mvnw test
 ```
 
-- Usar `spring-boot-starter-flyway-test` para pruebas que validen migraciones.
-
 ## Solución de Problemas
 
 | Problema | Solución |
