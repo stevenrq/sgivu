@@ -554,7 +554,7 @@ export class PurchaseSaleCreateComponent implements OnInit, OnDestroy {
     this.subscriptions.push(summarySub);
   }
 
-  private applyPrefilledPurchasePrice(value: number = 0): void {
+  private applyPrefilledPurchasePrice(value = 0): void {
     this.contractForm.purchasePrice = value;
     this.purchasePriceInput = this.formatPriceInput(value);
   }
