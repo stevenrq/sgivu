@@ -19,7 +19,7 @@ Documentación central del sistema SGIVU (backend, frontend, ML e infraestructur
 - Backend: Spring Boot, Spring Cloud, PostgreSQL, Redis.
 - Frontend: Angular.
 - ML: FastAPI, scikit-learn.
-- Infraestructura: Docker, Docker Compose, AWS.
+- Infraestructura: Docker, Docker Compose, Nginx, AWS.
 - Observabilidad: Actuator, Micrometer, Zipkin.
 
 ## Configuración
@@ -91,6 +91,16 @@ Documentación central del sistema SGIVU (backend, frontend, ML e infraestructur
 
 - Infra sugerida: VPC privada con EC2/ECS/EKS, RDS y ALB.
 - Exponer públicamente solo el gateway; el resto en red interna.
+
+### Nginx (Producción)
+
+Nginx actúa como único punto de entrada público (ver `infra/nginx/sites-available/default.conf`):
+
+- **Auth Server** (puerto 9000): `/login`, `/oauth2/*`, `/.well-known/*` — flujos OIDC directos, sin pasar por Gateway.
+- **Gateway** (puerto 8080): `/v1/*`, `/docs/*`, `/auth/session` — APIs de negocio y BFF.
+- **Frontend**: S3 como fallback catch-all para la SPA Angular.
+
+Esta separación permite escalar Auth y Gateway independientemente y simplifica reglas de firewall (solo 80/443 expuestos).
 
 ## Monitoreo
 
