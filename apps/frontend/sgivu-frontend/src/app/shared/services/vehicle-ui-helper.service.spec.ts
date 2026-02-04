@@ -27,7 +27,7 @@ describe('VehicleUiHelperService', () => {
     service = TestBed.inject(VehicleUiHelperService);
 
     // Silenciar advertencias de Swal en la salida de prueba
-    spyOn(console, 'error').and.callFake(() => {});
+    spyOn(console, 'error').and.callFake(() => { /* noop */ });
   });
 
   describe('updateCarStatus()', () => {

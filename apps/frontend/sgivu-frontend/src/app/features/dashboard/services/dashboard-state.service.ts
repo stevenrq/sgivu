@@ -53,7 +53,9 @@ export class DashboardStateService {
     }
     try {
       localStorage.setItem(this.storageKey, JSON.stringify(state));
-    } catch {}
+    } catch {
+      // Silently ignore storage errors (quota exceeded, private browsing, etc.)
+    }
   }
 
   private readFromStorage(): SavedPredictionState | null {
@@ -78,7 +80,9 @@ export class DashboardStateService {
     }
     try {
       localStorage.removeItem(this.storageKey);
-    } catch {}
+    } catch {
+      // Silently ignore storage errors (quota exceeded, private browsing, etc.)
+    }
   }
 
   private hasStorage(): boolean {

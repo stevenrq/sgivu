@@ -180,12 +180,12 @@ export class VehicleFormComponent implements OnInit, OnDestroy {
               ? 'El vehículo fue actualizado correctamente.'
               : 'El vehículo fue registrado correctamente.',
           });
-          let redirect: any[];
+          let redirect: string[];
           if (this.isEditMode) {
             if (this.isCar) {
-              redirect = ['/vehicles/cars/page', 0];
+              redirect = ['/vehicles/cars/page', '0'];
             } else {
-              redirect = ['/vehicles/motorcycles/page', 0];
+              redirect = ['/vehicles/motorcycles/page', '0'];
             }
           } else {
             redirect = ['/purchase-sales/registrar'];

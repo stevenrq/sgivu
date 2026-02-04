@@ -29,7 +29,7 @@ import { PermissionService } from '../../features/auth/services/permission.servi
   selector: '[appHasPermission]',
 })
 export class HasPermissionDirective implements OnChanges, OnDestroy {
-  private readonly templateRef = inject<TemplateRef<any>>(TemplateRef);
+  private readonly templateRef = inject(TemplateRef<void>);
   private readonly viewContainerRef = inject(ViewContainerRef);
   private readonly permissionService = inject(PermissionService);
 

@@ -34,11 +34,26 @@ module.exports = defineConfig([
     },
   },
   {
+    files: ["**/*.spec.ts"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-empty-function": "off",
+    },
+  },
+  {
+    files: ["**/purchase-sale-list.component.ts"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+    },
+  },
+  {
     files: ["**/*.html"],
     extends: [
       angular.configs.templateRecommended,
       angular.configs.templateAccessibility,
     ],
-    rules: {},
+    rules: {
+      "@angular-eslint/template/prefer-control-flow": "off",
+    },
   },
 ]);

@@ -33,7 +33,9 @@ describe('AuthService', () => {
     sessionStorage.clear();
 
     // Silencia console.error para mantener la salida de tests limpia (algunas pruebas provocan errores esperados)
-    spyOn(console, 'error').and.callFake(() => {});
+    spyOn(console, 'error').and.callFake(() => {
+      /* noop */
+    });
   });
 
   afterEach(() => {
@@ -350,7 +352,6 @@ describe('AuthService', () => {
     });
 
     it('should return false when isAdmin is missing', () => {
-      // @ts-ignore: simular campo faltante
       (service as any).sessionSubject$.next({
         authenticated: true,
         userId: '3',
@@ -486,7 +487,9 @@ describe('AuthService', () => {
 
   describe('fetchAndStoreCurrentAuthenticatedUser()', () => {
     it('should set user to null and warn when no userId', async () => {
-      const warnSpy = spyOn(console, 'warn').and.callFake(() => {});
+      const warnSpy = spyOn(console, 'warn').and.callFake(() => {
+        /* noop */
+      });
 
       // sin sesión / sin userId
       (service as any).sessionSubject$.next(null);
