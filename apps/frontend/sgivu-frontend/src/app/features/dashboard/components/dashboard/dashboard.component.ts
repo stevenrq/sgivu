@@ -16,7 +16,15 @@ import {
 } from '@angular/forms';
 import { ChartConfiguration, ChartOptions } from 'chart.js';
 import { BaseChartDirective } from 'ng2-charts';
-import { Subscription, forkJoin, of, map, catchError } from 'rxjs';
+import {
+  Subscription,
+  forkJoin,
+  of,
+  map,
+  catchError,
+  retry,
+  timer,
+} from 'rxjs';
 import { KpiCardComponent } from '../../../../shared/components/kpi-card/kpi-card.component';
 import { CarService } from '../../../vehicles/services/car.service';
 import { MotorcycleService } from '../../../vehicles/services/motorcycle.service';
@@ -204,8 +212,30 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.loadError = null;
 
     const dashboardSub = forkJoin({
-      vehicleCounts: this.loadVehicleCounts(),
-      contracts: this.purchaseSaleService.getAll(),
+      vehicleCounts: this.loadVehicleCounts().pipe(
+        retry({
+          count: 3,
+          delay: (error, retryCount) => {
+            const delayMs = Math.pow(2, retryCount) * 1000; // 1s, 2s, 4s
+            console.warn(
+              `Reintentando loadVehicleCounts, intento ${retryCount + 1}...`,
+            );
+            return timer(delayMs);
+          },
+        }),
+      ),
+      contracts: this.purchaseSaleService.getAll().pipe(
+        retry({
+          count: 3,
+          delay: (error, retryCount) => {
+            const delayMs = Math.pow(2, retryCount) * 1000;
+            console.warn(
+              `Reintentando getAll contracts, intento ${retryCount + 1}...`,
+            );
+            return timer(delayMs);
+          },
+        }),
+      ),
       latestModel: this.demandPredictionService
         .getLatestModel()
         .pipe(catchError(() => of(null))),
