@@ -504,18 +504,31 @@
                         Marcar como completada
                       </button>
                     </li>
-                    <li>
-                      <button
-                        class="dropdown-item text-danger"
-                        type="button"
-                        (click)="
-                          updateStatus(contract, ContractStatus.CANCELED)
-                        "
-                      >
-                        <i class="bi bi-x-circle-fill me-2"></i>
-                        Cancelar contrato
-                      </button>
-                    </li>
+                    @if (contract.contractStatus !== ContractStatus.CANCELED) {
+                      <li>
+                        <button
+                          class="dropdown-item text-danger"
+                          type="button"
+                          (click)="
+                            updateStatus(contract, ContractStatus.CANCELED)
+                          "
+                        >
+                          <i class="bi bi-x-circle-fill me-2"></i>
+                          Cancelar contrato
+                        </button>
+                      </li>
+                    } @else {
+                      <li *appHasPermission="'purchase_sale:delete'">
+                        <button
+                          class="dropdown-item text-danger"
+                          type="button"
+                          (click)="deleteContract(contract)"
+                        >
+                          <i class="bi bi-x-circle-fill me-2"></i>
+                          Eliminar contrato
+                        </button>
+                      </li>
+                    }
                   </ul>
                 </div>
               </td>

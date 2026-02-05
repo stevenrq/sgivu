@@ -1,6 +1,5 @@
 package com.sgivu.user.controller.api;
 
-import com.sgivu.user.dto.ApiResponse;
 import com.sgivu.user.dto.UserResponse;
 import com.sgivu.user.dto.UserUpdateRequest;
 import com.sgivu.user.entity.User;
@@ -10,6 +9,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
@@ -35,25 +35,22 @@ public interface UserApi {
               + "(documento, teléfono, roles). El password se cifra antes de persistir.")
   @ApiResponses(
       value = {
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        @ApiResponse(
             responseCode = "201",
             description = "Usuario creado exitosamente",
             content = @Content(schema = @Schema(implementation = ApiResponse.class))),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        @ApiResponse(
             responseCode = "400",
             description = "Datos de entrada inválidos",
             content = @Content),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(
-            responseCode = "401",
-            description = "No autorizado",
-            content = @Content),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        @ApiResponse(responseCode = "401", description = "No autorizado", content = @Content),
+        @ApiResponse(
             responseCode = "403",
             description = "Sin permisos suficientes (requiere user:create)",
             content = @Content)
       })
   @PostMapping
-  ResponseEntity<ApiResponse<UserResponse>> create(
+  ResponseEntity<com.sgivu.user.dto.ApiResponse<UserResponse>> create(
       @Parameter(description = "Datos del usuario a registrar", required = true)
           @Validated(ValidationGroups.Create.class)
           @RequestBody
@@ -66,18 +63,15 @@ public interface UserApi {
           "Retorna el perfil completo de un usuario para pantallas de detalle y auditoría.")
   @ApiResponses(
       value = {
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        @ApiResponse(
             responseCode = "200",
             description = "Usuario encontrado",
             content = @Content(schema = @Schema(implementation = UserResponse.class))),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        @ApiResponse(
             responseCode = "404",
             description = "Usuario no encontrado",
             content = @Content),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(
-            responseCode = "401",
-            description = "No autorizado",
-            content = @Content)
+        @ApiResponse(responseCode = "401", description = "No autorizado", content = @Content)
       })
   @GetMapping("/{id}")
   ResponseEntity<UserResponse> getById(
@@ -90,13 +84,8 @@ public interface UserApi {
           "Retorna la lista completa de usuarios sin paginación para exportaciones pequeñas.")
   @ApiResponses(
       value = {
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(
-            responseCode = "200",
-            description = "Lista de usuarios obtenida exitosamente"),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(
-            responseCode = "401",
-            description = "No autorizado",
-            content = @Content)
+        @ApiResponse(responseCode = "200", description = "Lista de usuarios obtenida exitosamente"),
+        @ApiResponse(responseCode = "401", description = "No autorizado", content = @Content)
       })
   @GetMapping
   ResponseEntity<List<UserResponse>> getAll();
@@ -106,13 +95,10 @@ public interface UserApi {
       description = "Retorna usuarios paginados con tamaño fijo de 10 elementos por página.")
   @ApiResponses(
       value = {
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        @ApiResponse(
             responseCode = "200",
             description = "Página de usuarios obtenida exitosamente"),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(
-            responseCode = "401",
-            description = "No autorizado",
-            content = @Content)
+        @ApiResponse(responseCode = "401", description = "No autorizado", content = @Content)
       })
   @GetMapping("/page/{page}")
   ResponseEntity<Page<UserResponse>> getAllPaginated(
@@ -127,29 +113,26 @@ public interface UserApi {
               + "o modificación por un administrador con permiso user:update.")
   @ApiResponses(
       value = {
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        @ApiResponse(
             responseCode = "200",
             description = "Usuario actualizado exitosamente",
             content = @Content(schema = @Schema(implementation = ApiResponse.class))),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        @ApiResponse(
             responseCode = "400",
             description = "Datos de entrada inválidos",
             content = @Content),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        @ApiResponse(
             responseCode = "404",
             description = "Usuario no encontrado",
             content = @Content),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(
-            responseCode = "401",
-            description = "No autorizado",
-            content = @Content),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        @ApiResponse(responseCode = "401", description = "No autorizado", content = @Content),
+        @ApiResponse(
             responseCode = "403",
             description = "Sin permisos suficientes",
             content = @Content)
       })
   @PutMapping("/{id}")
-  ResponseEntity<ApiResponse<UserResponse>> update(
+  ResponseEntity<com.sgivu.user.dto.ApiResponse<UserResponse>> update(
       @Parameter(description = "ID del usuario a actualizar", required = true, example = "1")
           @PathVariable
           Long id,
@@ -167,18 +150,13 @@ public interface UserApi {
       description = "Elimina un usuario definitivamente del sistema.")
   @ApiResponses(
       value = {
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(
-            responseCode = "204",
-            description = "Usuario eliminado exitosamente"),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        @ApiResponse(responseCode = "204", description = "Usuario eliminado exitosamente"),
+        @ApiResponse(
             responseCode = "404",
             description = "Usuario no encontrado",
             content = @Content),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(
-            responseCode = "401",
-            description = "No autorizado",
-            content = @Content),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        @ApiResponse(responseCode = "401", description = "No autorizado", content = @Content),
+        @ApiResponse(
             responseCode = "403",
             description = "Sin permisos suficientes (requiere user:delete)",
             content = @Content)
@@ -200,17 +178,12 @@ public interface UserApi {
               + "y operaciones transaccionales.")
   @ApiResponses(
       value = {
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(
-            responseCode = "200",
-            description = "Estado actualizado exitosamente"),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        @ApiResponse(responseCode = "200", description = "Estado actualizado exitosamente"),
+        @ApiResponse(
             responseCode = "404",
             description = "Usuario no encontrado",
             content = @Content),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(
-            responseCode = "401",
-            description = "No autorizado",
-            content = @Content)
+        @ApiResponse(responseCode = "401", description = "No autorizado", content = @Content)
       })
   @PatchMapping("/{id}/status")
   ResponseEntity<Map<String, Boolean>> updateStatus(
@@ -227,11 +200,7 @@ public interface UserApi {
       description =
           "Retorna estadísticas rápidas: total, activos e inactivos para tableros operativos.")
   @ApiResponses(
-      value = {
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(
-            responseCode = "200",
-            description = "Conteo obtenido exitosamente")
-      })
+      value = {@ApiResponse(responseCode = "200", description = "Conteo obtenido exitosamente")})
   @GetMapping("/count")
   ResponseEntity<Map<String, Long>> getUserCounts();
 
@@ -246,13 +215,8 @@ public interface UserApi {
               + "Todos los filtros son opcionales y se aplican con lógica AND.")
   @ApiResponses(
       value = {
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(
-            responseCode = "200",
-            description = "Búsqueda ejecutada exitosamente"),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(
-            responseCode = "401",
-            description = "No autorizado",
-            content = @Content)
+        @ApiResponse(responseCode = "200", description = "Búsqueda ejecutada exitosamente"),
+        @ApiResponse(responseCode = "401", description = "No autorizado", content = @Content)
       })
   @GetMapping("/search")
   ResponseEntity<List<UserResponse>> searchUsers(
@@ -278,13 +242,10 @@ public interface UserApi {
               + "con filtros combinados.")
   @ApiResponses(
       value = {
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        @ApiResponse(
             responseCode = "200",
             description = "Búsqueda paginada ejecutada exitosamente"),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(
-            responseCode = "401",
-            description = "No autorizado",
-            content = @Content)
+        @ApiResponse(responseCode = "401", description = "No autorizado", content = @Content)
       })
   @GetMapping("/search/page/{page}")
   ResponseEntity<Page<UserResponse>> searchUsersPaginated(

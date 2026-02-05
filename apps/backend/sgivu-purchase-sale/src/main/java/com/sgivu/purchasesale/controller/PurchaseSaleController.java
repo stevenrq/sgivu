@@ -15,8 +15,10 @@ import com.sgivu.purchasesale.service.PurchaseSaleReportService;
 import com.sgivu.purchasesale.service.PurchaseSaleService;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import org.springframework.core.env.Environment;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -30,16 +32,20 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class PurchaseSaleController implements PurchaseSaleApi {
 
+  private final Environment env;
+
   private final PurchaseSaleService purchaseSaleService;
   private final PurchaseSaleMapper purchaseSaleMapper;
   private final PurchaseSaleReportService purchaseSaleReportService;
   private final PurchaseSaleDetailService purchaseSaleDetailService;
 
   public PurchaseSaleController(
+      Environment env,
       PurchaseSaleService purchaseSaleService,
       PurchaseSaleMapper purchaseSaleMapper,
       PurchaseSaleReportService purchaseSaleReportService,
       PurchaseSaleDetailService purchaseSaleDetailService) {
+    this.env = env;
     this.purchaseSaleService = purchaseSaleService;
     this.purchaseSaleMapper = purchaseSaleMapper;
     this.purchaseSaleReportService = purchaseSaleReportService;
@@ -158,6 +164,10 @@ public class PurchaseSaleController implements PurchaseSaleApi {
   @Override
   @PreAuthorize("hasAuthority('purchase_sale:delete')")
   public ResponseEntity<Void> deleteById(Long id) {
+    if (!Arrays.asList(env.getActiveProfiles()).contains("dev")) {
+      return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+    }
+
     return purchaseSaleService
         .findById(id)
         .map(

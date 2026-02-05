@@ -1,12 +1,12 @@
 import { CommonModule } from '@angular/common';
 import {
   Component,
+  computed,
+  inject,
   OnDestroy,
   OnInit,
-  WritableSignal,
-  computed,
   signal,
-  inject,
+  WritableSignal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
@@ -17,11 +17,11 @@ import {
   RouterLink,
 } from '@angular/router';
 import {
-  Subscription,
   combineLatest,
   finalize,
   forkJoin,
   map,
+  Subscription,
   tap,
 } from 'rxjs';
 import Swal from 'sweetalert2';
@@ -53,13 +53,13 @@ import {
 import { RowNavigateDirective } from '../../../../shared/directives/row-navigate.directive';
 import {
   ClientOption,
-  UserOption,
-  VehicleOption,
   mapCarsToVehicles,
   mapCompaniesToClients,
   mapMotorcyclesToVehicles,
   mapPersonsToClients,
   mapUsersToOptions,
+  UserOption,
+  VehicleOption,
 } from '../../models/purchase-sale-reference.model';
 
 interface PurchaseSaleListState {
@@ -120,6 +120,53 @@ interface QuickSuggestion {
   styleUrl: './purchase-sale-list.component.css',
 })
 export class PurchaseSaleListComponent implements OnInit, OnDestroy {
+  readonly contractStatuses = Object.values(ContractStatus);
+  readonly contractTypes = Object.values(ContractType);
+  readonly ContractStatus = ContractStatus;
+  readonly ContractType = ContractType;
+  readonly paymentMethods = Object.values(PaymentMethod);
+  readonly clients: WritableSignal<ClientOption[]> = signal<ClientOption[]>([]);
+  readonly users: WritableSignal<UserOption[]> = signal<UserOption[]>([]);
+  readonly vehicles: WritableSignal<VehicleOption[]> = signal<VehicleOption[]>(
+    [],
+  );
+  readonly clientMap = computed(
+    () =>
+      new Map<number, ClientOption>(
+        this.clients().map((client) => [client.id, client]),
+      ),
+  );
+  readonly userMap = computed(
+    () =>
+      new Map<number, UserOption>(this.users().map((user) => [user.id, user])),
+  );
+  readonly vehicleMap = computed(
+    () =>
+      new Map<number, VehicleOption>(
+        this.vehicles().map((vehicle) => [vehicle.id, vehicle]),
+      ),
+  );
+  readonly summaryState = signal({
+    total: 0,
+    purchases: 0,
+    sales: 0,
+  });
+  filters: PurchaseSaleUiFilters = this.getDefaultUiFilters();
+  reportStartDate: string | null = null;
+  reportEndDate: string | null = null;
+  exportLoading: Record<ExportFormat, boolean> = {
+    pdf: false,
+    excel: false,
+    csv: false,
+  };
+  listState: PurchaseSaleListState = {
+    items: [],
+    loading: false,
+    error: null,
+  };
+  quickSuggestions: QuickSuggestion[] = [];
+  pagerQueryParams: Params | null = null;
+  readonly pagerUrl = '/purchase-sales/page';
   private readonly purchaseSaleService = inject(PurchaseSaleService);
   private readonly personService = inject(PersonService);
   private readonly companyService = inject(CompanyService);
@@ -128,68 +175,12 @@ export class PurchaseSaleListComponent implements OnInit, OnDestroy {
   private readonly motorcycleService = inject(MotorcycleService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
-
-  readonly contractStatuses = Object.values(ContractStatus);
-  readonly contractTypes = Object.values(ContractType);
-  readonly ContractStatus = ContractStatus;
-  readonly ContractType = ContractType;
-  readonly paymentMethods = Object.values(PaymentMethod);
-
-  readonly clients: WritableSignal<ClientOption[]> = signal<ClientOption[]>([]);
-  readonly users: WritableSignal<UserOption[]> = signal<UserOption[]>([]);
-  readonly vehicles: WritableSignal<VehicleOption[]> = signal<VehicleOption[]>(
-    [],
-  );
-
-  readonly clientMap = computed(
-    () =>
-      new Map<number, ClientOption>(
-        this.clients().map((client) => [client.id, client]),
-      ),
-  );
-
-  readonly userMap = computed(
-    () =>
-      new Map<number, UserOption>(this.users().map((user) => [user.id, user])),
-  );
-
-  readonly vehicleMap = computed(
-    () =>
-      new Map<number, VehicleOption>(
-        this.vehicles().map((vehicle) => [vehicle.id, vehicle]),
-      ),
-  );
-
-  readonly summaryState = signal({
-    total: 0,
-    purchases: 0,
-    sales: 0,
-  });
-
-  filters: PurchaseSaleUiFilters = this.getDefaultUiFilters();
-
-  reportStartDate: string | null = null;
-  reportEndDate: string | null = null;
-  exportLoading: Record<ExportFormat, boolean> = {
-    pdf: false,
-    excel: false,
-    csv: false,
-  };
-
-  listState: PurchaseSaleListState = {
-    items: [],
-    loading: false,
-    error: null,
-  };
-  quickSuggestions: QuickSuggestion[] = [];
   private readonly linkedClientIds = new Set<number>();
   private readonly linkedUserIds = new Set<number>();
   private readonly linkedVehicleIds = new Set<number>();
-
   private currentPage = 0;
   private readonly subscriptions: Subscription[] = [];
   private activeSearchFilters: PurchaseSaleSearchFilters | null = null;
-  pagerQueryParams: Params | null = null;
   private readonly priceDecimals = 0;
   private readonly statusLabels: Record<ContractStatus, string> = {
     [ContractStatus.PENDING]: 'Pendiente',
@@ -197,12 +188,10 @@ export class PurchaseSaleListComponent implements OnInit, OnDestroy {
     [ContractStatus.COMPLETED]: 'Completado',
     [ContractStatus.CANCELED]: 'Cancelado',
   };
-
   private readonly typeLabels: Record<ContractType, string> = {
     [ContractType.PURCHASE]: 'Compra',
     [ContractType.SALE]: 'Venta',
   };
-
   private readonly paymentMethodLabels: Record<PaymentMethod, string> = {
     [PaymentMethod.CASH]: 'Efectivo',
     [PaymentMethod.BANK_TRANSFER]: 'Transferencia bancaria',
@@ -243,21 +232,9 @@ export class PurchaseSaleListComponent implements OnInit, OnDestroy {
     this.refreshSummary();
   }
 
-  ngOnDestroy(): void {
-    for (const sub of this.subscriptions) {
-      sub.unsubscribe();
-    }
-  }
-
-  navigateToCreate(): void {
-    void this.router.navigate(['/purchase-sales/register']);
-  }
-
   get pager(): PaginatedResponse<PurchaseSale> | undefined {
     return this.listState.pager;
   }
-
-  readonly pagerUrl = '/purchase-sales/page';
 
   get isListLoading(): boolean {
     return this.listState.loading;
@@ -269,6 +246,10 @@ export class PurchaseSaleListComponent implements OnInit, OnDestroy {
 
   get contracts(): PurchaseSale[] {
     return this.listState.items;
+  }
+
+  set contracts(value: PurchaseSale[]) {
+    this.listState.items = value;
   }
 
   get totalContracts(): number {
@@ -283,17 +264,20 @@ export class PurchaseSaleListComponent implements OnInit, OnDestroy {
     return this.summaryState().sales;
   }
 
+  ngOnDestroy(): void {
+    for (const sub of this.subscriptions) {
+      sub.unsubscribe();
+    }
+  }
+
+  navigateToCreate(): void {
+    void this.router.navigate(['/purchase-sales/register']);
+  }
+
   getVehicleBadgeClass(contract: PurchaseSale): string {
     return contract.contractType === ContractType.PURCHASE
       ? 'bg-primary-subtle text-primary-emphasis'
       : 'bg-success-subtle text-success-emphasis';
-  }
-
-  private getVehicleOption(contract: PurchaseSale): VehicleOption | undefined {
-    if (!contract.vehicleId) {
-      return undefined;
-    }
-    return this.vehicleMap().get(contract.vehicleId);
   }
 
   getStatusBadgeClass(status: ContractStatus): string {
@@ -378,11 +362,6 @@ export class PurchaseSaleListComponent implements OnInit, OnDestroy {
 
     const fallback = this.vehicleMap().get(contract.vehicleId);
     return fallback ? fallback.label : 'Vehículo';
-  }
-
-  private getVehicleLabelById(vehicleId: number): string | null {
-    const option = this.vehicleMap().get(vehicleId);
-    return option ? option.label : null;
   }
 
   resetFilters(): void {
@@ -480,39 +459,48 @@ export class PurchaseSaleListComponent implements OnInit, OnDestroy {
     this.applyFilters();
   }
 
-  private getReportObservable(
-    format: ExportFormat,
-    start?: string,
-    end?: string,
-  ) {
-    switch (format) {
-      case 'pdf':
-        return this.purchaseSaleService.downloadPdf(start, end);
-      case 'excel':
-        return this.purchaseSaleService.downloadExcel(start, end);
-      case 'csv':
-      default:
-        return this.purchaseSaleService.downloadCsv(start, end);
+  deleteContract(contract: PurchaseSale): void {
+    if (!contract.id) {
+      return;
     }
-  }
 
-  private getExtension(format: ExportFormat): ReportExtension {
-    if (format === 'pdf') {
-      return 'pdf';
+    if (contract.contractStatus !== ContractStatus.CANCELED) {
+      void Swal.fire({
+        icon: 'warning',
+        title: 'Acción no permitida',
+        text: 'Solo se pueden eliminar operaciones canceladas.',
+        confirmButtonColor: '#0d6efd',
+      });
+      return;
     }
-    if (format === 'excel') {
-      return 'xlsx';
-    }
-    return 'csv';
-  }
 
-  private buildReportFileName(extension: ReportExtension): string {
-    const today = new Date().toISOString().split('T')[0];
-    const rangeLabel =
-      this.reportStartDate || this.reportEndDate
-        ? `${this.reportStartDate ?? 'inicio'}-a-${this.reportEndDate ?? 'fin'}`
-        : 'completo';
-    return `reporte-compras-ventas-${rangeLabel}-${today}.${extension}`;
+    void Swal.fire({
+      title: '¿Confirmas esta acción?',
+      text: `Vas a eliminar la operación #${contract.id}.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, continuar',
+      cancelButtonText: 'No, cancelar',
+      confirmButtonColor: '#fd0d0d',
+      cancelButtonColor: '#6c757d',
+    }).then((result) => {
+      if (!result.isConfirmed) {
+        return;
+      }
+
+      this.purchaseSaleService.deleteById(contract.id!).subscribe({
+        next: () => {
+          const vehicleMsg = this.decorateVehicleMessage(
+            contract.vehicleSummary?.plate ?? null,
+          );
+          this.showSuccessMessage(
+            `Operación #${contract.id} eliminada correctamente.${vehicleMsg}`,
+          );
+          this.reloadCurrentPage();
+        },
+        error: (error) => this.handleError(error, 'eliminar la operación'),
+      });
+    });
   }
 
   updateStatus(contract: PurchaseSale, status: ContractStatus): void {
@@ -559,6 +547,53 @@ export class PurchaseSaleListComponent implements OnInit, OnDestroy {
           error: (error) => this.handleError(error, 'actualizar el contrato'),
         });
     });
+  }
+
+  private getVehicleOption(contract: PurchaseSale): VehicleOption | undefined {
+    if (!contract.vehicleId) {
+      return undefined;
+    }
+    return this.vehicleMap().get(contract.vehicleId);
+  }
+
+  private getVehicleLabelById(vehicleId: number): string | null {
+    const option = this.vehicleMap().get(vehicleId);
+    return option ? option.label : null;
+  }
+
+  private getReportObservable(
+    format: ExportFormat,
+    start?: string,
+    end?: string,
+  ) {
+    switch (format) {
+      case 'pdf':
+        return this.purchaseSaleService.downloadPdf(start, end);
+      case 'excel':
+        return this.purchaseSaleService.downloadExcel(start, end);
+      case 'csv':
+      default:
+        return this.purchaseSaleService.downloadCsv(start, end);
+    }
+  }
+
+  private getExtension(format: ExportFormat): ReportExtension {
+    if (format === 'pdf') {
+      return 'pdf';
+    }
+    if (format === 'excel') {
+      return 'xlsx';
+    }
+    return 'csv';
+  }
+
+  private buildReportFileName(extension: ReportExtension): string {
+    const today = new Date().toISOString().split('T')[0];
+    const rangeLabel =
+      this.reportStartDate || this.reportEndDate
+        ? `${this.reportStartDate ?? 'inicio'}-a-${this.reportEndDate ?? 'fin'}`
+        : 'completo';
+    return `reporte-compras-ventas-${rangeLabel}-${today}.${extension}`;
   }
 
   private reloadCurrentPage(): void {

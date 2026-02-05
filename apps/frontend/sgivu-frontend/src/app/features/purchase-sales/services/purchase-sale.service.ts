@@ -138,4 +138,8 @@ export class PurchaseSaleService {
     }
     return params;
   }
+
+  deleteById(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.apiUrl}/${id}`);
+  }
 }
