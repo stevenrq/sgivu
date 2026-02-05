@@ -100,6 +100,15 @@ public interface PurchaseSaleApi {
   ResponseEntity<PurchaseSaleResponse> update(
       @PathVariable Long id, @Valid @RequestBody PurchaseSaleRequest purchaseSaleRequest);
 
+  @Operation(
+      summary = "Eliminar contrato",
+      description = "Elimina un contrato por su ID.",
+      responses = {
+        @ApiResponse(responseCode = "204", description = "Contrato eliminado correctamente"),
+        @ApiResponse(responseCode = "401", description = "No autorizado"),
+        @ApiResponse(responseCode = "403", description = "Prohibido"),
+        @ApiResponse(responseCode = "404", description = "Contrato no encontrado")
+      })
   @DeleteMapping("/{id}")
   ResponseEntity<Void> deleteById(@PathVariable Long id);
 
