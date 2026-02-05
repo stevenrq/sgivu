@@ -1,13 +1,37 @@
 import { CommonModule } from '@angular/common';
-import { Component, computed, inject, OnDestroy, OnInit, signal, WritableSignal } from '@angular/core';
+import {
+  Component,
+  computed,
+  inject,
+  OnDestroy,
+  OnInit,
+  signal,
+  WritableSignal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, ParamMap, Params, Router, RouterLink } from '@angular/router';
-import { combineLatest, finalize, forkJoin, map, Subscription, tap } from 'rxjs';
+import {
+  ActivatedRoute,
+  ParamMap,
+  Params,
+  Router,
+  RouterLink,
+} from '@angular/router';
+import {
+  combineLatest,
+  finalize,
+  forkJoin,
+  map,
+  Subscription,
+  tap,
+} from 'rxjs';
 import Swal from 'sweetalert2';
 import { HasPermissionDirective } from '../../../../shared/directives/has-permission.directive';
 import { PagerComponent } from '../../../../shared/components/pager/pager.component';
 import { UtcToGmtMinus5Pipe } from '../../../../shared/pipes/utc-to-gmt-minus5.pipe';
-import { PurchaseSaleSearchFilters, PurchaseSaleService } from '../../services/purchase-sale.service';
+import {
+  PurchaseSaleSearchFilters,
+  PurchaseSaleService,
+} from '../../services/purchase-sale.service';
 import { PurchaseSale } from '../../models/purchase-sale.model';
 import { ContractType } from '../../models/contract-type.enum';
 import { ContractStatus } from '../../models/contract-status.enum';
@@ -22,7 +46,10 @@ import { PageHeaderComponent } from '../../../../shared/components/page-header/p
 import { KpiCardComponent } from '../../../../shared/components/kpi-card/kpi-card.component';
 import { DataTableComponent } from '../../../../shared/components/data-table/data-table.component';
 import { CopCurrencyPipe } from '../../../../shared/pipes/cop-currency.pipe';
-import { normalizeMoneyInput, parseCopCurrency } from '../../../../shared/utils/currency.utils';
+import {
+  normalizeMoneyInput,
+  parseCopCurrency,
+} from '../../../../shared/utils/currency.utils';
 import { RowNavigateDirective } from '../../../../shared/directives/row-navigate.directive';
 import {
   ClientOption,
@@ -32,7 +59,7 @@ import {
   mapPersonsToClients,
   mapUsersToOptions,
   UserOption,
-  VehicleOption
+  VehicleOption,
 } from '../../models/purchase-sale-reference.model';
 
 interface PurchaseSaleListState {
