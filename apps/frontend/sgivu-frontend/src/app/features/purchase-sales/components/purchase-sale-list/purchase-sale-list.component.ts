@@ -204,34 +204,6 @@ export class PurchaseSaleListComponent implements OnInit, OnDestroy {
     [PaymentMethod.INSTALLMENT_PAYMENT]: 'Pago a plazos',
   };
 
-  get pager(): PaginatedResponse<PurchaseSale> | undefined {
-    return this.listState.pager;
-  }
-
-  get isListLoading(): boolean {
-    return this.listState.loading;
-  }
-
-  get listError(): string | null {
-    return this.listState.error;
-  }
-
-  get contracts(): PurchaseSale[] {
-    return this.listState.items;
-  }
-
-  get totalContracts(): number {
-    return this.summaryState().total;
-  }
-
-  get totalPurchases(): number {
-    return this.summaryState().purchases;
-  }
-
-  get totalSales(): number {
-    return this.summaryState().sales;
-  }
-
   ngOnInit(): void {
     this.loadLookups();
     const routeSub = combineLatest([
@@ -258,6 +230,38 @@ export class PurchaseSaleListComponent implements OnInit, OnDestroy {
 
     this.subscriptions.push(routeSub);
     this.refreshSummary();
+  }
+
+  get pager(): PaginatedResponse<PurchaseSale> | undefined {
+    return this.listState.pager;
+  }
+
+  get isListLoading(): boolean {
+    return this.listState.loading;
+  }
+
+  get listError(): string | null {
+    return this.listState.error;
+  }
+
+  get contracts(): PurchaseSale[] {
+    return this.listState.items;
+  }
+
+  set contracts(value: PurchaseSale[]) {
+    this.listState.items = value;
+  }
+
+  get totalContracts(): number {
+    return this.summaryState().total;
+  }
+
+  get totalPurchases(): number {
+    return this.summaryState().purchases;
+  }
+
+  get totalSales(): number {
+    return this.summaryState().sales;
   }
 
   ngOnDestroy(): void {
@@ -453,6 +457,50 @@ export class PurchaseSaleListComponent implements OnInit, OnDestroy {
 
     this.quickSuggestions = [];
     this.applyFilters();
+  }
+
+  deleteContract(contract: PurchaseSale): void {
+    if (!contract.id) {
+      return;
+    }
+
+    if (contract.contractStatus !== ContractStatus.CANCELED) {
+      void Swal.fire({
+        icon: 'warning',
+        title: 'Acción no permitida',
+        text: 'Solo se pueden eliminar operaciones canceladas.',
+        confirmButtonColor: '#0d6efd',
+      });
+      return;
+    }
+
+    void Swal.fire({
+      title: '¿Confirmas esta acción?',
+      text: `Vas a eliminar la operación #${contract.id}.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, continuar',
+      cancelButtonText: 'No, cancelar',
+      confirmButtonColor: '#fd0d0d',
+      cancelButtonColor: '#6c757d',
+    }).then((result) => {
+      if (!result.isConfirmed) {
+        return;
+      }
+
+      this.purchaseSaleService.deleteById(contract.id!).subscribe({
+        next: () => {
+          const vehicleMsg = this.decorateVehicleMessage(
+            contract.vehicleSummary?.plate ?? null,
+          );
+          this.showSuccessMessage(
+            `Operación #${contract.id} eliminada correctamente.${vehicleMsg}`,
+          );
+          this.reloadCurrentPage();
+        },
+        error: (error) => this.handleError(error, 'eliminar la operación'),
+      });
+    });
   }
 
   updateStatus(contract: PurchaseSale, status: ContractStatus): void {

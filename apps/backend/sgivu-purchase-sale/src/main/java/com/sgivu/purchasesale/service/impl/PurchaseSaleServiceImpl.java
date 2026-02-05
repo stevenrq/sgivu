@@ -139,6 +139,16 @@ public class PurchaseSaleServiceImpl implements PurchaseSaleService {
   @Transactional
   @Override
   public void deleteById(Long id) {
+    PurchaseSale purchaseSale =
+        purchaseSaleRepository
+            .findById(id)
+            .orElseThrow(
+                () -> new IllegalArgumentException("Contrato no encontrado con id: " + id));
+    if (purchaseSale.getContractStatus() != ContractStatus.CANCELED) {
+      throw new IllegalArgumentException(
+          "Solo se pueden eliminar contratos que estén en estado 'CANCELED'.");
+    }
+
     purchaseSaleRepository.deleteById(requireContractId(id));
   }
 
@@ -150,8 +160,8 @@ public class PurchaseSaleServiceImpl implements PurchaseSaleService {
 
   @Override
   public List<PurchaseSale> findByUserId(Long userId) {
-    resolveUserId(userId);
-    return purchaseSaleRepository.findByUserId(userId);
+    Long resolvedUserId = resolveUserId(userId);
+    return purchaseSaleRepository.findByUserId(resolvedUserId);
   }
 
   @Override

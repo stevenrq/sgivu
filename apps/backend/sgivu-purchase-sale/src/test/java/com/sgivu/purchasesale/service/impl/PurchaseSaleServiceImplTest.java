@@ -1794,6 +1794,80 @@ public class PurchaseSaleServiceImplTest {
   }
 
   @Nested
+  @DisplayName("deleteById(Long)")
+  class DeleteByIdTests {
+
+    @Test
+    @DisplayName("deleteById deletes when status is CANCELED")
+    void deleteById_elimina_cuando_estado_CANCELED() {
+      Long id = 1L;
+      PurchaseSale ps = new PurchaseSale();
+      ps.setId(id);
+      ps.setContractStatus(ContractStatus.CANCELED);
+
+      when(purchaseSaleRepository.findById(id)).thenReturn(Optional.of(ps));
+
+      assertDoesNotThrow(() -> service.deleteById(id));
+
+      verify(purchaseSaleRepository).findById(id);
+      verify(purchaseSaleRepository).deleteById(id);
+      verifyNoMoreInteractions(purchaseSaleRepository);
+    }
+
+    @Test
+    @DisplayName("deleteById throws NotFound when contract does not exist")
+    void deleteById_lanza_notFound_si_no_existe() {
+      Long id = 2L;
+      when(purchaseSaleRepository.findById(id)).thenReturn(Optional.empty());
+
+      IllegalArgumentException ex =
+          assertThrows(IllegalArgumentException.class, () -> service.deleteById(id));
+      assertEquals("Contrato no encontrado con id: " + id, ex.getMessage());
+
+      verify(purchaseSaleRepository).findById(id);
+      verify(purchaseSaleRepository, never()).deleteById(id);
+    }
+
+    @Test
+    @DisplayName("deleteById throws when status is not CANCELED")
+    void deleteById_lanza_si_estado_no_es_CANCELED() {
+      Long id = 3L;
+      PurchaseSale ps = new PurchaseSale();
+      ps.setId(id);
+      ps.setContractStatus(ContractStatus.PENDING);
+
+      when(purchaseSaleRepository.findById(id)).thenReturn(Optional.of(ps));
+
+      IllegalArgumentException ex =
+          assertThrows(IllegalArgumentException.class, () -> service.deleteById(id));
+      assertEquals(
+          "Solo se pueden eliminar contratos que estén en estado 'CANCELED'.", ex.getMessage());
+
+      verify(purchaseSaleRepository).findById(id);
+      verify(purchaseSaleRepository, never()).deleteById(id);
+    }
+
+    @Test
+    @DisplayName("deleteById with null id throws due to requireContractId")
+    void deleteById_null_id_requireContractId_lanza() {
+      Long id = null;
+      PurchaseSale ps = new PurchaseSale();
+      ps.setId(null);
+      ps.setContractStatus(ContractStatus.CANCELED);
+
+      // simular ruta en la que el repositorio devuelve un Optional incluso con id null
+      doReturn(Optional.of(ps)).when(purchaseSaleRepository).findById(null);
+
+      IllegalArgumentException ex =
+          assertThrows(IllegalArgumentException.class, () -> service.deleteById(null));
+      assertEquals("El ID del contrato debe ser proporcionado.", ex.getMessage());
+
+      verify(purchaseSaleRepository).findById(null);
+      verify(purchaseSaleRepository, never()).deleteById(null);
+    }
+  }
+
+  @Nested
   @DisplayName("requireContractId(Long)")
   class RequireContractIdTests {
 
