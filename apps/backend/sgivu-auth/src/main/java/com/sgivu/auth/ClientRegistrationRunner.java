@@ -131,7 +131,7 @@ public class ClientRegistrationRunner implements CommandLineRunner {
 
   private TokenSettings tokenSettings() {
     return TokenSettings.builder()
-        .accessTokenTimeToLive(Duration.ofMinutes(15))
+        .accessTokenTimeToLive(Duration.ofMinutes(30))
         .refreshTokenTimeToLive(Duration.ofDays(30))
         .reuseRefreshTokens(false)
         .build();

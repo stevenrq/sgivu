@@ -16,17 +16,17 @@ Angular SPA → Gateway (BFF) → Microservicios → PostgreSQL/MySQL
 
 ### Límites de Servicios
 
-| Servicio | Puerto | Rol |
-| -------- | ------ | --- |
-| `sgivu-gateway` | 8080 | API Gateway + BFF (cliente OAuth2, relay de tokens) |
-| `sgivu-auth` | 9000 | Servidor de Autorización (OAuth2.1/OIDC, emisor JWT) |
-| `sgivu-config` | 8888 | Spring Cloud Config Server |
-| `sgivu-discovery` | 8761 | Registro de Servicios Eureka |
-| `sgivu-user` | 8081 | Gestión de usuarios |
-| `sgivu-client` | 8082 | Gestión de clientes |
-| `sgivu-vehicle` | 8083 | Inventario de vehículos |
-| `sgivu-purchase-sale` | 8084 | Transacciones de compra/venta |
-| `sgivu-ml` | 8000 | Predicciones ML (FastAPI) |
+| Servicio              | Puerto | Rol                                                  |
+| --------------------- | ------ | ---------------------------------------------------- |
+| `sgivu-gateway`       | 8080   | API Gateway + BFF (cliente OAuth2, relay de tokens)  |
+| `sgivu-auth`          | 9000   | Servidor de Autorización (OAuth2.1/OIDC, emisor JWT) |
+| `sgivu-config`        | 8888   | Spring Cloud Config Server                           |
+| `sgivu-discovery`     | 8761   | Registro de Servicios Eureka                         |
+| `sgivu-user`          | 8081   | Gestión de usuarios                                  |
+| `sgivu-client`        | 8082   | Gestión de clientes                                  |
+| `sgivu-vehicle`       | 8083   | Inventario de vehículos                              |
+| `sgivu-purchase-sale` | 8084   | Transacciones de compra/venta                        |
+| `sgivu-ml`            | 8000   | Predicciones ML (FastAPI)                            |
 
 ## Comandos Esenciales
 
@@ -104,12 +104,69 @@ http.oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConve
 
 Migraciones Flyway en `src/main/resources/db/migration/`. Los archivos siguen el nombrado `V{n}__{descripcion}.sql`.
 
+## Redis (Sesiones del Gateway)
+
+Redis se usa **exclusivamente en `sgivu-gateway`** para **persistir sesiones HTTP** como parte del patrón BFF. El gateway es cliente OAuth2 y almacena los tokens (`access_token`, `refresh_token`) y el estado de sesión del usuario en la sesión web, la cual se respalda en Redis. Esto permite escalar el gateway horizontalmente sin perder sesiones.
+
+**No se usa Redis** para rate limiting, caché (`@Cacheable`) ni operaciones directas con `RedisTemplate` en ningún servicio.
+
+### Dependencias Maven (`sgivu-gateway/pom.xml`)
+
+```xml
+<dependency>
+    <groupId>org.springframework.session</groupId>
+    <artifactId>spring-session-data-redis</artifactId>
+</dependency>
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-data-redis-reactive</artifactId>
+</dependency>
+```
+
+### Configuración (`sgivu-config-repo/sgivu-gateway.yml`)
+
+```yaml
+spring:
+  session:
+    store-type: redis
+    redis:
+      namespace: spring:session:sgivu-gateway
+  data:
+    redis:
+      host: ${REDIS_HOST:sgivu-redis}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD}
+```
+
+### Clase de Configuración Java
+
+`RedisSessionConfig.java` en `sgivu-gateway/config/` configura la cookie de sesión:
+
+- Nombre: `SESSION`
+- `HttpOnly=true`, `SameSite=Lax`, `Path=/`
+- `SameSite=Lax` es necesario para que la cookie sobreviva los redirects OAuth2 desde `sgivu-auth`
+
+La conexión a Redis y el repositorio de sesiones se auto-configuran por Spring Boot a partir de las dependencias y la configuración YAML.
+
+### Docker
+
+Servicio `sgivu-redis` en Docker Compose (`redis:7`) con autenticación por contraseña y volumen persistente `redis-data`. El gateway declara `depends_on: sgivu-redis`.
+
+### Variables de Entorno
+
+| Variable         | Default       | Descripción                             |
+| ---------------- | ------------- | --------------------------------------- |
+| `REDIS_HOST`     | `sgivu-redis` | Host del servidor Redis                 |
+| `REDIS_PORT`     | `6379`        | Puerto de Redis                         |
+| `REDIS_PASSWORD` | —             | Contraseña de autenticación (requerida) |
+
 ## Puntos Clave de Integración
 
 1. **Gateway → Auth**: Registro de cliente OAuth2 en `sgivu-gateway.yml`, flujos de redirección vía `/login/oauth2/code/sgivu-gateway`
-2. **Auth → User**: Validación de credenciales vía `CredentialsValidationService` usando clave interna
-3. **Todos los Servicios → Config**: Bootstrap desde `http://sgivu-config:8888`
-4. **Todos los Servicios → Discovery**: Registro con Eureka en `http://sgivu-discovery:8761/eureka`
+2. **Gateway → Redis**: Persistencia de sesiones HTTP (tokens OAuth2) vía `spring-session-data-redis`
+3. **Auth → User**: Validación de credenciales vía `CredentialsValidationService` usando clave interna
+4. **Todos los Servicios → Config**: Bootstrap desde `http://sgivu-config:8888`
+5. **Todos los Servicios → Discovery**: Registro con Eureka en `http://sgivu-discovery:8761/eureka`
 
 ## Frontend (Angular)
 
@@ -133,13 +190,13 @@ Ubicado en `apps/ml/sgivu-ml`. Python 3.12 con scikit-learn.
 
 El gateway (`GatewayRoutesConfig.java`) define el enrutamiento a microservicios usando balanceo de carga vía Eureka (`lb://`):
 
-| Ruta | Servicio | Filtros |
-| ---- | -------- | ------- |
-| `/v1/users/**`, `/v1/roles/**`, `/v1/permissions/**` | `lb://sgivu-user` | tokenRelay, circuitBreaker |
-| `/v1/persons/**`, `/v1/companies/**` | `lb://sgivu-client` | tokenRelay, circuitBreaker |
-| `/v1/vehicles/**`, `/v1/cars/**`, `/v1/motorcycles/**` | `lb://sgivu-vehicle` | tokenRelay, circuitBreaker |
-| `/v1/purchase-sales/**` | `lb://sgivu-purchase-sale` | tokenRelay, circuitBreaker |
-| `/v1/ml/**` | `http://sgivu-ml:8000` | tokenRelay, circuitBreaker |
+| Ruta                                                   | Servicio                   | Filtros                    |
+| ------------------------------------------------------ | -------------------------- | -------------------------- |
+| `/v1/users/**`, `/v1/roles/**`, `/v1/permissions/**`   | `lb://sgivu-user`          | tokenRelay, circuitBreaker |
+| `/v1/persons/**`, `/v1/companies/**`                   | `lb://sgivu-client`        | tokenRelay, circuitBreaker |
+| `/v1/vehicles/**`, `/v1/cars/**`, `/v1/motorcycles/**` | `lb://sgivu-vehicle`       | tokenRelay, circuitBreaker |
+| `/v1/purchase-sales/**`                                | `lb://sgivu-purchase-sale` | tokenRelay, circuitBreaker |
+| `/v1/ml/**`                                            | `http://sgivu-ml:8000`     | tokenRelay, circuitBreaker |
 
 **Swagger UI por servicio**: `/docs/<servicio>/swagger-ui.html` → reescrito a `/<servicio>/swagger-ui/*`
 
@@ -193,7 +250,7 @@ FROM amazoncorretto:21-alpine-jdk
 WORKDIR /app
 COPY ./target/sgivu-<servicio>-0.0.1-SNAPSHOT.jar sgivu-<servicio>.jar
 EXPOSE <puerto>
-ENTRYPOINT ["java", "-jar", "sgivu-<servicio>.jar"]
+ENTRYPOINT ["java", "-jar", "sgivu-<servicio>.jar"] 
 ```
 
 ## Solución de Problemas
@@ -201,4 +258,5 @@ ENTRYPOINT ["java", "-jar", "sgivu-<servicio>.jar"]
 - **Configuración no carga**: Asegurar que `sgivu-config` inicie antes que otros servicios (verificar `depends_on` en compose)
 - **Errores de issuer mismatch**: Verificar que `ISSUER_URL` coincida con la URL real usada por clientes
 - **Falla autenticación interna entre servicios**: Verificar que `SERVICE_INTERNAL_SECRET_KEY` coincida en todos los servicios
+- **Sesiones perdidas tras reinicio del gateway**: Verificar que `sgivu-redis` esté corriendo y que `REDIS_PASSWORD` coincida entre el contenedor Redis y la configuración del gateway
 - **Acceso en desarrollo local**: Agregar `sgivu-auth` a `/etc/hosts` apuntando a `127.0.0.1`

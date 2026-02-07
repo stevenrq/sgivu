@@ -3,6 +3,8 @@ package com.sgivu.gateway.security;
 import com.sgivu.gateway.config.AngularClientProperties;
 import com.sgivu.gateway.config.ServicesProperties;
 import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
@@ -38,11 +40,16 @@ import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.security.web.server.authentication.HttpStatusServerEntryPoint;
 import org.springframework.security.web.server.authentication.RedirectServerAuthenticationSuccessHandler;
 import org.springframework.security.web.server.authentication.ServerAuthenticationSuccessHandler;
+import org.springframework.security.web.server.authentication.logout.DelegatingServerLogoutHandler;
+import org.springframework.security.web.server.authentication.logout.SecurityContextServerLogoutHandler;
+import org.springframework.security.web.server.authentication.logout.ServerLogoutHandler;
 import org.springframework.security.web.server.authentication.logout.ServerLogoutSuccessHandler;
 import org.springframework.security.web.server.util.matcher.ServerWebExchangeMatchers;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.CorsConfigurationSource;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
+import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.server.WebSession;
 import reactor.core.publisher.Mono;
 
 @Configuration
@@ -85,7 +92,8 @@ public class SecurityConfig {
       ServerHttpSecurity http,
       ReactiveClientRegistrationRepository clientRegistrationRepository,
       ServerOAuth2AuthorizationRequestResolver authorizationRequestResolver,
-      ServerOAuth2AuthorizedClientRepository authorizedClientRepository) {
+      ServerOAuth2AuthorizedClientRepository authorizedClientRepository,
+      ServerLogoutHandler tokenRevocationLogoutHandler) {
     http.cors(corsSpec -> corsSpec.configurationSource(corsConfigurationSource()))
         .csrf(ServerHttpSecurity.CsrfSpec::disable)
         .oauth2Login(
@@ -102,10 +110,19 @@ public class SecurityConfig {
                 exceptions.authenticationEntryPoint(
                     new HttpStatusServerEntryPoint(HttpStatus.UNAUTHORIZED)))
         .logout(
-            logout ->
-                logout
-                    .requiresLogout(ServerWebExchangeMatchers.pathMatchers(LOGOUT_URL))
-                    .logoutSuccessHandler(logoutSuccessHandler(clientRegistrationRepository)))
+            logout -> {
+              ServerLogoutHandler sessionInvalidationHandler =
+                  (webFilterExchange, auth) ->
+                      webFilterExchange.getExchange().getSession().flatMap(WebSession::invalidate);
+              logout
+                  .requiresLogout(ServerWebExchangeMatchers.pathMatchers(LOGOUT_URL))
+                  .logoutHandler(
+                      new DelegatingServerLogoutHandler(
+                          tokenRevocationLogoutHandler,
+                          new SecurityContextServerLogoutHandler(),
+                          sessionInvalidationHandler))
+                  .logoutSuccessHandler(logoutSuccessHandler(clientRegistrationRepository));
+            })
         .authorizeExchange(
             exchanges ->
                 exchanges
@@ -200,13 +217,31 @@ public class SecurityConfig {
     OidcClientInitiatedServerLogoutSuccessHandler handler =
         new OidcClientInitiatedServerLogoutSuccessHandler(clientRegistrationRepository);
     handler.setPostLogoutRedirectUri(angularClientProperties.getUrl().concat("/login"));
-    handler.setLogoutSuccessUrl(URI.create(angularClientProperties.getUrl().concat("/login")));
+
+    // Fallback cuando no hay OidcUser (sesión expirada): redirigir al auth server para
+    // invalidar su sesión JDBC antes de ir a Angular. Sin esto, la sesión activa del auth server
+    // (15 min) causa re-autenticación automática ya que el consent previo está guardado.
+    String angularLoginUrl = angularClientProperties.getUrl().concat("/login");
+    String authUrl = servicesProperties.getMap().get("sgivu-auth").getUrl();
+    String ssoLogoutFallbackUrl =
+        authUrl
+            + "/sso-logout?redirect_uri="
+            + URLEncoder.encode(angularLoginUrl, StandardCharsets.UTF_8);
+    handler.setLogoutSuccessUrl(URI.create(ssoLogoutFallbackUrl));
+
     return handler;
   }
 
   @Bean
   ServerOAuth2AuthorizedClientRepository authorizedClientRepository() {
     return new WebSessionServerOAuth2AuthorizedClientRepository();
+  }
+
+  @Bean
+  ServerLogoutHandler tokenRevocationLogoutHandler(
+      ServerOAuth2AuthorizedClientRepository authorizedClientRepository) {
+    WebClient webClient = WebClient.builder().build();
+    return new TokenRevocationServerLogoutHandler(authorizedClientRepository, webClient);
   }
 
   @Bean

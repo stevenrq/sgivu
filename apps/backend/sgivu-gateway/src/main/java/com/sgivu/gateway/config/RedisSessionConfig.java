@@ -1,6 +1,7 @@
 package com.sgivu.gateway.config;
 
 import jakarta.annotation.PostConstruct;
+import java.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
@@ -37,6 +38,7 @@ public class RedisSessionConfig {
           builder.path("/");
           builder.httpOnly(true);
           builder.sameSite("Lax");
+          builder.maxAge(Duration.ofHours(1));
         });
     log.info("WebSessionIdResolver configured with SameSite=Lax");
     return resolver;
