@@ -130,14 +130,14 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers("/.well-known/**")
                     .permitAll()
-                    .requestMatchers("/api/validate-credentials")
+                    .requestMatchers("/api/validate-credentials", "/sso-logout")
                     .permitAll()
                     .requestMatchers(
                         "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/webjars/**")
                     .permitAll()
                     .anyRequest()
                     .authenticated())
-        .csrf(csrf -> csrf.ignoringRequestMatchers("/api/validate-credentials"))
+        .csrf(csrf -> csrf.ignoringRequestMatchers("/api/validate-credentials", "/sso-logout"))
         .formLogin(
             formLogin ->
                 formLogin
@@ -245,7 +245,11 @@ public class SecurityConfig {
 
       } else if (context.getTokenType().getValue().equals(OidcParameterNames.ID_TOKEN)) {
         claims.claim("userId", userId);
-        claims.expiresAt(Instant.now().plus(Duration.ofMinutes(15)));
+        // El id_token debe tener un TTL >= al refresh_token, ya que el OidcUser (y su id_token)
+        // nunca se actualiza durante el refresh de tokens en Spring Security. El id_token original
+        // del login se usa como id_token_hint durante el RP-Initiated Logout (OIDC), por lo que
+        // debe seguir siendo válido mientras la sesión esté activa.
+        claims.expiresAt(Instant.now().plus(Duration.ofDays(30)));
       }
     };
   }

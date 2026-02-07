@@ -51,6 +51,17 @@ Documentación central del sistema SGIVU (backend, frontend, ML e infraestructur
 - Claves internas para comunicación service-to-service.
 - Nunca versionar secretos ni `.env` reales.
 
+## Redis
+
+Redis se usa **exclusivamente en `sgivu-gateway`** para persistir sesiones HTTP (patrón BFF). El gateway almacena en la sesión web los tokens OAuth2 del usuario y respalda dicha sesión en Redis, lo que permite escalar el gateway horizontalmente sin perder estado de sesión.
+
+- **Dependencias**: `spring-session-data-redis` y `spring-boot-starter-data-redis-reactive` en `sgivu-gateway`.
+- **Configuración**: `sgivu-config-repo/sgivu-gateway.yml` define `spring.session.store-type: redis`, namespace `spring:session:sgivu-gateway` y conexión vía `${REDIS_HOST}`, `${REDIS_PORT}`, `${REDIS_PASSWORD}`.
+- **Cookie de sesión**: `RedisSessionConfig.java` configura la cookie `SESSION` con `HttpOnly`, `SameSite=Lax` y `Path=/`.
+- **Docker**: Servicio `sgivu-redis` (imagen `redis:7`) con autenticación por contraseña y volumen persistente `redis-data`.
+- **Variables de entorno**: `REDIS_HOST` (default `sgivu-redis`), `REDIS_PORT` (default `6379`), `REDIS_PASSWORD` (requerida).
+- **No se usa** para rate limiting, caché ni operaciones directas con `RedisTemplate`.
+
 ## Servicios y Componentes
 
 ### Backend
