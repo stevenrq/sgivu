@@ -3,8 +3,8 @@
     <div page-header-actions>
       <button
         class="btn btn-primary"
-        [routerLink]="createLink"
-        *appHasPermission="createPermission"
+        [routerLink]="['/users/create']"
+        *appHasPermission="'user:create'"
       >
         <i class="bi bi-plus-circle me-2"></i>{{ createLabel }}
       </button>
@@ -15,7 +15,7 @@
     <div class="col-md-4">
       <app-kpi-card
         label="Usuarios Totales"
-        [value]="totalUsers"
+        [value]="listManager.total()"
         icon="bi-people-fill"
         variant="primary"
       ></app-kpi-card>
@@ -23,7 +23,7 @@
     <div class="col-md-4">
       <app-kpi-card
         label="Usuarios Activos"
-        [value]="activeUsers"
+        [value]="listManager.active()"
         icon="bi-person-check-fill"
         variant="success"
       ></app-kpi-card>
@@ -31,7 +31,7 @@
     <div class="col-md-4">
       <app-kpi-card
         label="Usuarios Inactivos"
-        [value]="inactiveUsers"
+        [value]="listManager.inactive()"
         icon="bi-person-x-fill"
         variant="warning"
       ></app-kpi-card>
@@ -61,7 +61,7 @@
               id="filterUserName"
               [(ngModel)]="filters.name"
               (keyup.enter)="search()"
-              [placeholder]="searchPlaceholder"
+              placeholder="Buscar usuarios..."
               maxlength="{{ searchTermMaxLength }}"
             />
           </div>
@@ -140,15 +140,15 @@
       </div>
     </div>
 
-    @if (error) {
+    @if (listManager.error()) {
       <div class="alert alert-danger rounded-0 mb-0">
-        {{ error }}
+        {{ listManager.error() }}
       </div>
     }
 
     <div class="card-body p-0">
       <app-data-table
-        [loading]="isLoading"
+        [loading]="listManager.loading()"
         [minHeight]="300"
         loadingLabel="Cargando usuarios..."
       >
@@ -169,11 +169,11 @@
           </tr>
         </ng-container>
         <ng-container table-body>
-          @for (user of users; track user.id) {
+          @for (user of listManager.items(); track user.id) {
             <tr
               appRowNavigate
               [appRowNavigate]="['/users/profile', user.id]"
-              [appRowNavigateDisabled]="isLoading"
+              [appRowNavigateDisabled]="listManager.loading()"
             >
               <td>
                 <div class="d-flex align-items-center">
@@ -284,25 +284,29 @@
         <div
           table-empty
           class="text-center py-5 text-muted"
-          *ngIf="!users.length && !isLoading && !error"
+          *ngIf="
+            !listManager.items().length &&
+            !listManager.loading() &&
+            !listManager.error()
+          "
         >
           <i class="bi bi-people-slash display-6 d-block mb-2"></i>
           {{ emptyMessage }}
         </div>
       </app-data-table>
     </div>
-    @if (pager) {
+    @if (listManager.pager()) {
       <div
         class="card-footer bg-white d-flex justify-content-between align-items-center flex-wrap gap-2"
       >
         <span class="text-muted"
-          >Mostrando {{ pager.numberOfElements }} de
-          {{ pager.totalElements }} usuarios</span
+          >Mostrando {{ listManager.pager()!.numberOfElements }} de
+          {{ listManager.pager()!.totalElements }} usuarios</span
         >
         <app-pager
-          [pager]="pager"
+          [pager]="listManager.pager()!"
           [url]="pagerUrl"
-          [queryParams]="pagerQueryParams"
+          [queryParams]="activePagerQueryParams"
         ></app-pager>
       </div>
     }
