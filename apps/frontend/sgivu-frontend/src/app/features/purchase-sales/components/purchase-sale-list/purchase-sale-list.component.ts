@@ -1,29 +1,9 @@
 import { CommonModule } from '@angular/common';
-import {
-  Component,
-  computed,
-  inject,
-  OnDestroy,
-  OnInit,
-  signal,
-  WritableSignal,
-} from '@angular/core';
+import { Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import {
-  ActivatedRoute,
-  ParamMap,
-  Params,
-  Router,
-  RouterLink,
-} from '@angular/router';
-import {
-  combineLatest,
-  finalize,
-  forkJoin,
-  map,
-  Subscription,
-  tap,
-} from 'rxjs';
+import { ActivatedRoute, Params, Router, RouterLink } from '@angular/router';
+import { combineLatest, finalize, tap } from 'rxjs';
 import Swal from 'sweetalert2';
 import { HasPermissionDirective } from '../../../../shared/directives/has-permission.directive';
 import { PagerComponent } from '../../../../shared/components/pager/pager.component';
@@ -37,68 +17,46 @@ import { ContractType } from '../../models/contract-type.enum';
 import { ContractStatus } from '../../models/contract-status.enum';
 import { PaymentMethod } from '../../models/payment-method.enum';
 import { PaginatedResponse } from '../../../../shared/models/paginated-response';
-import { PersonService } from '../../../clients/services/person.service';
-import { CompanyService } from '../../../clients/services/company.service';
-import { UserService } from '../../../users/services/user.service';
-import { CarService } from '../../../vehicles/services/car.service';
-import { MotorcycleService } from '../../../vehicles/services/motorcycle.service';
 import { PageHeaderComponent } from '../../../../shared/components/page-header/page-header.component';
 import { KpiCardComponent } from '../../../../shared/components/kpi-card/kpi-card.component';
 import { DataTableComponent } from '../../../../shared/components/data-table/data-table.component';
 import { CopCurrencyPipe } from '../../../../shared/pipes/cop-currency.pipe';
-import {
-  normalizeMoneyInput,
-  parseCopCurrency,
-} from '../../../../shared/utils/currency.utils';
 import { RowNavigateDirective } from '../../../../shared/directives/row-navigate.directive';
+import { VehicleOption } from '../../models/purchase-sale-reference.model';
+import { PurchaseSaleLookupService } from '../../services/purchase-sale-lookup.service';
 import {
-  ClientOption,
-  mapCarsToVehicles,
-  mapCompaniesToClients,
-  mapMotorcyclesToVehicles,
-  mapPersonsToClients,
-  mapUsersToOptions,
-  UserOption,
-  VehicleOption,
-} from '../../models/purchase-sale-reference.model';
+  PurchaseSaleReportService,
+  ExportFormat,
+} from '../../services/purchase-sale-report.service';
+import {
+  getStatusLabel,
+  getContractTypeLabel,
+  getPaymentMethodLabel,
+  getStatusBadgeClass,
+  getVehicleBadgeClass,
+} from '../../utils/purchase-sale-labels.utils';
+import {
+  PurchaseSaleUiFilters,
+  PriceFilterKey,
+  ContractStatusFilter,
+  ContractTypeFilter,
+  getDefaultUiFilters,
+  normalizePriceInput,
+  buildQueryParamsFromFilters,
+  extractFiltersFromQuery,
+  paramMapToObject,
+} from '../../utils/purchase-sale-filter.utils';
+import {
+  QuickSuggestion,
+  buildQuickSuggestions,
+  hintQuickSearchFilters,
+} from '../../utils/quick-search.utils';
 
 interface PurchaseSaleListState {
   items: PurchaseSale[];
   pager?: PaginatedResponse<PurchaseSale>;
   loading: boolean;
   error: string | null;
-}
-
-type ContractTypeFilter = ContractType | 'ALL';
-type ContractStatusFilter = ContractStatus | 'ALL';
-type PriceFilterKey =
-  | 'minPurchasePrice'
-  | 'maxPurchasePrice'
-  | 'minSalePrice'
-  | 'maxSalePrice';
-
-interface PurchaseSaleUiFilters {
-  contractType: ContractTypeFilter;
-  contractStatus: ContractStatusFilter;
-  clientId: string;
-  userId: string;
-  vehicleId: string;
-  paymentMethod: string;
-  term: string;
-  minPurchasePrice: string;
-  maxPurchasePrice: string;
-  minSalePrice: string;
-  maxSalePrice: string;
-}
-
-type ExportFormat = 'pdf' | 'excel' | 'csv';
-type ReportExtension = 'pdf' | 'xlsx' | 'csv';
-type QuickSuggestionType = 'client' | 'user' | 'vehicle' | 'status' | 'type';
-interface QuickSuggestion {
-  label: string;
-  context: string;
-  type: QuickSuggestionType;
-  value: string;
 }
 
 @Component({
@@ -119,46 +77,19 @@ interface QuickSuggestion {
   templateUrl: './purchase-sale-list.component.html',
   styleUrl: './purchase-sale-list.component.css',
 })
-export class PurchaseSaleListComponent implements OnInit, OnDestroy {
+export class PurchaseSaleListComponent implements OnInit {
   readonly contractStatuses = Object.values(ContractStatus);
   readonly contractTypes = Object.values(ContractType);
   readonly ContractStatus = ContractStatus;
   readonly ContractType = ContractType;
   readonly paymentMethods = Object.values(PaymentMethod);
-  readonly clients: WritableSignal<ClientOption[]> = signal<ClientOption[]>([]);
-  readonly users: WritableSignal<UserOption[]> = signal<UserOption[]>([]);
-  readonly vehicles: WritableSignal<VehicleOption[]> = signal<VehicleOption[]>(
-    [],
-  );
-  readonly clientMap = computed(
-    () =>
-      new Map<number, ClientOption>(
-        this.clients().map((client) => [client.id, client]),
-      ),
-  );
-  readonly userMap = computed(
-    () =>
-      new Map<number, UserOption>(this.users().map((user) => [user.id, user])),
-  );
-  readonly vehicleMap = computed(
-    () =>
-      new Map<number, VehicleOption>(
-        this.vehicles().map((vehicle) => [vehicle.id, vehicle]),
-      ),
-  );
-  readonly summaryState = signal({
-    total: 0,
-    purchases: 0,
-    sales: 0,
-  });
-  filters: PurchaseSaleUiFilters = this.getDefaultUiFilters();
+  readonly lookupService = inject(PurchaseSaleLookupService);
+  readonly reportService = inject(PurchaseSaleReportService);
+
+  readonly summaryState = signal({ total: 0, purchases: 0, sales: 0 });
+  filters: PurchaseSaleUiFilters = getDefaultUiFilters();
   reportStartDate: string | null = null;
   reportEndDate: string | null = null;
-  exportLoading: Record<ExportFormat, boolean> = {
-    pdf: false,
-    excel: false,
-    csv: false,
-  };
   listState: PurchaseSaleListState = {
     items: [],
     loading: false,
@@ -167,70 +98,49 @@ export class PurchaseSaleListComponent implements OnInit, OnDestroy {
   quickSuggestions: QuickSuggestion[] = [];
   pagerQueryParams: Params | null = null;
   readonly pagerUrl = '/purchase-sales/page';
+
   private readonly purchaseSaleService = inject(PurchaseSaleService);
-  private readonly personService = inject(PersonService);
-  private readonly companyService = inject(CompanyService);
-  private readonly userService = inject(UserService);
-  private readonly carService = inject(CarService);
-  private readonly motorcycleService = inject(MotorcycleService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly linkedClientIds = new Set<number>();
   private readonly linkedUserIds = new Set<number>();
   private readonly linkedVehicleIds = new Set<number>();
   private currentPage = 0;
-  private readonly subscriptions: Subscription[] = [];
   private activeSearchFilters: PurchaseSaleSearchFilters | null = null;
-  private readonly priceDecimals = 0;
-  private readonly statusLabels: Record<ContractStatus, string> = {
-    [ContractStatus.PENDING]: 'Pendiente',
-    [ContractStatus.ACTIVE]: 'Activo',
-    [ContractStatus.COMPLETED]: 'Completado',
-    [ContractStatus.CANCELED]: 'Cancelado',
-  };
-  private readonly typeLabels: Record<ContractType, string> = {
-    [ContractType.PURCHASE]: 'Compra',
-    [ContractType.SALE]: 'Venta',
-  };
-  private readonly paymentMethodLabels: Record<PaymentMethod, string> = {
-    [PaymentMethod.CASH]: 'Efectivo',
-    [PaymentMethod.BANK_TRANSFER]: 'Transferencia bancaria',
-    [PaymentMethod.BANK_DEPOSIT]: 'Consignación bancaria',
-    [PaymentMethod.CASHIERS_CHECK]: 'Cheque de gerencia',
-    [PaymentMethod.MIXED]: 'Pago combinado',
-    [PaymentMethod.FINANCING]: 'Financiación',
-    [PaymentMethod.DIGITAL_WALLET]: 'Billetera digital',
-    [PaymentMethod.TRADE_IN]: 'Permuta',
-    [PaymentMethod.INSTALLMENT_PAYMENT]: 'Pago a plazos',
-  };
+
+  // ── Lifecycle ──────────────────────────────────────────────────────
 
   ngOnInit(): void {
-    this.loadLookups();
-    const routeSub = combineLatest([
-      this.route.paramMap,
-      this.route.queryParamMap,
-    ]).subscribe(([params, query]) => {
-      const pageParam = params.get('page');
-      const requiredPage = this.parsePage(pageParam);
-      if (Number.isNaN(requiredPage) || requiredPage < 0) {
-        this.navigateToPage(0, this.paramMapToObject(query) ?? undefined);
-        return;
-      }
+    this.lookupService.loadAll(this.destroyRef, (err) =>
+      this.handleError(err, 'cargar la información auxiliar'),
+    );
 
-      const {
-        uiFilters,
-        requestFilters,
-        queryParams: pagerParams,
-      } = this.extractFiltersFromQuery(query);
-      this.filters = uiFilters;
-      this.pagerQueryParams = pagerParams;
-      this.activeSearchFilters = requestFilters;
-      this.loadContracts(requiredPage, requestFilters ?? undefined);
-    });
+    combineLatest([this.route.paramMap, this.route.queryParamMap])
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(([params, query]) => {
+        const pageParam = params.get('page');
+        const requiredPage = pageParam ? Number(pageParam) : 0;
+        if (Number.isNaN(requiredPage) || requiredPage < 0) {
+          this.navigateToPage(0, paramMapToObject(query) ?? undefined);
+          return;
+        }
 
-    this.subscriptions.push(routeSub);
+        const {
+          uiFilters,
+          requestFilters,
+          queryParams: pagerParams,
+        } = extractFiltersFromQuery(query);
+        this.filters = uiFilters;
+        this.pagerQueryParams = pagerParams;
+        this.activeSearchFilters = requestFilters;
+        this.loadContracts(requiredPage, requestFilters ?? undefined);
+      });
+
     this.refreshSummary();
   }
+
+  // ── Getters ────────────────────────────────────────────────────────
 
   get pager(): PaginatedResponse<PurchaseSale> | undefined {
     return this.listState.pager;
@@ -248,10 +158,6 @@ export class PurchaseSaleListComponent implements OnInit, OnDestroy {
     return this.listState.items;
   }
 
-  set contracts(value: PurchaseSale[]) {
-    this.listState.items = value;
-  }
-
   get totalContracts(): number {
     return this.summaryState().total;
   }
@@ -264,45 +170,53 @@ export class PurchaseSaleListComponent implements OnInit, OnDestroy {
     return this.summaryState().sales;
   }
 
-  ngOnDestroy(): void {
-    for (const sub of this.subscriptions) {
-      sub.unsubscribe();
+  // ── Labels & badges (delegated) ───────────────────────────────────
+
+  readonly getStatusLabel = getStatusLabel;
+  readonly getContractTypeLabel = getContractTypeLabel;
+  readonly getPaymentMethodLabel = getPaymentMethodLabel;
+  readonly getStatusBadgeClass = getStatusBadgeClass;
+  readonly getVehicleBadgeClass = getVehicleBadgeClass;
+
+  // ── Entity labels (summary + lookup fallback) ─────────────────────
+
+  getClientLabel(contract: PurchaseSale): string {
+    const summary = contract.clientSummary;
+    if (summary) {
+      const pieces = [summary.name ?? `Cliente ##${summary.id}`];
+      if (summary.identifier) {
+        pieces.push(summary.identifier);
+      }
+      return pieces.join(' - ');
     }
+    const fallback = this.lookupService.clientMap().get(contract.clientId);
+    return fallback ? fallback.label : `Cliente #${contract.clientId}`;
   }
 
-  navigateToCreate(): void {
-    void this.router.navigate(['/purchase-sales/register']);
-  }
-
-  getVehicleBadgeClass(contract: PurchaseSale): string {
-    return contract.contractType === ContractType.PURCHASE
-      ? 'bg-primary-subtle text-primary-emphasis'
-      : 'bg-success-subtle text-success-emphasis';
-  }
-
-  getStatusBadgeClass(status: ContractStatus): string {
-    switch (status) {
-      case ContractStatus.ACTIVE:
-        return 'bg-primary-subtle text-primary-emphasis';
-      case ContractStatus.COMPLETED:
-        return 'bg-success-subtle text-success-emphasis';
-      case ContractStatus.CANCELED:
-        return 'bg-danger-subtle text-danger-emphasis';
-      default:
-        return 'bg-warning-subtle text-warning-emphasis';
+  getUserLabel(contract: PurchaseSale): string {
+    const summary = contract.userSummary;
+    if (summary) {
+      return [summary.fullName ?? `Usuario #${summary.id}`]
+        .filter(Boolean)
+        .join(' ');
     }
+    const fallback = this.lookupService.userMap().get(contract.userId);
+    return fallback ? fallback.label : `Usuario #${contract.userId}`;
   }
 
-  getStatusLabel(status: ContractStatus): string {
-    return this.statusLabels[status] ?? status;
-  }
-
-  getContractTypeLabel(type: ContractType): string {
-    return this.typeLabels[type] ?? type;
-  }
-
-  getPaymentMethodLabel(method: PaymentMethod): string {
-    return this.paymentMethodLabels[method] ?? method;
+  getVehicleLabel(contract: PurchaseSale): string {
+    const summary = contract.vehicleSummary;
+    if (summary) {
+      const brand = summary.brand ?? 'Vehículo';
+      const model = summary.model ?? 'N/D';
+      const plate = summary.plate ?? 'N/D';
+      return `${brand} ${model} (${plate})`;
+    }
+    if (!contract.vehicleId) {
+      return 'Vehículo no disponible';
+    }
+    const fallback = this.lookupService.vehicleMap().get(contract.vehicleId);
+    return fallback ? fallback.label : 'Vehículo';
   }
 
   getPurchaseDate(contract: PurchaseSale): string | null {
@@ -321,51 +235,10 @@ export class PurchaseSaleListComponent implements OnInit, OnDestroy {
     return contract.createdAt ?? vehicle?.updatedAt ?? null;
   }
 
-  getClientLabel(contract: PurchaseSale): string {
-    const summary = contract.clientSummary;
-    if (summary) {
-      const pieces = [summary.name ?? `Cliente ##${summary.id}`];
-      if (summary.identifier) {
-        pieces.push(summary.identifier);
-      }
-      return pieces.join(' - ');
-    }
+  // ── Actions ────────────────────────────────────────────────────────
 
-    const fallback = this.clientMap().get(contract.clientId);
-    return fallback ? fallback.label : `Cliente #${contract.clientId}`;
-  }
-
-  getUserLabel(contract: PurchaseSale): string {
-    const summary = contract.userSummary;
-    if (summary) {
-      return [summary.fullName ?? `Usuario #${summary.id}`]
-        .filter(Boolean)
-        .join(' ');
-    }
-
-    const fallback = this.userMap().get(contract.userId);
-    return fallback ? fallback.label : `Usuario #${contract.userId}`;
-  }
-
-  getVehicleLabel(contract: PurchaseSale): string {
-    const summary = contract.vehicleSummary;
-    if (summary) {
-      const brand = summary.brand ?? 'Vehículo';
-      const model = summary.model ?? 'N/D';
-      const plate = summary.plate ?? 'N/D';
-      return `${brand} ${model} (${plate})`;
-    }
-
-    if (!contract.vehicleId) {
-      return 'Vehículo no disponible';
-    }
-
-    const fallback = this.vehicleMap().get(contract.vehicleId);
-    return fallback ? fallback.label : 'Vehículo';
-  }
-
-  resetFilters(): void {
-    this.clearFilters();
+  navigateToCreate(): void {
+    void this.router.navigate(['/purchase-sales/register']);
   }
 
   resetReportDates(): void {
@@ -373,68 +246,46 @@ export class PurchaseSaleListComponent implements OnInit, OnDestroy {
     this.reportEndDate = null;
   }
 
+  downloadReport(format: ExportFormat): void {
+    this.reportService.download(
+      format,
+      this.destroyRef,
+      this.reportStartDate,
+      this.reportEndDate,
+    );
+  }
+
+  // ── Filter actions ─────────────────────────────────────────────────
+
   applyFilters(): void {
     this.quickSuggestions = [];
-    this.hintQuickSearchFilters();
-    const queryParams = this.buildQueryParamsFromFilters();
-    void this.router.navigate(['/purchase-sales/page', 0], {
-      queryParams,
-    });
+    hintQuickSearchFilters(this.filters, this.buildSearchContext());
+    const queryParams = buildQueryParamsFromFilters(this.filters);
+    void this.router.navigate(['/purchase-sales/page', 0], { queryParams });
   }
 
   clearFilters(): void {
-    this.filters = this.getDefaultUiFilters();
+    this.filters = getDefaultUiFilters();
     this.quickSuggestions = [];
     void this.router.navigate(['/purchase-sales/page', 0]);
   }
 
+  resetFilters(): void {
+    this.clearFilters();
+  }
+
   onPriceFilterChange(field: PriceFilterKey, rawValue: string): void {
-    const { displayValue } = normalizeMoneyInput(rawValue, this.priceDecimals);
-    this.filters[field] = displayValue;
+    this.filters[field] = normalizePriceInput(rawValue);
   }
 
-  downloadReport(format: ExportFormat): void {
-    if (this.reportStartDate && this.reportEndDate) {
-      if (this.reportStartDate > this.reportEndDate) {
-        void Swal.fire({
-          icon: 'warning',
-          title: 'Rango inválido',
-          text: 'La fecha inicial no puede ser posterior a la fecha final.',
-        });
-        return;
-      }
-    }
-
-    this.exportLoading[format] = true;
-    const start = this.reportStartDate ?? undefined;
-    const end = this.reportEndDate ?? undefined;
-    const request$ = this.getReportObservable(format, start, end);
-
-    request$
-      .pipe(finalize(() => (this.exportLoading[format] = false)))
-      .subscribe({
-        next: (blob) => {
-          const extension = this.getExtension(format);
-          const fileName = this.buildReportFileName(extension);
-          const url = URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = fileName;
-          document.body.appendChild(link);
-          link.click();
-          link.remove();
-          URL.revokeObjectURL(url);
-          this.showSuccessMessage(
-            `Reporte ${extension.toUpperCase()} generado correctamente.`,
-          );
-        },
-        error: (error) => this.handleError(error, 'generar el reporte'),
-      });
-  }
+  // ── Quick search ───────────────────────────────────────────────────
 
   onQuickSearchChange(term: string): void {
     this.filters.term = term;
-    this.updateQuickSuggestions(term);
+    this.quickSuggestions = buildQuickSuggestions(
+      term,
+      this.buildSearchContext(),
+    );
   }
 
   selectQuickSuggestion(suggestion: QuickSuggestion): void {
@@ -454,10 +305,11 @@ export class PurchaseSaleListComponent implements OnInit, OnDestroy {
       this.filters.contractType = suggestion.value as ContractTypeFilter;
       this.filters.term = '';
     }
-
     this.quickSuggestions = [];
     this.applyFilters();
   }
+
+  // ── Delete & status ────────────────────────────────────────────────
 
   deleteContract(contract: PurchaseSale): void {
     if (!contract.id) {
@@ -529,10 +381,7 @@ export class PurchaseSaleListComponent implements OnInit, OnDestroy {
         return;
       }
 
-      const payload: PurchaseSale = {
-        ...contract,
-        contractStatus: status,
-      };
+      const payload: PurchaseSale = { ...contract, contractStatus: status };
 
       this.purchaseSaleService
         .update(contract.id!, payload)
@@ -549,51 +398,25 @@ export class PurchaseSaleListComponent implements OnInit, OnDestroy {
     });
   }
 
+  // ── Private helpers ────────────────────────────────────────────────
+
   private getVehicleOption(contract: PurchaseSale): VehicleOption | undefined {
-    if (!contract.vehicleId) {
-      return undefined;
-    }
-    return this.vehicleMap().get(contract.vehicleId);
+    return contract.vehicleId
+      ? this.lookupService.vehicleMap().get(contract.vehicleId)
+      : undefined;
   }
 
-  private getVehicleLabelById(vehicleId: number): string | null {
-    const option = this.vehicleMap().get(vehicleId);
-    return option ? option.label : null;
-  }
-
-  private getReportObservable(
-    format: ExportFormat,
-    start?: string,
-    end?: string,
-  ) {
-    switch (format) {
-      case 'pdf':
-        return this.purchaseSaleService.downloadPdf(start, end);
-      case 'excel':
-        return this.purchaseSaleService.downloadExcel(start, end);
-      case 'csv':
-      default:
-        return this.purchaseSaleService.downloadCsv(start, end);
-    }
-  }
-
-  private getExtension(format: ExportFormat): ReportExtension {
-    if (format === 'pdf') {
-      return 'pdf';
-    }
-    if (format === 'excel') {
-      return 'xlsx';
-    }
-    return 'csv';
-  }
-
-  private buildReportFileName(extension: ReportExtension): string {
-    const today = new Date().toISOString().split('T')[0];
-    const rangeLabel =
-      this.reportStartDate || this.reportEndDate
-        ? `${this.reportStartDate ?? 'inicio'}-a-${this.reportEndDate ?? 'fin'}`
-        : 'completo';
-    return `reporte-compras-ventas-${rangeLabel}-${today}.${extension}`;
+  private buildSearchContext() {
+    return {
+      clients: this.lookupService.clients(),
+      users: this.lookupService.users(),
+      vehicles: this.lookupService.vehicles(),
+      linkedClientIds: this.linkedClientIds,
+      linkedUserIds: this.linkedUserIds,
+      linkedVehicleIds: this.linkedVehicleIds,
+      contractStatuses: this.contractStatuses,
+      contractTypes: this.contractTypes,
+    };
   }
 
   private reloadCurrentPage(): void {
@@ -629,81 +452,30 @@ export class PurchaseSaleListComponent implements OnInit, OnDestroy {
     });
   }
 
-  private loadLookups(): void {
-    const clients$ = forkJoin([
-      this.personService.getAll(),
-      this.companyService.getAll(),
-    ]).pipe(
-      map(([persons, companies]) => [
-        ...mapPersonsToClients(persons),
-        ...mapCompaniesToClients(companies),
-      ]),
-    );
-
-    const users$ = this.userService.getAll().pipe(map(mapUsersToOptions));
-
-    const vehicles$ = forkJoin([
-      this.carService.getAll(),
-      this.motorcycleService.getAll(),
-    ]).pipe(
-      map(([cars, motorcycles]) => [
-        ...mapCarsToVehicles(cars),
-        ...mapMotorcyclesToVehicles(motorcycles),
-      ]),
-    );
-
-    const lookupSub = forkJoin([clients$, users$, vehicles$]).subscribe({
-      next: ([clientOptions, userOptions, vehicleOptions]) => {
-        const sortedClients = clientOptions
-          .slice()
-          .sort((a, b) => a.label.localeCompare(b.label));
-        const sortedUsers = userOptions
-          .slice()
-          .sort((a, b) => a.label.localeCompare(b.label));
-        const sortedVehicles = vehicleOptions
-          .slice()
-          .sort((a, b) => a.label.localeCompare(b.label));
-
-        this.clients.set(sortedClients);
-        this.users.set(sortedUsers);
-        this.vehicles.set(sortedVehicles);
-      },
-      error: (error) => {
-        this.handleError(error, 'cargar la información auxiliar');
-      },
-    });
-
-    this.subscriptions.push(lookupSub);
-  }
-
   private refreshSummary(): void {
-    const summarySub = this.purchaseSaleService.getAll().subscribe({
-      next: (contracts) => {
-        const purchases = contracts.filter(
-          (contract) => contract.contractType === ContractType.PURCHASE,
-        ).length;
-        const sales = contracts.filter(
-          (contract) => contract.contractType === ContractType.SALE,
-        ).length;
-
-        this.summaryState.set({
-          total: contracts.length,
-          purchases,
-          sales,
-        });
-        this.updateLinkedEntities(contracts);
-      },
-      error: () => {
-        this.summaryState.set({
-          total: 0,
-          purchases: 0,
-          sales: 0,
-        });
-        this.updateLinkedEntities([]);
-      },
-    });
-
-    this.subscriptions.push(summarySub);
+    this.purchaseSaleService
+      .getAll()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (contracts) => {
+          const purchases = contracts.filter(
+            (c) => c.contractType === ContractType.PURCHASE,
+          ).length;
+          const sales = contracts.filter(
+            (c) => c.contractType === ContractType.SALE,
+          ).length;
+          this.summaryState.set({
+            total: contracts.length,
+            purchases,
+            sales,
+          });
+          this.updateLinkedEntities(contracts);
+        },
+        error: () => {
+          this.summaryState.set({ total: 0, purchases: 0, sales: 0 });
+          this.updateLinkedEntities([]);
+        },
+      });
   }
 
   private updateLinkedEntities(contracts: PurchaseSale[]): void {
@@ -711,11 +483,11 @@ export class PurchaseSaleListComponent implements OnInit, OnDestroy {
     this.linkedUserIds.clear();
     this.linkedVehicleIds.clear();
 
-    contracts.forEach((contract) => {
-      this.trackLinkedId(this.linkedClientIds, contract.clientId);
-      this.trackLinkedId(this.linkedUserIds, contract.userId);
-      this.trackLinkedId(this.linkedVehicleIds, contract.vehicleId);
-    });
+    for (const c of contracts) {
+      this.trackLinkedId(this.linkedClientIds, c.clientId);
+      this.trackLinkedId(this.linkedUserIds, c.userId);
+      this.trackLinkedId(this.linkedVehicleIds, c.vehicleId);
+    }
   }
 
   private trackLinkedId(
@@ -728,345 +500,7 @@ export class PurchaseSaleListComponent implements OnInit, OnDestroy {
   }
 
   private navigateToPage(page: number, queryParams?: Params): void {
-    void this.router.navigate(['/purchase-sales/page', page], {
-      queryParams,
-    });
-  }
-
-  private parsePage(value: string | null): number {
-    return value ? Number(value) : 0;
-  }
-
-  private getDefaultUiFilters(): PurchaseSaleUiFilters {
-    return {
-      contractType: 'ALL',
-      contractStatus: 'ALL',
-      clientId: '',
-      userId: '',
-      vehicleId: '',
-      paymentMethod: '',
-      term: '',
-      minPurchasePrice: '',
-      maxPurchasePrice: '',
-      minSalePrice: '',
-      maxSalePrice: '',
-    };
-  }
-
-  private hintQuickSearchFilters(): void {
-    const rawTerm = (this.filters.term ?? '').trim();
-    if (!rawTerm) {
-      return;
-    }
-
-    const normalized = rawTerm.toLowerCase();
-
-    const vehicleMatch = this.vehicles().find(
-      (vehicle) =>
-        this.linkedVehicleIds.has(vehicle.id) &&
-        this.includesTerm(vehicle.label, normalized),
-    );
-    if (vehicleMatch && !this.filters.vehicleId) {
-      this.filters.vehicleId = vehicleMatch.id.toString();
-    }
-
-    const clientMatch = this.clients().find(
-      (client) =>
-        this.linkedClientIds.has(client.id) &&
-        this.includesTerm(client.label, normalized),
-    );
-    if (clientMatch && !this.filters.clientId) {
-      this.filters.clientId = clientMatch.id.toString();
-    }
-
-    const userMatch = this.users().find(
-      (user) =>
-        this.linkedUserIds.has(user.id) &&
-        this.includesTerm(user.label, normalized),
-    );
-    if (userMatch && !this.filters.userId) {
-      this.filters.userId = userMatch.id.toString();
-    }
-
-    this.filters.term = rawTerm;
-  }
-
-  private updateQuickSuggestions(term: string): void {
-    const normalized = term.trim().toLowerCase();
-    if (normalized.length < 2) {
-      this.quickSuggestions = [];
-      return;
-    }
-
-    const matches: QuickSuggestion[] = [];
-
-    this.clients()
-      .filter(
-        (client) =>
-          this.linkedClientIds.has(client.id) &&
-          this.includesTerm(client.label, normalized),
-      )
-      .slice(0, 3)
-      .forEach((client) =>
-        matches.push({
-          label: client.label,
-          context: 'Cliente con contratos',
-          type: 'client',
-          value: client.id.toString(),
-        }),
-      );
-
-    this.users()
-      .filter(
-        (user) =>
-          this.linkedUserIds.has(user.id) &&
-          this.includesTerm(user.label, normalized),
-      )
-      .slice(0, 3)
-      .forEach((user) =>
-        matches.push({
-          label: user.label,
-          context: 'Usuario con contratos',
-          type: 'user',
-          value: user.id.toString(),
-        }),
-      );
-
-    this.vehicles()
-      .filter(
-        (vehicle) =>
-          this.linkedVehicleIds.has(vehicle.id) &&
-          this.includesTerm(vehicle.label, normalized),
-      )
-      .slice(0, 3)
-      .forEach((vehicle) =>
-        matches.push({
-          label: vehicle.label,
-          context: 'Vehículo utilizado en contratos',
-          type: 'vehicle',
-          value: vehicle.id.toString(),
-        }),
-      );
-
-    this.contractStatuses
-      .filter((status) => this.matchesStatus(status, normalized))
-      .forEach((status) =>
-        matches.push({
-          label: this.getStatusLabel(status),
-          context: 'Estado de contrato',
-          type: 'status',
-          value: status,
-        }),
-      );
-
-    this.contractTypes
-      .filter((type) => this.matchesType(type, normalized))
-      .forEach((type) =>
-        matches.push({
-          label: this.getContractTypeLabel(type),
-          context: 'Tipo de contrato',
-          type: 'type',
-          value: type,
-        }),
-      );
-
-    this.quickSuggestions = matches.slice(0, 9);
-  }
-
-  private buildQueryParamsFromFilters(): Params | undefined {
-    const params: Params = {};
-
-    if (this.filters.contractType !== 'ALL') {
-      params['contractType'] = this.filters.contractType;
-    }
-
-    if (this.filters.contractStatus !== 'ALL') {
-      params['contractStatus'] = this.filters.contractStatus;
-    }
-
-    if (this.filters.paymentMethod) {
-      params['paymentMethod'] = this.filters.paymentMethod;
-    }
-
-    [
-      ['clientId', this.filters.clientId],
-      ['userId', this.filters.userId],
-      ['vehicleId', this.filters.vehicleId],
-      ['term', this.filters.term],
-    ].forEach(([key, value]) => {
-      if (value) {
-        params[key] = value;
-      }
-    });
-
-    const parsedPriceFilters: Partial<Record<PriceFilterKey, number | null>> = {
-      minPurchasePrice: this.parsePriceFilter(this.filters.minPurchasePrice),
-      maxPurchasePrice: this.parsePriceFilter(this.filters.maxPurchasePrice),
-      minSalePrice: this.parsePriceFilter(this.filters.minSalePrice),
-      maxSalePrice: this.parsePriceFilter(this.filters.maxSalePrice),
-    };
-
-    (
-      Object.entries(parsedPriceFilters) as [PriceFilterKey, number | null][]
-    ).forEach(([key, value]) => {
-      if (value !== null) {
-        params[key] = value;
-      }
-    });
-
-    return Object.keys(params).length ? params : undefined;
-  }
-
-  private includesTerm(value: string, normalizedTerm: string): boolean {
-    return value.toLowerCase().includes(normalizedTerm);
-  }
-
-  private matchesStatus(
-    status: ContractStatus,
-    normalizedTerm: string,
-  ): boolean {
-    const label = this.getStatusLabel(status).toLowerCase();
-    return (
-      label.includes(normalizedTerm) ||
-      status.toLowerCase().includes(normalizedTerm)
-    );
-  }
-
-  private matchesType(type: ContractType, normalizedTerm: string): boolean {
-    const label = this.getContractTypeLabel(type).toLowerCase();
-    return (
-      label.includes(normalizedTerm) ||
-      type.toLowerCase().includes(normalizedTerm)
-    );
-  }
-
-  private extractFiltersFromQuery(query: ParamMap): {
-    uiFilters: PurchaseSaleUiFilters;
-    requestFilters: PurchaseSaleSearchFilters | null;
-    queryParams: Params | null;
-  } {
-    const uiFilters = this.getDefaultUiFilters();
-    const requestFilters: PurchaseSaleSearchFilters = {};
-
-    const applyEnum = <T extends string>(
-      key: string,
-      isValid: (v: string | null) => v is T,
-    ) => {
-      const val = query.get(key);
-      if (isValid(val)) {
-        (uiFilters as any)[key] = val;
-        (requestFilters as any)[key] = val;
-      }
-    };
-
-    const applyNumber = (key: string, requestKey?: string) => {
-      const val = query.get(key);
-      if (!val) return;
-      (uiFilters as any)[key] = val;
-      const parsed = this.parseNumberParam(val);
-      if (parsed !== undefined) {
-        (requestFilters as any)[requestKey ?? key] = parsed;
-      }
-    };
-
-    const applyPrice = (key: string, requestKey?: string) => {
-      const val = query.get(key);
-      if (!val) return;
-      const { numericValue, displayValue } = normalizeMoneyInput(
-        val,
-        this.priceDecimals,
-      );
-      (uiFilters as any)[key] = displayValue;
-      if (numericValue !== null) {
-        (requestFilters as any)[requestKey ?? key] = numericValue;
-      }
-    };
-
-    const applyString = (key: string) => {
-      const val = query.get(key);
-      if (!val) return;
-      (uiFilters as any)[key] = val;
-      (requestFilters as any)[key] = val;
-    };
-
-    applyEnum('contractType', this.isValidContractType);
-    applyEnum('contractStatus', this.isValidContractStatus);
-    applyEnum('paymentMethod', this.isValidPaymentMethod);
-
-    applyNumber('clientId', 'clientId');
-    applyNumber('userId', 'userId');
-    applyNumber('vehicleId', 'vehicleId');
-
-    applyPrice('minPurchasePrice', 'minPurchasePrice');
-    applyPrice('maxPurchasePrice', 'maxPurchasePrice');
-    applyPrice('minSalePrice', 'minSalePrice');
-    applyPrice('maxSalePrice', 'maxSalePrice');
-
-    applyString('term');
-
-    const queryParams = this.paramMapToObject(query);
-    const hasFilters = !this.arePurchaseSaleFiltersEmpty(requestFilters);
-
-    return {
-      uiFilters,
-      requestFilters: hasFilters ? requestFilters : null,
-      queryParams,
-    };
-  }
-
-  private paramMapToObject(map: ParamMap): Params | null {
-    const params: Params = {};
-    map.keys.forEach((key) => {
-      const value = map.get(key);
-      if (value) {
-        params[key] = value;
-      }
-    });
-    return Object.keys(params).length ? params : null;
-  }
-
-  private parsePriceFilter(value: string): number | null {
-    const parsed = parseCopCurrency(value);
-    if (parsed === null) {
-      return null;
-    }
-    const factor = Math.pow(10, this.priceDecimals);
-    const normalized =
-      this.priceDecimals > 0
-        ? Math.round(parsed * factor) / factor
-        : Math.round(parsed);
-    const sanitized = Math.max(0, normalized);
-    return Number.isFinite(sanitized) ? sanitized : null;
-  }
-
-  private parseNumberParam(value: string | null): number | undefined {
-    if (!value) {
-      return undefined;
-    }
-    const parsed = Number(value);
-    return Number.isNaN(parsed) ? undefined : parsed;
-  }
-
-  private arePurchaseSaleFiltersEmpty(
-    filters: PurchaseSaleSearchFilters,
-  ): boolean {
-    return Object.values(filters).every(
-      (value) => value === undefined || value === null,
-    );
-  }
-
-  private isValidContractType(value: string | null): value is ContractType {
-    return !!value && this.contractTypes.includes(value as ContractType);
-  }
-
-  private isValidContractStatus(value: string | null): value is ContractStatus {
-    return !!value && this.contractStatuses.includes(value as ContractStatus);
-  }
-
-  private isValidPaymentMethod(value: string | null): value is PaymentMethod {
-    return (
-      !!value && Object.values(PaymentMethod).includes(value as PaymentMethod)
-    );
+    void this.router.navigate(['/purchase-sales/page', page], { queryParams });
   }
 
   private showSuccessMessage(message: string): void {
@@ -1092,11 +526,7 @@ export class PurchaseSaleListComponent implements OnInit, OnDestroy {
     );
 
     if (displayAlert) {
-      void Swal.fire({
-        icon: 'error',
-        title: 'Oops...',
-        text: message,
-      });
+      void Swal.fire({ icon: 'error', title: 'Oops...', text: message });
     }
   }
 
@@ -1104,11 +534,10 @@ export class PurchaseSaleListComponent implements OnInit, OnDestroy {
     if (!message) {
       return '';
     }
-
     return message.replaceAll(/veh[ií]culo con id (\d+)/gi, (_, id: string) => {
       const numericId = Number(id);
-      const label = this.getVehicleLabelById(numericId);
-      return label ?? `vehículo con id ${id}`;
+      const option = this.lookupService.vehicleMap().get(numericId);
+      return option ? option.label : `vehículo con id ${id}`;
     });
   }
 }

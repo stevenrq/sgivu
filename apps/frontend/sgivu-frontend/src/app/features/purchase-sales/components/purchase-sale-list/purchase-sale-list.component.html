@@ -97,7 +97,7 @@
               [(ngModel)]="filters.clientId"
             >
               <option value="">Todos</option>
-              @for (client of clients(); track client.id) {
+              @for (client of lookupService.clients(); track client.id) {
                 <option [ngValue]="client.id.toString()">
                   {{ client.label }}
                 </option>
@@ -114,7 +114,7 @@
               [(ngModel)]="filters.userId"
             >
               <option value="">Todos</option>
-              @for (user of users(); track user.id) {
+              @for (user of lookupService.users(); track user.id) {
                 <option [ngValue]="user.id.toString()">{{ user.label }}</option>
               }
             </select>
@@ -129,7 +129,7 @@
               [(ngModel)]="filters.vehicleId"
             >
               <option value="">Todos</option>
-              @for (vehicle of vehicles(); track vehicle.id) {
+              @for (vehicle of lookupService.vehicles(); track vehicle.id) {
                 <option [ngValue]="vehicle.id.toString()">
                   {{ vehicle.label }}
                 </option>
@@ -293,7 +293,9 @@
           type="button"
           (click)="resetReportDates()"
           [disabled]="
-            exportLoading.pdf || exportLoading.excel || exportLoading.csv
+            reportService.exportLoading().pdf ||
+            reportService.exportLoading().excel ||
+            reportService.exportLoading().csv
           "
         >
           <i class="bi bi-eraser"></i>
@@ -302,9 +304,9 @@
           class="btn btn-outline-primary btn-sm"
           type="button"
           (click)="downloadReport('pdf')"
-          [disabled]="exportLoading.pdf"
+          [disabled]="reportService.exportLoading().pdf"
         >
-          @if (exportLoading.pdf) {
+          @if (reportService.exportLoading().pdf) {
             <span class="spinner-border spinner-border-sm"></span>
           } @else {
             <i class="bi bi-file-earmark-pdf me-1"></i>PDF
@@ -314,9 +316,9 @@
           class="btn btn-outline-success btn-sm"
           type="button"
           (click)="downloadReport('excel')"
-          [disabled]="exportLoading.excel"
+          [disabled]="reportService.exportLoading().excel"
         >
-          @if (exportLoading.excel) {
+          @if (reportService.exportLoading().excel) {
             <span class="spinner-border spinner-border-sm"></span>
           } @else {
             <i class="bi bi-file-earmark-excel me-1"></i>Excel
@@ -326,9 +328,9 @@
           class="btn btn-outline-dark btn-sm"
           type="button"
           (click)="downloadReport('csv')"
-          [disabled]="exportLoading.csv"
+          [disabled]="reportService.exportLoading().csv"
         >
-          @if (exportLoading.csv) {
+          @if (reportService.exportLoading().csv) {
             <span class="spinner-border spinner-border-sm"></span>
           } @else {
             <i class="bi bi-filetype-csv me-1"></i>CSV
