@@ -26,7 +26,9 @@ describe('ClientUiHelperService', () => {
     service = TestBed.inject(ClientUiHelperService);
 
     // Silenciar advertencias de Swal en la salida de prueba
-    spyOn(console, 'error').and.callFake(() => { /* noop */ });
+    spyOn(console, 'error').and.callFake(() => {
+      /* noop */
+    });
   });
 
   it('should be created', () => {
