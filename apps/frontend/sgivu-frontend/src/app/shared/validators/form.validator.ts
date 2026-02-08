@@ -1,4 +1,9 @@
-import { AbstractControl, ValidationErrors, ValidatorFn } from '@angular/forms';
+import {
+  AbstractControl,
+  ValidationErrors,
+  ValidatorFn,
+  Validators,
+} from '@angular/forms';
 
 export function lengthValidator(
   minLength: number,
@@ -40,4 +45,25 @@ export function passwordStrengthValidator(): ValidatorFn {
     const isValid: boolean = strongPassword.test(control.value);
     return isValid ? null : { weakPassword: { value: control.value } };
   };
+}
+
+/**
+ * Preset de validadores para campos de texto: required + longitud + sin espacios en blanco.
+ */
+export function textFieldValidators(min: number, max: number): ValidatorFn[] {
+  return [
+    Validators.required,
+    lengthValidator(min, max),
+    noWhitespaceValidator(),
+  ];
+}
+
+/**
+ * Preset de validadores para campos numéricos como texto: required + longitud.
+ */
+export function numericFieldValidators(
+  min: number,
+  max: number,
+): ValidatorFn[] {
+  return [Validators.required, lengthValidator(min, max)];
 }

@@ -1,11 +1,5 @@
-import {
-  Component,
-  OnDestroy,
-  OnInit,
-  computed,
-  signal,
-  inject,
-} from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   FormBuilder,
   FormControl,
@@ -20,21 +14,28 @@ import { CompanyService } from '../../services/company.service';
 import { FormShellComponent } from '../../../../shared/components/form-shell/form-shell.component';
 import {
   lengthValidator,
-  noWhitespaceValidator,
+  textFieldValidators,
 } from '../../../../shared/validators/form.validator';
-import { Address } from '../../../../shared/models/address.model';
 import { Person } from '../../models/person.model.';
 import { Company } from '../../models/company.model';
-import { finalize, of, switchMap, Observable, Subscription } from 'rxjs';
-import Swal from 'sweetalert2';
+import { finalize, of, switchMap } from 'rxjs';
+import {
+  showErrorAlert,
+  showSuccessAlert,
+} from '../../../../shared/utils/swal-alert.utils';
+import {
+  AddressFormControls,
+  buildAddressFormGroup,
+  normalizeAddress,
+} from '../../../../shared/utils/address-form.utils';
+import {
+  SubmitConfig,
+  SubmitCopy,
+  ViewCopy,
+  composeSubmitConfig,
+} from '../../../../shared/models/form-config.model';
 
 type ClientType = 'PERSON' | 'COMPANY';
-
-interface AddressFormControls {
-  street: FormControl<string | null>;
-  number: FormControl<string | null>;
-  city: FormControl<string | null>;
-}
 
 interface ClientFormControls {
   type: FormControl<ClientType>;
@@ -52,50 +53,28 @@ interface ClientFormControls {
 type PersonPayload = Omit<Person, 'id'> & Partial<Pick<Person, 'id'>>;
 type CompanyPayload = Omit<Company, 'id'> & Partial<Pick<Company, 'id'>>;
 
-interface SubmitConfig {
-  request$: Observable<unknown>;
-  successMessage: string;
-  errorMessage: string;
-  redirectCommand: (string | number)[];
-}
-
-interface SubmitCopy {
-  createSuccess: string;
-  updateSuccess: string;
-  createError: string;
-  updateError: string;
-  redirectCommand: (string | number)[];
-}
-
-interface ViewCopy {
-  createTitle: string;
-  editTitle: string;
-  createSubtitle: string;
-  editSubtitle: string;
-}
-
 @Component({
   selector: 'app-client-form',
   imports: [ReactiveFormsModule, NgClass, FormShellComponent],
   templateUrl: './client-form.component.html',
   styleUrl: './client-form.component.css',
 })
-export class ClientFormComponent implements OnInit, OnDestroy {
+export class ClientFormComponent implements OnInit {
   private readonly formBuilder = inject(FormBuilder);
   private readonly personService = inject(PersonService);
   private readonly companyService = inject(CompanyService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly destroyRef = inject(DestroyRef);
 
   formGroup: FormGroup<ClientFormControls> = this.buildForm();
-  isSubmitting = false;
+  readonly submitting = signal(false);
   isEditMode = false;
   private currentClientId: number | null = null;
   private currentAddressId: number | null = null;
   private initialized = false;
 
-  private readonly loadingSignal = signal<boolean>(false);
-  readonly isLoading = computed(() => this.loadingSignal());
+  readonly loading = signal(false);
 
   private readonly submitMessages: Record<ClientType, SubmitCopy> = {
     PERSON: {
@@ -132,28 +111,51 @@ export class ClientFormComponent implements OnInit, OnDestroy {
     },
   };
 
-  private readonly subscriptions: Subscription[] = [];
+  get clientType(): ClientType {
+    return this.formGroup.controls.type.getRawValue();
+  }
+
+  get headerIcon(): string {
+    if (this.isEditMode) return 'bi-pencil-square';
+    return this.clientType === 'PERSON'
+      ? 'bi-person-plus-fill'
+      : 'bi-building-add';
+  }
+
+  get titleText(): string {
+    const copy = this.viewCopyMap[this.clientType];
+    return this.isEditMode ? copy.editTitle : copy.createTitle;
+  }
+
+  get subtitleText(): string {
+    const copy = this.viewCopyMap[this.clientType];
+    return this.isEditMode ? copy.editSubtitle : copy.createSubtitle;
+  }
 
   ngOnInit(): void {
     const initialType = this.extractClientTypeFromRoute();
-    this.typeControl.setValue(initialType, { emitEvent: false });
+    this.formGroup.controls.type.setValue(initialType, { emitEvent: false });
     this.applyTypeSpecificSetup(initialType);
 
-    const typeSub = this.typeControl.valueChanges.subscribe((type) => {
-      if (type && !this.isEditMode) {
-        this.applyTypeSpecificSetup(type);
-      }
-    });
+    this.formGroup.controls.type.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((type) => {
+        if (type && !this.isEditMode) {
+          this.applyTypeSpecificSetup(type);
+        }
+      });
 
-    const querySub = this.route.queryParamMap.subscribe((params) => {
-      if (this.isEditMode) return;
-      const queryType = this.normalizeType(params.get('type'));
-      if (queryType !== this.typeControl.value) {
-        this.typeControl.setValue(queryType);
-      }
-    });
+    this.route.queryParamMap
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((params) => {
+        if (this.isEditMode) return;
+        const queryType = this.normalizeType(params.get('type'));
+        if (queryType !== this.formGroup.controls.type.value) {
+          this.formGroup.controls.type.setValue(queryType);
+        }
+      });
 
-    const paramsSub = this.route.paramMap
+    this.route.paramMap
       .pipe(
         switchMap((params) => {
           const idParam = params.get('id');
@@ -164,109 +166,24 @@ export class ClientFormComponent implements OnInit, OnDestroy {
 
           const id = Number(idParam);
           if (Number.isNaN(id)) {
-            this.showErrorAlert('El identificador proporcionado no es válido.');
+            void showErrorAlert('El identificador proporcionado no es válido.');
             void this.router.navigate(['/clients']);
             return of(null);
           }
 
           this.isEditMode = true;
           this.currentClientId = id;
-          this.typeControl.disable({ emitEvent: false });
+          this.formGroup.controls.type.disable({ emitEvent: false });
           const hintedType = this.extractClientTypeFromRoute();
           return of({ id, hintedType });
         }),
+        takeUntilDestroyed(this.destroyRef),
       )
       .subscribe((data) => {
-        if (!data || this.initialized) {
-          return;
-        }
-
+        if (!data || this.initialized) return;
         this.initialized = true;
         this.loadClientForEdit(data.id, data.hintedType);
       });
-
-    this.subscriptions.push(typeSub, querySub, paramsSub);
-  }
-
-  ngOnDestroy(): void {
-    for (const subscription of this.subscriptions) {
-      subscription.unsubscribe();
-    }
-  }
-
-  get clientType(): ClientType {
-    return this.typeControl.getRawValue();
-  }
-
-  get typeControl(): FormControl<ClientType> {
-    return this.formGroup.get('type') as FormControl<ClientType>;
-  }
-
-  get nationalId() {
-    return this.formGroup.get('nationalId');
-  }
-
-  get firstName() {
-    return this.formGroup.get('firstName');
-  }
-
-  get lastName() {
-    return this.formGroup.get('lastName');
-  }
-
-  get taxId() {
-    return this.formGroup.get('taxId');
-  }
-
-  get companyName() {
-    return this.formGroup.get('companyName');
-  }
-
-  get phoneNumber() {
-    return this.formGroup.get('phoneNumber');
-  }
-
-  get email() {
-    return this.formGroup.get('email');
-  }
-
-  get addressGroup(): FormGroup<AddressFormControls> | null {
-    return this.formGroup.get('address') as FormGroup<AddressFormControls>;
-  }
-
-  get street() {
-    return this.addressGroup?.get('street');
-  }
-
-  get number() {
-    return this.addressGroup?.get('number');
-  }
-
-  get city() {
-    return this.addressGroup?.get('city');
-  }
-
-  get enabled() {
-    return this.formGroup.get('enabled');
-  }
-
-  get headerIcon(): string {
-    if (this.isEditMode) {
-      return 'bi-pencil-square';
-    }
-    return this.clientType === 'PERSON'
-      ? 'bi-person-plus-fill'
-      : 'bi-building-add';
-  }
-
-  get titleText(): string {
-    const copy = this.getViewCopy(this.clientType);
-    return this.isEditMode ? copy.editTitle : copy.createTitle;
-  }
-
-  get subtitleText(): string {
-    const copy = this.getViewCopy(this.clientType);
-    return this.isEditMode ? copy.editSubtitle : copy.createSubtitle;
   }
 
   protected onSubmit(): void {
@@ -275,18 +192,17 @@ export class ClientFormComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.isSubmitting = true;
-
+    this.submitting.set(true);
     const { request$, successMessage, errorMessage, redirectCommand } =
       this.buildSubmitConfig();
 
-    request$.pipe(finalize(() => (this.isSubmitting = false))).subscribe({
+    request$.pipe(finalize(() => this.submitting.set(false))).subscribe({
       next: () => {
-        this.showSuccessAlert(successMessage);
+        void showSuccessAlert(successMessage);
         void this.router.navigate(redirectCommand);
       },
       error: () => {
-        this.showErrorAlert(errorMessage);
+        void showErrorAlert(errorMessage);
       },
     });
   }
@@ -295,6 +211,8 @@ export class ClientFormComponent implements OnInit, OnDestroy {
     void this.router.navigate(this.getRedirectCommand(this.clientType));
   }
 
+  // ── Configuración de submit ────────────────────────────────────
+
   private buildSubmitConfig(): SubmitConfig {
     if (this.clientType === 'PERSON') {
       const payload = this.buildPersonPayload();
@@ -302,8 +220,11 @@ export class ClientFormComponent implements OnInit, OnDestroy {
         this.isEditMode && this.currentClientId
           ? this.personService.update(this.currentClientId, payload as Person)
           : this.personService.create(payload as Person);
-
-      return this.composeSubmitConfig('PERSON', request$);
+      return composeSubmitConfig(
+        this.submitMessages['PERSON'],
+        request$,
+        this.isEditMode,
+      );
     }
 
     const payload = this.buildCompanyPayload();
@@ -311,34 +232,18 @@ export class ClientFormComponent implements OnInit, OnDestroy {
       this.isEditMode && this.currentClientId
         ? this.companyService.update(this.currentClientId, payload as Company)
         : this.companyService.create(payload as Company);
-
-    return this.composeSubmitConfig('COMPANY', request$);
-  }
-
-  private composeSubmitConfig(
-    type: ClientType,
-    request$: Observable<unknown>,
-  ): SubmitConfig {
-    const copy = this.getSubmitCopy(type);
-    return {
+    return composeSubmitConfig(
+      this.submitMessages['COMPANY'],
       request$,
-      successMessage: this.isEditMode ? copy.updateSuccess : copy.createSuccess,
-      errorMessage: this.isEditMode ? copy.updateError : copy.createError,
-      redirectCommand: this.getRedirectCommand(type),
-    };
-  }
-
-  private getSubmitCopy(type: ClientType): SubmitCopy {
-    return this.submitMessages[type];
+      this.isEditMode,
+    );
   }
 
   private getRedirectCommand(type: ClientType): (string | number)[] {
-    return [...this.getSubmitCopy(type).redirectCommand];
+    return [...this.submitMessages[type].redirectCommand];
   }
 
-  private getViewCopy(type: ClientType): ViewCopy {
-    return this.viewCopyMap[type];
-  }
+  // ── Construcción del formulario ────────────────────────────────
 
   private buildForm(): FormGroup<ClientFormControls> {
     return this.formBuilder.group({
@@ -358,26 +263,12 @@ export class ClientFormComponent implements OnInit, OnDestroy {
         Validators.email,
         lengthValidator(6, 80),
       ]),
-      address: this.formBuilder.group<AddressFormControls>({
-        street: new FormControl<string | null>('', [
-          Validators.required,
-          lengthValidator(5, 80),
-          noWhitespaceValidator(),
-        ]),
-        number: new FormControl<string | null>('', [
-          Validators.required,
-          lengthValidator(1, 10),
-          noWhitespaceValidator(),
-        ]),
-        city: new FormControl<string | null>('', [
-          Validators.required,
-          lengthValidator(3, 60),
-          noWhitespaceValidator(),
-        ]),
-      }),
+      address: buildAddressFormGroup(this.formBuilder),
       enabled: new FormControl<boolean>(true, { nonNullable: true }),
     });
   }
+
+  // ── Configuración por tipo de cliente ──────────────────────────
 
   private applyTypeSpecificSetup(type: ClientType): void {
     if (type === 'PERSON') {
@@ -390,74 +281,68 @@ export class ClientFormComponent implements OnInit, OnDestroy {
   }
 
   private enablePersonControls(): void {
-    this.nationalId?.setValidators([
+    const { nationalId, firstName, lastName } = this.formGroup.controls;
+    nationalId.setValidators([
       Validators.required,
       Validators.pattern(/^\d+$/),
       lengthValidator(7, 10),
     ]);
-    this.firstName?.setValidators([
-      Validators.required,
-      lengthValidator(3, 30),
-      noWhitespaceValidator(),
-    ]);
-    this.lastName?.setValidators([
-      Validators.required,
-      lengthValidator(3, 40),
-      noWhitespaceValidator(),
-    ]);
+    firstName.setValidators(textFieldValidators(3, 30));
+    lastName.setValidators(textFieldValidators(3, 40));
 
-    this.nationalId?.enable({ emitEvent: false });
-    this.firstName?.enable({ emitEvent: false });
-    this.lastName?.enable({ emitEvent: false });
+    nationalId.enable({ emitEvent: false });
+    firstName.enable({ emitEvent: false });
+    lastName.enable({ emitEvent: false });
 
-    this.nationalId?.updateValueAndValidity({ emitEvent: false });
-    this.firstName?.updateValueAndValidity({ emitEvent: false });
-    this.lastName?.updateValueAndValidity({ emitEvent: false });
+    nationalId.updateValueAndValidity({ emitEvent: false });
+    firstName.updateValueAndValidity({ emitEvent: false });
+    lastName.updateValueAndValidity({ emitEvent: false });
   }
 
   private disablePersonControls(): void {
-    this.nationalId?.reset(null, { emitEvent: false });
-    this.firstName?.reset('', { emitEvent: false });
-    this.lastName?.reset('', { emitEvent: false });
+    const { nationalId, firstName, lastName } = this.formGroup.controls;
+    nationalId.reset(null, { emitEvent: false });
+    firstName.reset('', { emitEvent: false });
+    lastName.reset('', { emitEvent: false });
 
-    this.nationalId?.clearValidators();
-    this.firstName?.clearValidators();
-    this.lastName?.clearValidators();
+    nationalId.clearValidators();
+    firstName.clearValidators();
+    lastName.clearValidators();
 
-    this.nationalId?.disable({ emitEvent: false });
-    this.firstName?.disable({ emitEvent: false });
-    this.lastName?.disable({ emitEvent: false });
+    nationalId.disable({ emitEvent: false });
+    firstName.disable({ emitEvent: false });
+    lastName.disable({ emitEvent: false });
   }
 
   private enableCompanyControls(): void {
-    this.taxId?.setValidators([
+    const { taxId, companyName } = this.formGroup.controls;
+    taxId.setValidators([
       Validators.required,
       Validators.pattern(/^\d+$/),
       lengthValidator(10, 13),
     ]);
-    this.companyName?.setValidators([
-      Validators.required,
-      lengthValidator(3, 60),
-      noWhitespaceValidator(),
-    ]);
+    companyName.setValidators(textFieldValidators(3, 60));
 
-    this.taxId?.enable({ emitEvent: false });
-    this.companyName?.enable({ emitEvent: false });
+    taxId.enable({ emitEvent: false });
+    companyName.enable({ emitEvent: false });
 
-    this.taxId?.updateValueAndValidity({ emitEvent: false });
-    this.companyName?.updateValueAndValidity({ emitEvent: false });
+    taxId.updateValueAndValidity({ emitEvent: false });
+    companyName.updateValueAndValidity({ emitEvent: false });
   }
 
   private disableCompanyControls(): void {
-    this.taxId?.reset(null, { emitEvent: false });
-    this.companyName?.reset('', { emitEvent: false });
+    const { taxId, companyName } = this.formGroup.controls;
+    taxId.reset(null, { emitEvent: false });
+    companyName.reset('', { emitEvent: false });
 
-    this.taxId?.clearValidators();
-    this.companyName?.clearValidators();
+    taxId.clearValidators();
+    companyName.clearValidators();
 
-    this.taxId?.disable({ emitEvent: false });
-    this.companyName?.disable({ emitEvent: false });
+    taxId.disable({ emitEvent: false });
+    companyName.disable({ emitEvent: false });
   }
+
+  // ── Construcción de payloads ───────────────────────────────────
 
   private buildPersonPayload(): PersonPayload {
     const { nationalId, firstName, lastName, phoneNumber, email, enabled } =
@@ -470,7 +355,10 @@ export class ClientFormComponent implements OnInit, OnDestroy {
       phoneNumber: phoneNumber ?? '',
       email: email?.trim() ?? '',
       enabled,
-      address: this.normalizeAddress(),
+      address: normalizeAddress(
+        this.formGroup.controls.address,
+        this.isEditMode ? this.currentAddressId : null,
+      ),
     };
 
     if (this.isEditMode && this.currentClientId) {
@@ -490,7 +378,10 @@ export class ClientFormComponent implements OnInit, OnDestroy {
       phoneNumber: phoneNumber ?? '',
       email: email?.trim() ?? '',
       enabled,
-      address: this.normalizeAddress(),
+      address: normalizeAddress(
+        this.formGroup.controls.address,
+        this.isEditMode ? this.currentAddressId : null,
+      ),
     };
 
     if (this.isEditMode && this.currentClientId) {
@@ -500,25 +391,7 @@ export class ClientFormComponent implements OnInit, OnDestroy {
     return payload;
   }
 
-  private normalizeAddress(): Address {
-    const addressGroupValue = this.addressGroup?.getRawValue() ?? {
-      street: '',
-      number: '',
-      city: '',
-    };
-
-    const address: Address = {
-      street: addressGroupValue.street?.trim() ?? '',
-      number: addressGroupValue.number?.trim() ?? '',
-      city: addressGroupValue.city?.trim() ?? '',
-    };
-
-    if (this.isEditMode && this.currentAddressId != null) {
-      address.id = this.currentAddressId;
-    }
-
-    return address;
-  }
+  // ── Utilidades de ruta ─────────────────────────────────────────
 
   private extractClientTypeFromRoute(): ClientType {
     const snapshotData = this.route.snapshot.data?.['clientType'] as
@@ -526,24 +399,23 @@ export class ClientFormComponent implements OnInit, OnDestroy {
       | undefined;
     const snapshotParam = this.route.snapshot.paramMap.get('type');
     const queryParam = this.route.snapshot.queryParamMap.get('type');
-
     return this.normalizeType(snapshotParam ?? snapshotData ?? queryParam);
   }
 
   private normalizeType(value: string | null | undefined): ClientType {
-    if (!value) {
-      return 'PERSON';
-    }
+    if (!value) return 'PERSON';
     return value.toUpperCase() === 'COMPANY' ? 'COMPANY' : 'PERSON';
   }
 
+  // ── Carga de datos para edición ────────────────────────────────
+
   private loadClientForEdit(id: number, hintedType: ClientType): void {
-    this.loadingSignal.set(true);
+    this.loading.set(true);
 
     if (hintedType === 'PERSON') {
       this.personService
         .getById(id)
-        .pipe(finalize(() => this.loadingSignal.set(false)))
+        .pipe(finalize(() => this.loading.set(false)))
         .subscribe({
           next: (person) => this.populatePerson(person),
           error: () => this.attemptCompanyFallback(id),
@@ -554,7 +426,7 @@ export class ClientFormComponent implements OnInit, OnDestroy {
     if (hintedType === 'COMPANY') {
       this.companyService
         .getById(id)
-        .pipe(finalize(() => this.loadingSignal.set(false)))
+        .pipe(finalize(() => this.loading.set(false)))
         .subscribe({
           next: (company) => this.populateCompany(company),
           error: () => this.attemptPersonFallback(id),
@@ -562,20 +434,22 @@ export class ClientFormComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.loadingSignal.set(false);
+    this.loading.set(false);
   }
 
   private attemptCompanyFallback(id: number): void {
     this.companyService
       .getById(id)
-      .pipe(finalize(() => this.loadingSignal.set(false)))
+      .pipe(finalize(() => this.loading.set(false)))
       .subscribe({
         next: (company) => {
-          this.typeControl.setValue('COMPANY', { emitEvent: false });
+          this.formGroup.controls.type.setValue('COMPANY', {
+            emitEvent: false,
+          });
           this.populateCompany(company);
         },
         error: () => {
-          this.showErrorAlert(
+          void showErrorAlert(
             'No se encontró información del cliente solicitado.',
           );
           void this.router.navigate(['/clients']);
@@ -586,14 +460,16 @@ export class ClientFormComponent implements OnInit, OnDestroy {
   private attemptPersonFallback(id: number): void {
     this.personService
       .getById(id)
-      .pipe(finalize(() => this.loadingSignal.set(false)))
+      .pipe(finalize(() => this.loading.set(false)))
       .subscribe({
         next: (person) => {
-          this.typeControl.setValue('PERSON', { emitEvent: false });
+          this.formGroup.controls.type.setValue('PERSON', {
+            emitEvent: false,
+          });
           this.populatePerson(person);
         },
         error: () => {
-          this.showErrorAlert(
+          void showErrorAlert(
             'No se encontró información del cliente solicitado.',
           );
           void this.router.navigate(['/clients']);
@@ -604,8 +480,8 @@ export class ClientFormComponent implements OnInit, OnDestroy {
   private populatePerson(person: Person): void {
     this.currentAddressId = person.address?.id ?? null;
     this.applyTypeSpecificSetup('PERSON');
-    this.typeControl.setValue('PERSON', { emitEvent: false });
-    this.typeControl.disable({ emitEvent: false });
+    this.formGroup.controls.type.setValue('PERSON', { emitEvent: false });
+    this.formGroup.controls.type.disable({ emitEvent: false });
     this.formGroup.patchValue({
       nationalId: person.nationalId?.toString() ?? '',
       firstName: person.firstName ?? '',
@@ -624,8 +500,8 @@ export class ClientFormComponent implements OnInit, OnDestroy {
   private populateCompany(company: Company): void {
     this.currentAddressId = company.address?.id ?? null;
     this.applyTypeSpecificSetup('COMPANY');
-    this.typeControl.setValue('COMPANY', { emitEvent: false });
-    this.typeControl.disable({ emitEvent: false });
+    this.formGroup.controls.type.setValue('COMPANY', { emitEvent: false });
+    this.formGroup.controls.type.disable({ emitEvent: false });
     this.formGroup.patchValue({
       taxId: company.taxId?.toString() ?? '',
       companyName: company.companyName ?? '',
@@ -644,28 +520,10 @@ export class ClientFormComponent implements OnInit, OnDestroy {
     this.isEditMode = false;
     this.currentClientId = null;
     this.currentAddressId = null;
-    this.typeControl.enable({ emitEvent: false });
+    this.formGroup.controls.type.enable({ emitEvent: false });
     this.initialized = true;
     const type = this.extractClientTypeFromRoute();
-    this.typeControl.setValue(type, { emitEvent: false });
+    this.formGroup.controls.type.setValue(type, { emitEvent: false });
     this.applyTypeSpecificSetup(type);
-  }
-
-  private showSuccessAlert(message: string): void {
-    void Swal.fire({
-      icon: 'success',
-      title: 'Operación exitosa',
-      text: message,
-      confirmButtonColor: '#0d6efd',
-    });
-  }
-
-  private showErrorAlert(message: string): void {
-    void Swal.fire({
-      icon: 'error',
-      title: 'Ha ocurrido un error',
-      text: message,
-      confirmButtonColor: '#d33',
-    });
   }
 }

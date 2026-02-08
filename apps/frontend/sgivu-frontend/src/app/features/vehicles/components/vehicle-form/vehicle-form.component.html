@@ -1,5 +1,5 @@
 <app-form-shell
-  [loading]="isLoading()"
+  [loading]="loading()"
   [title]="titleText"
   [subtitle]="subtitleText"
   [icon]="isCar ? 'bi-car-front-fill' : 'bi-bicycle'"
@@ -27,9 +27,9 @@
             <input
               [ngClass]="{
                 'is-invalid':
-                  formGroup.get('brand')?.invalid &&
-                  (formGroup.get('brand')?.dirty ||
-                    formGroup.get('brand')?.touched),
+                  formGroup.controls.brand.invalid &&
+                  (formGroup.controls.brand.dirty ||
+                    formGroup.controls.brand.touched),
               }"
               class="form-control"
               formControlName="brand"
@@ -49,9 +49,9 @@
             <input
               [ngClass]="{
                 'is-invalid':
-                  formGroup.get('model')?.invalid &&
-                  (formGroup.get('model')?.dirty ||
-                    formGroup.get('model')?.touched),
+                  formGroup.controls.model.invalid &&
+                  (formGroup.controls.model.dirty ||
+                    formGroup.controls.model.touched),
               }"
               class="form-control"
               formControlName="model"
@@ -71,9 +71,9 @@
             <input
               [ngClass]="{
                 'is-invalid':
-                  formGroup.get('line')?.invalid &&
-                  (formGroup.get('line')?.dirty ||
-                    formGroup.get('line')?.touched),
+                  formGroup.controls.line.invalid &&
+                  (formGroup.controls.line.dirty ||
+                    formGroup.controls.line.touched),
               }"
               class="form-control"
               formControlName="line"
@@ -100,9 +100,9 @@
             <input
               [ngClass]="{
                 'is-invalid':
-                  formGroup.get('plate')?.invalid &&
-                  (formGroup.get('plate')?.dirty ||
-                    formGroup.get('plate')?.touched),
+                  formGroup.controls.plate.invalid &&
+                  (formGroup.controls.plate.dirty ||
+                    formGroup.controls.plate.touched),
               }"
               [readonly]="isEditMode"
               class="form-control text-uppercase"
@@ -123,9 +123,9 @@
             <input
               [ngClass]="{
                 'is-invalid':
-                  formGroup.get('motorNumber')?.invalid &&
-                  (formGroup.get('motorNumber')?.dirty ||
-                    formGroup.get('motorNumber')?.touched),
+                  formGroup.controls.motorNumber.invalid &&
+                  (formGroup.controls.motorNumber.dirty ||
+                    formGroup.controls.motorNumber.touched),
               }"
               class="form-control"
               formControlName="motorNumber"
@@ -146,9 +146,9 @@
             <input
               [ngClass]="{
                 'is-invalid':
-                  formGroup.get('serialNumber')?.invalid &&
-                  (formGroup.get('serialNumber')?.dirty ||
-                    formGroup.get('serialNumber')?.touched),
+                  formGroup.controls.serialNumber.invalid &&
+                  (formGroup.controls.serialNumber.dirty ||
+                    formGroup.controls.serialNumber.touched),
               }"
               class="form-control"
               formControlName="serialNumber"
@@ -168,9 +168,9 @@
             <input
               [ngClass]="{
                 'is-invalid':
-                  formGroup.get('chassisNumber')?.invalid &&
-                  (formGroup.get('chassisNumber')?.dirty ||
-                    formGroup.get('chassisNumber')?.touched),
+                  formGroup.controls.chassisNumber.invalid &&
+                  (formGroup.controls.chassisNumber.dirty ||
+                    formGroup.controls.chassisNumber.touched),
               }"
               class="form-control"
               formControlName="chassisNumber"
@@ -199,9 +199,9 @@
             <input
               [ngClass]="{
                 'is-invalid':
-                  formGroup.get('capacity')?.invalid &&
-                  (formGroup.get('capacity')?.dirty ||
-                    formGroup.get('capacity')?.touched),
+                  formGroup.controls.capacity.invalid &&
+                  (formGroup.controls.capacity.dirty ||
+                    formGroup.controls.capacity.touched),
               }"
               class="form-control"
               formControlName="capacity"
@@ -224,9 +224,9 @@
             <input
               [ngClass]="{
                 'is-invalid':
-                  formGroup.get('color')?.invalid &&
-                  (formGroup.get('color')?.dirty ||
-                    formGroup.get('color')?.touched),
+                  formGroup.controls.color.invalid &&
+                  (formGroup.controls.color.dirty ||
+                    formGroup.controls.color.touched),
               }"
               class="form-control"
               formControlName="color"
@@ -244,9 +244,9 @@
             <input
               [ngClass]="{
                 'is-invalid':
-                  formGroup.get('cityRegistered')?.invalid &&
-                  (formGroup.get('cityRegistered')?.dirty ||
-                    formGroup.get('cityRegistered')?.touched),
+                  formGroup.controls.cityRegistered.invalid &&
+                  (formGroup.controls.cityRegistered.dirty ||
+                    formGroup.controls.cityRegistered.touched),
               }"
               class="form-control"
               formControlName="cityRegistered"
@@ -266,9 +266,9 @@
             <input
               [ngClass]="{
                 'is-invalid':
-                  formGroup.get('year')?.invalid &&
-                  (formGroup.get('year')?.dirty ||
-                    formGroup.get('year')?.touched),
+                  formGroup.controls.year.invalid &&
+                  (formGroup.controls.year.dirty ||
+                    formGroup.controls.year.touched),
               }"
               class="form-control"
               formControlName="year"
@@ -288,9 +288,9 @@
             <input
               [ngClass]="{
                 'is-invalid':
-                  formGroup.get('mileage')?.invalid &&
-                  (formGroup.get('mileage')?.dirty ||
-                    formGroup.get('mileage')?.touched),
+                  formGroup.controls.mileage.invalid &&
+                  (formGroup.controls.mileage.dirty ||
+                    formGroup.controls.mileage.touched),
               }"
               class="form-control"
               formControlName="mileage"
@@ -316,9 +316,9 @@
             <input
               [ngClass]="{
                 'is-invalid':
-                  formGroup.get('transmission')?.invalid &&
-                  (formGroup.get('transmission')?.dirty ||
-                    formGroup.get('transmission')?.touched),
+                  formGroup.controls.transmission.invalid &&
+                  (formGroup.controls.transmission.dirty ||
+                    formGroup.controls.transmission.touched),
               }"
               class="form-control"
               formControlName="transmission"
@@ -339,9 +339,9 @@
               <input
                 [ngClass]="{
                   'is-invalid':
-                    formGroup.get('bodyType')?.invalid &&
-                    (formGroup.get('bodyType')?.dirty ||
-                      formGroup.get('bodyType')?.touched),
+                    formGroup.controls.bodyType.invalid &&
+                    (formGroup.controls.bodyType.dirty ||
+                      formGroup.controls.bodyType.touched),
                 }"
                 class="form-control"
                 formControlName="bodyType"
@@ -361,9 +361,9 @@
               <input
                 [ngClass]="{
                   'is-invalid':
-                    formGroup.get('fuelType')?.invalid &&
-                    (formGroup.get('fuelType')?.dirty ||
-                      formGroup.get('fuelType')?.touched),
+                    formGroup.controls.fuelType.invalid &&
+                    (formGroup.controls.fuelType.dirty ||
+                      formGroup.controls.fuelType.touched),
                 }"
                 class="form-control"
                 formControlName="fuelType"
@@ -385,9 +385,9 @@
               <input
                 [ngClass]="{
                   'is-invalid':
-                    formGroup.get('numberOfDoors')?.invalid &&
-                    (formGroup.get('numberOfDoors')?.dirty ||
-                      formGroup.get('numberOfDoors')?.touched),
+                    formGroup.controls.numberOfDoors.invalid &&
+                    (formGroup.controls.numberOfDoors.dirty ||
+                      formGroup.controls.numberOfDoors.touched),
                 }"
                 class="form-control"
                 formControlName="numberOfDoors"
@@ -412,9 +412,9 @@
               <input
                 [ngClass]="{
                   'is-invalid':
-                    formGroup.get('motorcycleType')?.invalid &&
-                    (formGroup.get('motorcycleType')?.dirty ||
-                      formGroup.get('motorcycleType')?.touched),
+                    formGroup.controls.motorcycleType.invalid &&
+                    (formGroup.controls.motorcycleType.dirty ||
+                      formGroup.controls.motorcycleType.touched),
                 }"
                 class="form-control"
                 formControlName="motorcycleType"
@@ -444,9 +444,9 @@
             <input
               [ngClass]="{
                 'is-invalid':
-                  formGroup.get('purchasePrice')?.invalid &&
-                  (formGroup.get('purchasePrice')?.dirty ||
-                    formGroup.get('purchasePrice')?.touched),
+                  formGroup.controls.purchasePrice.invalid &&
+                  (formGroup.controls.purchasePrice.dirty ||
+                    formGroup.controls.purchasePrice.touched),
               }"
               class="form-control"
               formControlName="purchasePrice"
@@ -470,9 +470,9 @@
             <input
               [ngClass]="{
                 'is-invalid':
-                  formGroup.get('salePrice')?.invalid &&
-                  (formGroup.get('salePrice')?.dirty ||
-                    formGroup.get('salePrice')?.touched),
+                  formGroup.controls.salePrice.invalid &&
+                  (formGroup.controls.salePrice.dirty ||
+                    formGroup.controls.salePrice.touched),
               }"
               class="form-control"
               formControlName="salePrice"
@@ -557,7 +557,7 @@
                     class="btn btn-sm btn-outline-danger"
                     type="button"
                     (click)="removeSelectedFile($index)"
-                    [disabled]="isLoading()"
+                    [disabled]="loading()"
                     aria-label="Eliminar archivo seleccionado"
                   >
                     <i class="bi bi-x-lg"></i>
@@ -583,7 +583,7 @@
                 (click)="uploadSelectedImage()"
                 class="btn btn-primary btn-sm"
                 type="button"
-                [disabled]="isLoading() || selectedFiles.length === 0"
+                [disabled]="loading() || selectedFiles.length === 0"
               >
                 <i class="bi bi-cloud-upload me-1"></i>Subir imagen
               </button>
@@ -636,7 +636,7 @@
       (click)="goBack()"
       class="btn btn-outline-secondary me-2"
       type="button"
-      [disabled]="isLoading()"
+      [disabled]="loading()"
     >
       <i class="bi bi-arrow-left me-2"></i>Volver al listado
     </button>
@@ -645,7 +645,7 @@
       class="btn btn-primary"
       type="submit"
       (click)="onSubmit()"
-      [disabled]="formGroup.invalid || isLoading()"
+      [disabled]="formGroup.invalid || loading()"
     >
       <i class="bi bi-save me-2"></i>
       {{ isEditMode ? "Guardar cambios" : "Registrar vehículo" }}

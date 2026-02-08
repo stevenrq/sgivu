@@ -1,11 +1,5 @@
-import {
-  Component,
-  OnDestroy,
-  OnInit,
-  computed,
-  signal,
-  inject,
-} from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   FormBuilder,
   FormControl,
@@ -15,24 +9,31 @@ import {
 } from '@angular/forms';
 import { NgClass } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
-import { Observable, Subscription, finalize } from 'rxjs';
-import Swal from 'sweetalert2';
+import { finalize } from 'rxjs';
 import { FormShellComponent } from '../../../../shared/components/form-shell/form-shell.component';
 import {
   lengthValidator,
   noSpecialCharactersValidator,
   passwordStrengthValidator,
 } from '../../../../shared/validators/form.validator';
-import { Address } from '../../../../shared/models/address.model';
 import { User } from '../../models/user.model';
 import { UserService } from '../../services/user.service';
 import { AuthService } from '../../../auth/services/auth.service';
-
-interface AddressFormControls {
-  street: FormControl<string | null>;
-  number: FormControl<string | null>;
-  city: FormControl<string | null>;
-}
+import {
+  showErrorAlert,
+  showSuccessAlert,
+} from '../../../../shared/utils/swal-alert.utils';
+import {
+  AddressFormControls,
+  buildAddressFormGroup,
+  normalizeAddress,
+} from '../../../../shared/utils/address-form.utils';
+import {
+  SubmitConfig,
+  SubmitCopy,
+  ViewCopy,
+  composeSubmitConfig,
+} from '../../../../shared/models/form-config.model';
 
 interface UserFormControls {
   nationalId: FormControl<string | null>;
@@ -45,51 +46,29 @@ interface UserFormControls {
   password: FormControl<string | null>;
 }
 
-interface SubmitConfig {
-  request$: Observable<unknown>;
-  successMessage: string;
-  errorMessage: string;
-  redirectCommand: (string | number)[];
-}
-
-interface SubmitCopy {
-  createSuccess: string;
-  updateSuccess: string;
-  createError: string;
-  updateError: string;
-  redirectCommand: (string | number)[];
-}
-
-interface ViewCopy {
-  createTitle: string;
-  editTitle: string;
-  createSubtitle: string;
-  editSubtitle: string;
-}
-
 @Component({
   selector: 'app-user-form',
   imports: [ReactiveFormsModule, NgClass, FormShellComponent],
   templateUrl: './user-form.component.html',
   styleUrl: './user-form.component.css',
 })
-export class UserFormComponent implements OnInit, OnDestroy {
+export class UserFormComponent implements OnInit {
   private readonly formBuilder = inject(FormBuilder);
   private readonly userService = inject(UserService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly authService = inject(AuthService);
+  private readonly destroyRef = inject(DestroyRef);
 
   formGroup: FormGroup<UserFormControls> = this.buildForm();
   showPassword = false;
   isEditMode = false;
-  isSubmitting = false;
+  readonly submitting = signal(false);
 
   private currentUserId: number | null = null;
   private currentAddressId: number | null = null;
 
-  private readonly loadingSignal = signal<boolean>(false);
-  readonly isLoading = computed(() => this.loadingSignal());
+  readonly loading = signal(false);
 
   private readonly submitCopy: SubmitCopy = {
     createSuccess: 'El usuario fue registrado exitosamente.',
@@ -124,94 +103,6 @@ export class UserFormComponent implements OnInit, OnDestroy {
     password: '',
   };
 
-  private readonly subscriptions: Subscription[] = [];
-
-  ngOnInit(): void {
-    this.configurePasswordWatcher();
-    const isSelfEdit = this.route.snapshot.data?.['selfEdit'] === true;
-
-    const paramsSub = this.route.paramMap.subscribe((params) => {
-      const idParam = params.get('id');
-      if (idParam) {
-        const id = Number(idParam);
-        if (Number.isNaN(id)) {
-          this.showErrorAlert('El identificador proporcionado no es válido.');
-          void this.router.navigate(['/users/page', 0]);
-          return;
-        }
-
-        this.activateEditMode(id);
-        return;
-      }
-
-      if (isSelfEdit) {
-        const currentUserId = this.authService.getUserId();
-        if (currentUserId != null) {
-          this.activateEditMode(currentUserId);
-          return;
-        }
-
-        this.showErrorAlert('No se pudo identificar al usuario actual.');
-        void this.router.navigate(['/login']);
-        return;
-      }
-
-      this.resetToCreateMode();
-    });
-
-    this.subscriptions.push(paramsSub);
-  }
-
-  ngOnDestroy(): void {
-    for (const sub of this.subscriptions) {
-      sub.unsubscribe();
-    }
-  }
-
-  get nationalId() {
-    return this.formGroup.get('nationalId');
-  }
-
-  get firstName() {
-    return this.formGroup.get('firstName');
-  }
-
-  get lastName() {
-    return this.formGroup.get('lastName');
-  }
-
-  get phoneNumber() {
-    return this.formGroup.get('phoneNumber');
-  }
-
-  get email() {
-    return this.formGroup.get('email');
-  }
-
-  get username() {
-    return this.formGroup.get('username');
-  }
-
-  get password() {
-    return this.formGroup.get('password');
-  }
-
-  get addressGroup(): FormGroup<AddressFormControls> | null {
-    return this.formGroup.get('address') as FormGroup<AddressFormControls>;
-  }
-
-  get street() {
-    return this.addressGroup?.get('street');
-  }
-
-  get number() {
-    return this.addressGroup?.get('number');
-  }
-
-  get city() {
-    return this.addressGroup?.get('city');
-  }
-
   get headerIcon(): string {
     return this.isEditMode ? 'bi-pencil-square' : 'bi-person-plus-fill';
   }
@@ -228,6 +119,40 @@ export class UserFormComponent implements OnInit, OnDestroy {
       : this.viewCopy.createSubtitle;
   }
 
+  ngOnInit(): void {
+    this.configurePasswordWatcher();
+    const isSelfEdit = this.route.snapshot.data?.['selfEdit'] === true;
+
+    this.route.paramMap
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((params) => {
+        const idParam = params.get('id');
+        if (idParam) {
+          const id = Number(idParam);
+          if (Number.isNaN(id)) {
+            void showErrorAlert('El identificador proporcionado no es válido.');
+            void this.router.navigate(['/users/page', 0]);
+            return;
+          }
+          this.activateEditMode(id);
+          return;
+        }
+
+        if (isSelfEdit) {
+          const currentUserId = this.authService.getUserId();
+          if (currentUserId != null) {
+            this.activateEditMode(currentUserId);
+            return;
+          }
+          void showErrorAlert('No se pudo identificar al usuario actual.');
+          void this.router.navigate(['/login']);
+          return;
+        }
+
+        this.resetToCreateMode();
+      });
+  }
+
   togglePasswordVisibility(): void {
     this.showPassword = !this.showPassword;
   }
@@ -241,15 +166,15 @@ export class UserFormComponent implements OnInit, OnDestroy {
     const { request$, successMessage, errorMessage, redirectCommand } =
       this.buildSubmitConfig();
 
-    this.isSubmitting = true;
+    this.submitting.set(true);
 
-    request$.pipe(finalize(() => (this.isSubmitting = false))).subscribe({
+    request$.pipe(finalize(() => this.submitting.set(false))).subscribe({
       next: () => {
-        this.showSuccessAlert(successMessage);
+        void showSuccessAlert(successMessage);
         void this.router.navigate(redirectCommand);
       },
       error: () => {
-        this.showErrorAlert(errorMessage);
+        void showErrorAlert(errorMessage);
       },
     });
   }
@@ -257,6 +182,8 @@ export class UserFormComponent implements OnInit, OnDestroy {
   protected onCancel(): void {
     void this.router.navigate(this.submitCopy.redirectCommand);
   }
+
+  // ── Construcción del formulario ────────────────────────────────
 
   private buildForm(): FormGroup<UserFormControls> {
     return this.formBuilder.group({
@@ -283,19 +210,10 @@ export class UserFormComponent implements OnInit, OnDestroy {
         Validators.email,
         lengthValidator(16, 40),
       ]),
-      address: this.formBuilder.group<AddressFormControls>({
-        street: new FormControl<string | null>('', [
-          Validators.required,
-          lengthValidator(5, 50),
-        ]),
-        number: new FormControl<string | null>('', [
-          Validators.required,
-          lengthValidator(1, 10),
-        ]),
-        city: new FormControl<string | null>('', [
-          Validators.required,
-          lengthValidator(4, 30),
-        ]),
+      address: buildAddressFormGroup(this.formBuilder, {
+        street: { min: 5, max: 50 },
+        number: { min: 1, max: 10 },
+        city: { min: 4, max: 30 },
       }),
       username: new FormControl<string | null>('', [
         Validators.required,
@@ -310,36 +228,33 @@ export class UserFormComponent implements OnInit, OnDestroy {
     });
   }
 
+  // ── Configuración de contraseña ────────────────────────────────
+
   private configurePasswordWatcher(): void {
-    const passwordControl = this.password;
-    if (!passwordControl) {
-      return;
-    }
+    const passwordControl = this.formGroup.controls.password;
 
-    const sub = passwordControl.valueChanges.subscribe((value) => {
-      if (!this.isEditMode) {
-        return;
-      }
+    passwordControl.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((value) => {
+        if (!this.isEditMode) return;
 
-      if (value) {
-        passwordControl.setValidators([
-          lengthValidator(6, 20),
-          passwordStrengthValidator(),
-        ]);
-      } else {
-        passwordControl.clearValidators();
-      }
+        if (value) {
+          passwordControl.setValidators([
+            lengthValidator(6, 20),
+            passwordStrengthValidator(),
+          ]);
+        } else {
+          passwordControl.clearValidators();
+        }
 
-      passwordControl.updateValueAndValidity({ emitEvent: false });
-    });
-
-    this.subscriptions.push(sub);
+        passwordControl.updateValueAndValidity({ emitEvent: false });
+      });
   }
 
+  // ── Modo edición ───────────────────────────────────────────────
+
   private activateEditMode(id: number): void {
-    if (this.currentUserId === id && this.isEditMode) {
-      return;
-    }
+    if (this.currentUserId === id && this.isEditMode) return;
 
     this.isEditMode = true;
     this.currentUserId = id;
@@ -348,11 +263,14 @@ export class UserFormComponent implements OnInit, OnDestroy {
   }
 
   private loadUserForEdit(id: number): void {
-    this.loadingSignal.set(true);
+    this.loading.set(true);
 
-    const sub = this.userService
+    this.userService
       .getById(id)
-      .pipe(finalize(() => this.loadingSignal.set(false)))
+      .pipe(
+        finalize(() => this.loading.set(false)),
+        takeUntilDestroyed(this.destroyRef),
+      )
       .subscribe({
         next: (user) => {
           this.currentAddressId = user.address?.id ?? null;
@@ -374,14 +292,12 @@ export class UserFormComponent implements OnInit, OnDestroy {
           this.formGroup.markAsUntouched();
         },
         error: () => {
-          this.showErrorAlert(
+          void showErrorAlert(
             'No se pudo cargar la información del usuario solicitado.',
           );
           void this.router.navigate(this.submitCopy.redirectCommand);
         },
       });
-
-    this.subscriptions.push(sub);
   }
 
   private resetToCreateMode(): void {
@@ -395,19 +311,23 @@ export class UserFormComponent implements OnInit, OnDestroy {
   }
 
   private applyEditPasswordBehaviour(): void {
-    this.password?.setValue('', { emitEvent: false });
-    this.password?.clearValidators();
-    this.password?.updateValueAndValidity({ emitEvent: false });
+    const pw = this.formGroup.controls.password;
+    pw.setValue('', { emitEvent: false });
+    pw.clearValidators();
+    pw.updateValueAndValidity({ emitEvent: false });
   }
 
   private applyCreatePasswordBehaviour(): void {
-    this.password?.setValidators([
+    const pw = this.formGroup.controls.password;
+    pw.setValidators([
       Validators.required,
       lengthValidator(6, 20),
       passwordStrengthValidator(),
     ]);
-    this.password?.updateValueAndValidity({ emitEvent: false });
+    pw.updateValueAndValidity({ emitEvent: false });
   }
+
+  // ── Submit config y payload ────────────────────────────────────
 
   private buildSubmitConfig(): SubmitConfig {
     const payload = this.buildUserPayload();
@@ -417,16 +337,7 @@ export class UserFormComponent implements OnInit, OnDestroy {
         ? this.userService.update(this.currentUserId, payload as User)
         : this.userService.create(payload as User);
 
-    return {
-      request$,
-      successMessage: this.isEditMode
-        ? this.submitCopy.updateSuccess
-        : this.submitCopy.createSuccess,
-      errorMessage: this.isEditMode
-        ? this.submitCopy.updateError
-        : this.submitCopy.createError,
-      redirectCommand: [...this.submitCopy.redirectCommand],
-    };
+    return composeSubmitConfig(this.submitCopy, request$, this.isEditMode);
   }
 
   private buildUserPayload(): Partial<User> {
@@ -439,7 +350,10 @@ export class UserFormComponent implements OnInit, OnDestroy {
       email: raw.email?.trim() ?? '',
       username: raw.username?.trim().toLowerCase() ?? '',
       password: raw.password?.trim() || undefined,
-      address: this.normalizeAddress(),
+      address: normalizeAddress(
+        this.formGroup.controls.address,
+        this.isEditMode ? this.currentAddressId : null,
+      ),
     };
 
     if (!payload.password) {
@@ -453,50 +367,9 @@ export class UserFormComponent implements OnInit, OnDestroy {
     return payload;
   }
 
-  private normalizeAddress(): Address {
-    const addressGroup = this.addressGroup?.getRawValue() ?? {
-      street: '',
-      number: '',
-      city: '',
-    };
-
-    const address: Address = {
-      street: addressGroup.street?.trim() ?? '',
-      number: addressGroup.number?.trim() ?? '',
-      city: addressGroup.city?.trim() ?? '',
-    };
-
-    if (this.isEditMode && this.currentAddressId != null) {
-      address.id = this.currentAddressId;
-    }
-
-    return address;
-  }
-
   private toNumber(value: string | null | undefined): number | undefined {
-    if (!value) {
-      return undefined;
-    }
-
+    if (!value) return undefined;
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : undefined;
-  }
-
-  private showSuccessAlert(message: string): void {
-    void Swal.fire({
-      icon: 'success',
-      title: 'Operación exitosa',
-      text: message,
-      confirmButtonColor: '#0d6efd',
-    });
-  }
-
-  private showErrorAlert(message: string): void {
-    void Swal.fire({
-      icon: 'error',
-      title: 'Ha ocurrido un error',
-      text: message,
-      confirmButtonColor: '#d33',
-    });
   }
 }

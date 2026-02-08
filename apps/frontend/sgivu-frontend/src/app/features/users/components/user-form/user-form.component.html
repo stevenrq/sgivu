@@ -1,5 +1,5 @@
 <app-form-shell
-  [loading]="isLoading()"
+  [loading]="loading()"
   [title]="titleText"
   [subtitle]="subtitleText"
   [icon]="headerIcon"
@@ -31,21 +31,21 @@
               formControlName="nationalId"
               [ngClass]="{
                 'is-invalid':
-                  nationalId?.invalid &&
-                  (nationalId?.dirty || nationalId?.touched),
+                  formGroup.controls.nationalId.invalid &&
+                  (formGroup.controls.nationalId.dirty || formGroup.controls.nationalId.touched),
               }"
             />
             <label for="nationalId"
               ><i class="bi bi-person-vcard me-2"></i>Número de cédula</label
             >
             <div class="invalid-feedback">
-              @if (nationalId?.hasError("required")) {
+              @if (formGroup.controls.nationalId.hasError("required")) {
                 <div>La cédula es requerida.</div>
               }
-              @if (nationalId?.hasError("pattern")) {
+              @if (formGroup.controls.nationalId.hasError("pattern")) {
                 <div>Solo se permiten números.</div>
               }
-              @if (nationalId?.hasError("invalidLength")) {
+              @if (formGroup.controls.nationalId.hasError("invalidLength")) {
                 <div>Debe tener entre 7 y 10 dígitos.</div>
               }
             </div>
@@ -61,21 +61,21 @@
               formControlName="phoneNumber"
               [ngClass]="{
                 'is-invalid':
-                  phoneNumber?.invalid &&
-                  (phoneNumber?.dirty || phoneNumber?.touched),
+                  formGroup.controls.phoneNumber.invalid &&
+                  (formGroup.controls.phoneNumber.dirty || formGroup.controls.phoneNumber.touched),
               }"
             />
             <label for="phoneNumber"
               ><i class="bi bi-phone me-2"></i>Número de teléfono</label
             >
             <div class="invalid-feedback">
-              @if (phoneNumber?.hasError("required")) {
+              @if (formGroup.controls.phoneNumber.hasError("required")) {
                 <div>El teléfono es requerido.</div>
               }
-              @if (phoneNumber?.hasError("pattern")) {
+              @if (formGroup.controls.phoneNumber.hasError("pattern")) {
                 <div>Solo se permiten números.</div>
               }
-              @if (phoneNumber?.hasError("invalidLength")) {
+              @if (formGroup.controls.phoneNumber.hasError("invalidLength")) {
                 <div>Debe tener exactamente 10 dígitos.</div>
               }
             </div>
@@ -91,18 +91,18 @@
               formControlName="firstName"
               [ngClass]="{
                 'is-invalid':
-                  firstName?.invalid &&
-                  (firstName?.dirty || firstName?.touched),
+                  formGroup.controls.firstName.invalid &&
+                  (formGroup.controls.firstName.dirty || formGroup.controls.firstName.touched),
               }"
             />
             <label for="firstName"
               ><i class="bi bi-person me-2"></i>Nombres</label
             >
             <div class="invalid-feedback">
-              @if (firstName?.hasError("required")) {
+              @if (formGroup.controls.firstName.hasError("required")) {
                 <div>El nombre es requerido.</div>
               }
-              @if (firstName?.hasError("invalidLength")) {
+              @if (formGroup.controls.firstName.hasError("invalidLength")) {
                 <div>Debe tener entre 3 y 20 caracteres.</div>
               }
             </div>
@@ -118,17 +118,17 @@
               formControlName="lastName"
               [ngClass]="{
                 'is-invalid':
-                  lastName?.invalid && (lastName?.dirty || lastName?.touched),
+                  formGroup.controls.lastName.invalid && (formGroup.controls.lastName.dirty || formGroup.controls.lastName.touched),
               }"
             />
             <label for="lastName"
               ><i class="bi bi-person me-2"></i>Apellidos</label
             >
             <div class="invalid-feedback">
-              @if (lastName?.hasError("required")) {
+              @if (formGroup.controls.lastName.hasError("required")) {
                 <div>El apellido es requerido.</div>
               }
-              @if (lastName?.hasError("invalidLength")) {
+              @if (formGroup.controls.lastName.hasError("invalidLength")) {
                 <div>Debe tener entre 3 y 20 caracteres.</div>
               }
             </div>
@@ -144,17 +144,17 @@
               formControlName="email"
               [ngClass]="{
                 'is-invalid':
-                  email?.invalid && (email?.dirty || email?.touched),
+                  formGroup.controls.email.invalid && (formGroup.controls.email.dirty || formGroup.controls.email.touched),
               }"
             />
             <label for="email"
               ><i class="bi bi-envelope-at me-2"></i>Correo electrónico</label
             >
             <div class="invalid-feedback">
-              @if (email?.hasError("required")) {
+              @if (formGroup.controls.email.hasError("required")) {
                 <div>El correo es requerido.</div>
               }
-              @if (email?.hasError("email")) {
+              @if (formGroup.controls.email.hasError("email")) {
                 <div>Ingresa un correo válido.</div>
               }
             </div>
@@ -178,7 +178,7 @@
               formControlName="street"
               [ngClass]="{
                 'is-invalid':
-                  street?.invalid && (street?.dirty || street?.touched),
+                  formGroup.controls.address.controls.street.invalid && (formGroup.controls.address.controls.street.dirty || formGroup.controls.address.controls.street.touched),
               }"
             />
             <label for="street"
@@ -186,7 +186,7 @@
               >Calle/Avenida/Carrera</label
             >
             <div class="invalid-feedback">
-              @if (street?.hasError("required")) {
+              @if (formGroup.controls.address.controls.street.hasError("required")) {
                 <div>La calle es requerida.</div>
               }
             </div>
@@ -202,12 +202,12 @@
               formControlName="number"
               [ngClass]="{
                 'is-invalid':
-                  number?.invalid && (number?.dirty || number?.touched),
+                  formGroup.controls.address.controls.number.invalid && (formGroup.controls.address.controls.number.dirty || formGroup.controls.address.controls.number.touched),
               }"
             />
             <label for="number"><i class="bi bi-hash me-2"></i>Número</label>
             <div class="invalid-feedback">
-              @if (number?.hasError("required")) {
+              @if (formGroup.controls.address.controls.number.hasError("required")) {
                 <div>El número es requerido.</div>
               }
             </div>
@@ -222,12 +222,12 @@
               placeholder="Ciudad"
               formControlName="city"
               [ngClass]="{
-                'is-invalid': city?.invalid && (city?.dirty || city?.touched),
+                'is-invalid': formGroup.controls.address.controls.city.invalid && (formGroup.controls.address.controls.city.dirty || formGroup.controls.address.controls.city.touched),
               }"
             />
             <label for="city"><i class="bi bi-building me-2"></i>Ciudad</label>
             <div class="invalid-feedback">
-              @if (city?.hasError("required")) {
+              @if (formGroup.controls.address.controls.city.hasError("required")) {
                 <div>La ciudad es requerida.</div>
               }
             </div>
@@ -251,20 +251,20 @@
               formControlName="username"
               [ngClass]="{
                 'is-invalid':
-                  username?.invalid && (username?.dirty || username?.touched),
+                  formGroup.controls.username.invalid && (formGroup.controls.username.dirty || formGroup.controls.username.touched),
               }"
             />
             <label for="username"
               ><i class="bi bi-person-circle me-2"></i>Nombre de usuario</label
             >
             <div class="invalid-feedback">
-              @if (username?.hasError("required")) {
+              @if (formGroup.controls.username.hasError("required")) {
                 <div>El usuario es requerido.</div>
               }
-              @if (username?.hasError("invalidLength")) {
+              @if (formGroup.controls.username.hasError("invalidLength")) {
                 <div>Debe tener entre 6 y 20 caracteres.</div>
               }
-              @if (username?.hasError("forbiddenCharacters")) {
+              @if (formGroup.controls.username.hasError("forbiddenCharacters")) {
                 <div>No puede contener caracteres especiales.</div>
               }
             </div>
@@ -284,7 +284,7 @@
                 formControlName="password"
                 [ngClass]="{
                   'is-invalid':
-                    password?.invalid && (password?.dirty || password?.touched),
+                    formGroup.controls.password.invalid && (formGroup.controls.password.dirty || formGroup.controls.password.touched),
                 }"
               />
               <button
@@ -297,20 +297,20 @@
               </button>
             </div>
           </div>
-          @if (isEditMode && !password?.value) {
+          @if (isEditMode && !formGroup.controls.password.value) {
             <div class="form-text text-muted">
               Dejar en blanco para no cambiar la contraseña.
             </div>
           }
-          @if (password?.invalid && (password?.dirty || password?.touched)) {
+          @if (formGroup.controls.password.invalid && (formGroup.controls.password.dirty || formGroup.controls.password.touched)) {
             <div class="invalid-feedback d-block">
-              @if (password?.hasError("required")) {
+              @if (formGroup.controls.password.hasError("required")) {
                 <div>La contraseña es requerida.</div>
               }
-              @if (password?.hasError("invalidLength")) {
+              @if (formGroup.controls.password.hasError("invalidLength")) {
                 <div>Debe tener entre 6 y 20 caracteres.</div>
               }
-              @if (password?.hasError("weakPassword")) {
+              @if (formGroup.controls.password.hasError("weakPassword")) {
                 <div>
                   Debe contener almenos una <strong>mayúscula</strong>,
                   <strong>minúscula</strong>, <strong>número</strong> y un
@@ -329,7 +329,7 @@
       type="button"
       class="btn btn-secondary me-2"
       (click)="onCancel()"
-      [disabled]="isSubmitting"
+      [disabled]="submitting()"
     >
       Cancelar
     </button>
@@ -337,9 +337,9 @@
       type="submit"
       class="btn btn-primary"
       (click)="onSubmit()"
-      [disabled]="formGroup.invalid || isSubmitting"
+      [disabled]="formGroup.invalid || submitting()"
     >
-      @if (isSubmitting) {
+      @if (submitting()) {
         <span
           class="spinner-border spinner-border-sm me-2"
           aria-hidden="true"

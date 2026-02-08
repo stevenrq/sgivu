@@ -1,13 +1,8 @@
-import {
-  Component,
-  computed,
-  OnDestroy,
-  OnInit,
-  signal,
-  inject,
-} from '@angular/core';
+import { Component, DestroyRef, OnInit, signal, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   FormBuilder,
+  FormControl,
   FormGroup,
   ReactiveFormsModule,
   Validators,
@@ -15,11 +10,10 @@ import {
 import { ActivatedRoute, Router } from '@angular/router';
 import { DecimalPipe, NgClass } from '@angular/common';
 import { FormShellComponent } from '../../../../shared/components/form-shell/form-shell.component';
-import { finalize, firstValueFrom, Observable, Subscription } from 'rxjs';
-import Swal from 'sweetalert2';
+import { finalize, Observable } from 'rxjs';
 import {
   lengthValidator,
-  noWhitespaceValidator,
+  textFieldValidators,
 } from '../../../../shared/validators/form.validator';
 import { VehicleStatus } from '../../models/vehicle-status.enum';
 import { CarService } from '../../services/car.service';
@@ -28,13 +22,48 @@ import { Car } from '../../models/car.model';
 import { Motorcycle } from '../../models/motorcycle.model';
 import { ContractType } from '../../../purchase-sales/models/contract-type.enum';
 import { VehicleImageService } from '../../services/vehicle-image.service';
+import { VehicleImageUploadService } from '../../services/vehicle-image-upload.service';
 import { VehicleImageResponse } from '../../models/vehicle-image-response';
 import {
   formatCopNumber,
   normalizeMoneyInput,
 } from '../../../../shared/utils/currency.utils';
+import {
+  showAlert,
+  showErrorAlert,
+  showSuccessAlert,
+  showConfirmDialog,
+} from '../../../../shared/utils/swal-alert.utils';
+import {
+  SubmitCopy,
+  ViewCopy,
+} from '../../../../shared/models/form-config.model';
 
 type VehicleFormType = 'CAR' | 'MOTORCYCLE';
+
+interface VehicleFormControls {
+  brand: FormControl<string | null>;
+  model: FormControl<string | null>;
+  capacity: FormControl<number | null>;
+  line: FormControl<string | null>;
+  plate: FormControl<string | null>;
+  motorNumber: FormControl<string | null>;
+  serialNumber: FormControl<string | null>;
+  chassisNumber: FormControl<string | null>;
+  color: FormControl<string | null>;
+  cityRegistered: FormControl<string | null>;
+  year: FormControl<number | null>;
+  mileage: FormControl<number | null>;
+  transmission: FormControl<string | null>;
+  purchasePrice: FormControl<number | null>;
+  salePrice: FormControl<number | null>;
+  status: FormControl<VehicleStatus | null>;
+  photoUrl: FormControl<string | null>;
+  bodyType: FormControl<string | null>;
+  fuelType: FormControl<string | null>;
+  numberOfDoors: FormControl<number | null>;
+  motorcycleType: FormControl<string | null>;
+}
 
 type CarPayload = Omit<Car, 'id'> & Partial<Pick<Car, 'id'>>;
 type MotorcyclePayload = Omit<Motorcycle, 'id'> &
@@ -47,15 +76,17 @@ type MotorcyclePayload = Omit<Motorcycle, 'id'> &
   templateUrl: './vehicle-form.component.html',
   styleUrl: './vehicle-form.component.css',
 })
-export class VehicleFormComponent implements OnInit, OnDestroy {
+export class VehicleFormComponent implements OnInit {
   private readonly formBuilder = inject(FormBuilder);
   private readonly carService = inject(CarService);
   private readonly motorcycleService = inject(MotorcycleService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly vehicleImageService = inject(VehicleImageService);
+  private readonly imageUploadService = inject(VehicleImageUploadService);
+  private readonly destroyRef = inject(DestroyRef);
 
-  formGroup: FormGroup = this.buildForm();
+  formGroup: FormGroup<VehicleFormControls> = this.buildForm();
   isEditMode = false;
   readonly statuses = Object.values(VehicleStatus);
   readonly vehicleImages = signal<VehicleImageResponse[]>([]);
@@ -77,27 +108,54 @@ export class VehicleFormComponent implements OnInit, OnDestroy {
 
   private vehicleId: number | null = null;
   private vehicleType: VehicleFormType = 'CAR';
-  private readonly subscriptions: Subscription[] = [];
-  private readonly loadingSignal = signal<boolean>(false);
-  readonly isLoading = computed(() => this.loadingSignal());
+  readonly loading = signal(false);
   private readonly priceDecimals = 0;
 
+  private readonly submitMessages: Record<VehicleFormType, SubmitCopy> = {
+    CAR: {
+      createSuccess: 'El vehículo fue registrado correctamente.',
+      updateSuccess: 'El vehículo fue actualizado correctamente.',
+      createError:
+        'Ocurrió un problema al procesar la solicitud. Intenta nuevamente.',
+      updateError:
+        'Ocurrió un problema al procesar la solicitud. Intenta nuevamente.',
+      redirectCommand: ['/vehicles/cars/page', 0],
+    },
+    MOTORCYCLE: {
+      createSuccess: 'El vehículo fue registrado correctamente.',
+      updateSuccess: 'El vehículo fue actualizado correctamente.',
+      createError:
+        'Ocurrió un problema al procesar la solicitud. Intenta nuevamente.',
+      updateError:
+        'Ocurrió un problema al procesar la solicitud. Intenta nuevamente.',
+      redirectCommand: ['/vehicles/motorcycles/page', 0],
+    },
+  };
+
+  private readonly viewCopyMap: Record<VehicleFormType, ViewCopy> = {
+    CAR: {
+      createTitle: 'Registrar automóvil',
+      editTitle: 'Editar automóvil',
+      createSubtitle: 'Completa los datos para registrar un nuevo automóvil.',
+      editSubtitle: 'Actualiza la información del automóvil seleccionado.',
+    },
+    MOTORCYCLE: {
+      createTitle: 'Registrar motocicleta',
+      editTitle: 'Editar motocicleta',
+      createSubtitle:
+        'Completa los datos para registrar una nueva motocicleta.',
+      editSubtitle: 'Actualiza la información de la motocicleta seleccionada.',
+    },
+  };
+
   get titleText(): string {
-    if (this.vehicleType === 'CAR') {
-      return this.isEditMode ? 'Editar automóvil' : 'Registrar automóvil';
-    }
-    return this.isEditMode ? 'Editar motocicleta' : 'Registrar motocicleta';
+    const copy = this.viewCopyMap[this.vehicleType];
+    return this.isEditMode ? copy.editTitle : copy.createTitle;
   }
 
   get subtitleText(): string {
-    if (this.vehicleType === 'CAR') {
-      return this.isEditMode
-        ? 'Actualiza la información del automóvil seleccionado.'
-        : 'Completa los datos para registrar un nuevo automóvil.';
-    }
-    return this.isEditMode
-      ? 'Actualiza la información de la motocicleta seleccionada.'
-      : 'Completa los datos para registrar una nueva motocicleta.';
+    const copy = this.viewCopyMap[this.vehicleType];
+    return this.isEditMode ? copy.editSubtitle : copy.createSubtitle;
   }
 
   get isCar(): boolean {
@@ -109,35 +167,37 @@ export class VehicleFormComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    const dataSub = this.route.data.subscribe((data) => {
-      this.vehicleType = this.normalizeType(data['vehicleType']);
-      this.applyTypeSpecificValidators();
-    });
+    this.route.data
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((data) => {
+        this.vehicleType = this.normalizeType(data['vehicleType']);
+        this.applyTypeSpecificValidators();
+      });
 
-    const paramSub = this.route.paramMap.subscribe((params) => {
-      const idParam = params.get('id');
-      if (!idParam) {
-        this.isEditMode = false;
-        this.vehicleId = null;
-        this.formGroup.enable();
-        return;
-      }
-      const id = Number(idParam);
-      if (Number.isNaN(id)) {
-        void Swal.fire({
-          icon: 'error',
-          title: 'Identificador inválido',
-          text: 'El identificador proporcionado no es válido.',
-        });
-        void this.router.navigate(['/vehicles']);
-        return;
-      }
-      this.vehicleId = id;
-      this.isEditMode = true;
-      this.loadVehicle(id);
-    });
-
-    this.subscriptions.push(dataSub, paramSub);
+    this.route.paramMap
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((params) => {
+        const idParam = params.get('id');
+        if (!idParam) {
+          this.isEditMode = false;
+          this.vehicleId = null;
+          this.formGroup.enable();
+          return;
+        }
+        const id = Number(idParam);
+        if (Number.isNaN(id)) {
+          void showAlert({
+            icon: 'error',
+            title: 'Identificador inválido',
+            text: 'El identificador proporcionado no es válido.',
+          });
+          void this.router.navigate(['/vehicles']);
+          return;
+        }
+        this.vehicleId = id;
+        this.isEditMode = true;
+        this.loadVehicle(id);
+      });
   }
 
   goBack(): void {
@@ -148,15 +208,11 @@ export class VehicleFormComponent implements OnInit, OnDestroy {
     void this.router.navigate(command);
   }
 
-  ngOnDestroy(): void {
-    for (const subscription of this.subscriptions) {
-      subscription.unsubscribe();
-    }
-  }
-
   getStatusLabel(status: VehicleStatus): string {
     return this.statusLabels[status] ?? status;
   }
+
+  // ── Submit ─────────────────────────────────────────────────────
 
   onSubmit(): void {
     if (this.formGroup.invalid) {
@@ -164,29 +220,28 @@ export class VehicleFormComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.loadingSignal.set(true);
-    const request: Observable<Car | Motorcycle> = this.isCar
+    this.loading.set(true);
+    const request$: Observable<Car | Motorcycle> = this.isCar
       ? (this.submitCar() as Observable<Car | Motorcycle>)
       : (this.submitMotorcycle() as Observable<Car | Motorcycle>);
 
-    const sub = request
-      .pipe(finalize(() => this.loadingSignal.set(false)))
+    request$
+      .pipe(
+        finalize(() => this.loading.set(false)),
+        takeUntilDestroyed(this.destroyRef),
+      )
       .subscribe({
         next: () => {
-          void Swal.fire({
-            icon: 'success',
-            title: 'Operación exitosa',
-            text: this.isEditMode
+          void showSuccessAlert(
+            this.isEditMode
               ? 'El vehículo fue actualizado correctamente.'
               : 'El vehículo fue registrado correctamente.',
-          });
+          );
           let redirect: string[];
           if (this.isEditMode) {
-            if (this.isCar) {
-              redirect = ['/vehicles/cars/page', '0'];
-            } else {
-              redirect = ['/vehicles/motorcycles/page', '0'];
-            }
+            redirect = this.isCar
+              ? ['/vehicles/cars/page', '0']
+              : ['/vehicles/motorcycles/page', '0'];
           } else {
             redirect = ['/purchase-sales/registrar'];
           }
@@ -202,159 +257,52 @@ export class VehicleFormComponent implements OnInit, OnDestroy {
         },
         error: (error) => {
           if (error?.status === 409) {
-            void Swal.fire({
+            void showAlert({
               icon: 'warning',
               title: 'Datos duplicados',
               text: 'Ya existe un vehículo con la placa, número de motor, serial o chasis ingresado. Verifica que esos campos sean únicos.',
             });
             return;
           }
-
-          void Swal.fire({
-            icon: 'error',
-            title: 'Error al guardar el vehículo',
-            text: 'Ocurrió un problema al procesar la solicitud. Intenta nuevamente.',
-          });
+          void showErrorAlert(
+            'Ocurrió un problema al procesar la solicitud. Intenta nuevamente.',
+          );
         },
       });
-
-    this.subscriptions.push(sub);
   }
 
+  // ── Imágenes ───────────────────────────────────────────────────
+
   onImageSelected(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    if (!input.files || input.files.length === 0) {
+    const result = this.imageUploadService.processFileSelection(event);
+    if (!result) {
       this.selectedFiles = [];
       this.previewUrl = null;
-      return;
-    }
-
-    const files = Array.from(input.files);
-
-    const onlyImages = files.filter((f) => f.type.startsWith('image/'));
-    if (onlyImages.length !== files.length) {
-      void Swal.fire({
-        icon: 'warning',
-        title: 'Archivo no válido',
-        text: 'Por favor selecciona imágenes (JPEG, PNG, WEBP).',
-      });
-      this.selectedFiles = [];
-      this.previewUrl = null;
-      input.value = '';
       return;
     }
 
     if (this.previewUrl) URL.revokeObjectURL(this.previewUrl);
-    this.selectedFiles = onlyImages;
-    this.previewUrl = URL.createObjectURL(onlyImages[0]);
+    this.selectedFiles = result.files;
+    this.previewUrl = result.previewUrl;
   }
 
-  uploadSelectedImage(): void {
-    if (!this.selectedFiles.length || !this.vehicleId) {
-      void Swal.fire({
-        icon: 'info',
-        title: 'Sin imagen seleccionada',
-        text: 'Selecciona una o varias imágenes antes de subirlas.',
-      });
-      return;
+  async uploadSelectedImage(): Promise<void> {
+    if (!this.vehicleId) return;
+
+    this.loading.set(true);
+    const { success } = await this.imageUploadService.uploadFiles(
+      this.vehicleId,
+      this.selectedFiles,
+      this.vehicleImages(),
+    );
+    this.loading.set(false);
+
+    if (success) {
+      this.selectedFiles = [];
+      if (this.previewUrl) URL.revokeObjectURL(this.previewUrl);
+      this.previewUrl = null;
+      this.loadVehicleImages(this.vehicleId);
     }
-
-    const files = this.selectedFiles;
-    const hasImages = this.vehicleImages().length > 0;
-    this.loadingSignal.set(true);
-
-    const uploadFile = async (
-      file: File,
-      attempt: number,
-      primary: boolean,
-    ): Promise<void> => {
-      const contentType = this.resolveContentType(file);
-      try {
-        const presigned = await firstValueFrom(
-          this.vehicleImageService.createPresignedUploadUrl(
-            this.vehicleId!,
-            contentType,
-          ),
-        );
-
-        await firstValueFrom(
-          this.vehicleImageService.uploadToPresignedUrl(
-            presigned.uploadUrl,
-            file,
-            contentType,
-          ),
-        );
-
-        await firstValueFrom(
-          this.vehicleImageService.confirmUpload(this.vehicleId!, {
-            fileName: file.name,
-            contentType,
-            size: file.size,
-            key: presigned.key,
-            primary,
-          }),
-        );
-      } catch (err: unknown) {
-        if (attempt === 1 && this.shouldRetryUpload(err as Error)) {
-          return uploadFile(file, 2, primary);
-        }
-        throw err;
-      }
-    };
-
-    (async () => {
-      try {
-        const currentCount = this.vehicleImages().length;
-        for (let idx = 0; idx < files.length; idx++) {
-          const primary = !hasImages && idx === 0 && currentCount === 0;
-          await uploadFile(files[idx], 1, primary);
-        }
-
-        void Swal.fire({
-          icon: 'success',
-          title: 'Imágenes subidas',
-          text: 'Las imágenes se han almacenado correctamente.',
-        });
-        this.selectedFiles = [];
-        if (this.previewUrl) URL.revokeObjectURL(this.previewUrl);
-        this.previewUrl = null;
-        this.loadVehicleImages(this.vehicleId!);
-      } catch (error: unknown) {
-        const errWithProps = error as Error & {
-          status?: number;
-          error?: string;
-        };
-        const s3Message =
-          typeof errWithProps?.error === 'string' &&
-          errWithProps.error.startsWith('<?xml')
-            ? 'El enlace de subida expiró o la firma no es válida. Genera una nueva URL e inténtalo de nuevo.'
-            : '';
-        const duplicateMessage =
-          typeof errWithProps?.error === 'string' &&
-          (errWithProps.error.includes(
-            'Ya existe una imagen con el mismo nombre de archivo',
-          ) ||
-            errWithProps.error.includes(
-              'Ya existe una imagen registrada con esta clave',
-            ))
-            ? 'Ya existe una imagen con ese nombre o clave para este vehículo.'
-            : '';
-        const text =
-          errWithProps?.status === 0
-            ? 'No se pudo contactar con el bucket de almacenamiento. Verifica la conexión y la configuración de CORS.'
-            : duplicateMessage ||
-              s3Message ||
-              'Ocurrió un problema al subir la imagen. Intenta nuevamente.';
-
-        void Swal.fire({
-          icon: 'error',
-          title: 'Error al subir la imagen',
-          text,
-        });
-      } finally {
-        this.loadingSignal.set(false);
-      }
-    })();
   }
 
   removeSelectedFile(index: number): void {
@@ -368,88 +316,28 @@ export class VehicleFormComponent implements OnInit, OnDestroy {
     }
   }
 
-  deleteImage(imageId: number): void {
-    if (!this.vehicleId) {
-      return;
-    }
+  async deleteImage(imageId: number): Promise<void> {
+    if (!this.vehicleId) return;
 
-    void Swal.fire({
-      icon: 'warning',
+    const result = await showConfirmDialog({
       title: 'Eliminar imagen',
       text: '¿Estás seguro de eliminar esta imagen?',
-      showCancelButton: true,
-      confirmButtonText: 'Sí, eliminar',
-      cancelButtonText: 'Cancelar',
-    }).then((result) => {
-      if (!result.isConfirmed) return;
-
-      const sub = this.vehicleImageService
-        .deleteImage(this.vehicleId!, imageId)
-        .subscribe({
-          next: () => {
-            this.loadVehicleImages(this.vehicleId!);
-          },
-          error: () => {
-            void Swal.fire({
-              icon: 'error',
-              title: 'No se pudo eliminar',
-              text: 'Ocurrió un problema al eliminar la imagen.',
-            });
-          },
-        });
-
-      this.subscriptions.push(sub);
+      confirmText: 'Sí, eliminar',
+      cancelText: 'Cancelar',
     });
+
+    if (!result.isConfirmed) return;
+
+    const deleted = await this.imageUploadService.deleteImage(
+      this.vehicleId,
+      imageId,
+    );
+    if (deleted) {
+      this.loadVehicleImages(this.vehicleId);
+    }
   }
 
-  private submitCar() {
-    const payload: CarPayload = {
-      id: this.vehicleId ?? undefined,
-      ...this.pickCommonFields(),
-      bodyType: this.formGroup.get('bodyType')!.value ?? '',
-      fuelType: this.formGroup.get('fuelType')!.value ?? '',
-      numberOfDoors: Number(this.formGroup.get('numberOfDoors')!.value ?? 4),
-    };
-    return this.isEditMode && this.vehicleId
-      ? this.carService.update(this.vehicleId, payload as Car)
-      : this.carService.create(payload as Car);
-  }
-
-  private submitMotorcycle() {
-    const payload: MotorcyclePayload = {
-      id: this.vehicleId ?? undefined,
-      ...this.pickCommonFields(),
-      motorcycleType: this.formGroup.get('motorcycleType')!.value ?? '',
-    };
-    return this.isEditMode && this.vehicleId
-      ? this.motorcycleService.update(this.vehicleId, payload as Motorcycle)
-      : this.motorcycleService.create(payload as Motorcycle);
-  }
-
-  private pickCommonFields() {
-    return {
-      brand: (this.formGroup.get('brand')!.value ?? '').trim(),
-      model: (this.formGroup.get('model')!.value ?? '').trim(),
-      capacity: Number(this.formGroup.get('capacity')!.value ?? 0),
-      line: (this.formGroup.get('line')!.value ?? '').trim(),
-      plate: (this.formGroup.get('plate')!.value ?? '').trim().toUpperCase(),
-      motorNumber: (this.formGroup.get('motorNumber')!.value ?? '').trim(),
-      serialNumber: (this.formGroup.get('serialNumber')!.value ?? '').trim(),
-      chassisNumber: (this.formGroup.get('chassisNumber')!.value ?? '').trim(),
-      color: (this.formGroup.get('color')!.value ?? '').trim(),
-      cityRegistered: (
-        this.formGroup.get('cityRegistered')!.value ?? ''
-      ).trim(),
-      year: Number(this.formGroup.get('year')!.value ?? 0),
-      mileage: Number(this.formGroup.get('mileage')!.value ?? 0),
-      transmission: (this.formGroup.get('transmission')!.value ?? '').trim(),
-      purchasePrice: Number(this.formGroup.get('purchasePrice')!.value ?? 0),
-      salePrice: Number(this.formGroup.get('salePrice')!.value ?? 0),
-      status: (this.formGroup.get('status')!.value ??
-        VehicleStatus.AVAILABLE) as VehicleStatus,
-      photoUrl: this.formGroup.get('photoUrl')!.value ?? undefined,
-    };
-  }
+  // ── Inputs de precio y kilometraje ─────────────────────────────
 
   onPriceInput(
     field: 'purchasePrice' | 'salePrice',
@@ -462,12 +350,12 @@ export class VehicleFormComponent implements OnInit, OnDestroy {
 
     if (field === 'purchasePrice') {
       this.purchasePriceInput = displayValue;
-      this.formGroup.get('purchasePrice')?.setValue(numericValue);
+      this.formGroup.controls.purchasePrice.setValue(numericValue);
       return;
     }
 
     this.salePriceInput = displayValue;
-    this.formGroup.get('salePrice')?.setValue(numericValue);
+    this.formGroup.controls.salePrice.setValue(numericValue);
   }
 
   onMileageInput(rawValue: string | null | undefined = ''): void {
@@ -476,29 +364,75 @@ export class VehicleFormComponent implements OnInit, OnDestroy {
       0,
     );
     this.mileageInput = displayValue;
-    this.formGroup.get('mileage')?.setValue(numericValue);
+    this.formGroup.controls.mileage.setValue(numericValue);
   }
 
-  private loadVehicle(id: number): void {
-    this.loadingSignal.set(true);
-    if (this.vehicleType === 'CAR') {
-      const sub = this.carService
-        .getById(id)
-        .pipe(finalize(() => this.loadingSignal.set(false)))
-        .subscribe({
-          next: (vehicle) => {
-            this.patchVehicleForm(vehicle);
-            this.loadVehicleImages(id);
-          },
-          error: () => this.handleLoadError(),
-        });
-      this.subscriptions.push(sub);
-      return;
-    }
+  // ── Payloads y submit helpers ──────────────────────────────────
 
-    const sub = this.motorcycleService
-      .getById(id)
-      .pipe(finalize(() => this.loadingSignal.set(false)))
+  private submitCar() {
+    const c = this.formGroup.controls;
+    const payload: CarPayload = {
+      id: this.vehicleId ?? undefined,
+      ...this.pickCommonFields(),
+      bodyType: c.bodyType.value ?? '',
+      fuelType: c.fuelType.value ?? '',
+      numberOfDoors: Number(c.numberOfDoors.value ?? 4),
+    };
+    return this.isEditMode && this.vehicleId
+      ? this.carService.update(this.vehicleId, payload as Car)
+      : this.carService.create(payload as Car);
+  }
+
+  private submitMotorcycle() {
+    const c = this.formGroup.controls;
+    const payload: MotorcyclePayload = {
+      id: this.vehicleId ?? undefined,
+      ...this.pickCommonFields(),
+      motorcycleType: c.motorcycleType.value ?? '',
+    };
+    return this.isEditMode && this.vehicleId
+      ? this.motorcycleService.update(this.vehicleId, payload as Motorcycle)
+      : this.motorcycleService.create(payload as Motorcycle);
+  }
+
+  private pickCommonFields() {
+    const c = this.formGroup.controls;
+    return {
+      brand: (c.brand.value ?? '').trim(),
+      model: (c.model.value ?? '').trim(),
+      capacity: Number(c.capacity.value ?? 0),
+      line: (c.line.value ?? '').trim(),
+      plate: (c.plate.value ?? '').trim().toUpperCase(),
+      motorNumber: (c.motorNumber.value ?? '').trim(),
+      serialNumber: (c.serialNumber.value ?? '').trim(),
+      chassisNumber: (c.chassisNumber.value ?? '').trim(),
+      color: (c.color.value ?? '').trim(),
+      cityRegistered: (c.cityRegistered.value ?? '').trim(),
+      year: Number(c.year.value ?? 0),
+      mileage: Number(c.mileage.value ?? 0),
+      transmission: (c.transmission.value ?? '').trim(),
+      purchasePrice: Number(c.purchasePrice.value ?? 0),
+      salePrice: Number(c.salePrice.value ?? 0),
+      status: (c.status.value ?? VehicleStatus.AVAILABLE) as VehicleStatus,
+      photoUrl: c.photoUrl.value ?? undefined,
+    };
+  }
+
+  // ── Carga de datos ─────────────────────────────────────────────
+
+  private loadVehicle(id: number): void {
+    this.loading.set(true);
+    const service$ = (
+      this.vehicleType === 'CAR'
+        ? this.carService.getById(id)
+        : this.motorcycleService.getById(id)
+    ) as Observable<Car | Motorcycle>;
+
+    service$
+      .pipe(
+        finalize(() => this.loading.set(false)),
+        takeUntilDestroyed(this.destroyRef),
+      )
       .subscribe({
         next: (vehicle) => {
           this.patchVehicleForm(vehicle);
@@ -506,24 +440,17 @@ export class VehicleFormComponent implements OnInit, OnDestroy {
         },
         error: () => this.handleLoadError(),
       });
-    this.subscriptions.push(sub);
   }
 
   private patchVehicleForm(vehicle: Car | Motorcycle): void {
-    this.formGroup.patchValue({
-      ...vehicle,
-    });
+    this.formGroup.patchValue({ ...vehicle });
     this.purchasePriceInput = this.formatPriceInput(vehicle.purchasePrice);
     this.salePriceInput = this.formatPriceInput(vehicle.salePrice);
     this.mileageInput = this.formatMileage(vehicle.mileage);
   }
 
   private handleLoadError(): void {
-    void Swal.fire({
-      icon: 'error',
-      title: 'No se pudo cargar el vehículo',
-      text: 'Verifica el identificador e intenta nuevamente.',
-    });
+    void showErrorAlert('Verifica el identificador e intenta nuevamente.');
     void this.router.navigate(['/vehicles']);
   }
 
@@ -541,86 +468,52 @@ export class VehicleFormComponent implements OnInit, OnDestroy {
     });
   }
 
-  private buildForm(): FormGroup {
-    return this.formBuilder.group({
-      brand: [
-        '',
-        [Validators.required, lengthValidator(2, 20), noWhitespaceValidator()],
-      ],
-      model: [
-        '',
-        [Validators.required, lengthValidator(1, 20), noWhitespaceValidator()],
-      ],
-      capacity: [null, [Validators.required, Validators.min(1)]],
-      line: [
-        '',
-        [Validators.required, lengthValidator(1, 20), noWhitespaceValidator()],
-      ],
-      plate: [
-        '',
-        [
-          Validators.required,
-          lengthValidator(5, 10),
-          Validators.pattern(/^[A-Z0-9-]+$/i),
-        ],
-      ],
-      motorNumber: [
-        '',
-        [Validators.required, lengthValidator(5, 30), noWhitespaceValidator()],
-      ],
-      serialNumber: [
-        '',
-        [Validators.required, lengthValidator(5, 30), noWhitespaceValidator()],
-      ],
-      chassisNumber: [
-        '',
-        [Validators.required, lengthValidator(5, 30), noWhitespaceValidator()],
-      ],
-      color: [
-        '',
-        [Validators.required, lengthValidator(3, 20), noWhitespaceValidator()],
-      ],
-      cityRegistered: [
-        '',
-        [Validators.required, lengthValidator(3, 30), noWhitespaceValidator()],
-      ],
-      year: [
-        null,
-        [Validators.required, Validators.min(1950), Validators.max(2050)],
-      ],
-      mileage: [null, [Validators.required, Validators.min(0)]],
-      transmission: [
-        '',
-        [Validators.required, lengthValidator(3, 20), noWhitespaceValidator()],
-      ],
-      purchasePrice: [null, [Validators.required, Validators.min(0)]],
-      salePrice: [null, [Validators.min(0)]],
-      status: [VehicleStatus.AVAILABLE, Validators.required],
-      photoUrl: [''],
-      bodyType: [''],
-      fuelType: [''],
-      numberOfDoors: [4],
-      motorcycleType: [''],
+  // ── Construcción del formulario ────────────────────────────────
+
+  private buildForm(): FormGroup<VehicleFormControls> {
+    return this.formBuilder.group<VehicleFormControls>({
+      brand: new FormControl('', textFieldValidators(2, 20)),
+      model: new FormControl('', textFieldValidators(1, 20)),
+      capacity: new FormControl(null, [Validators.required, Validators.min(1)]),
+      line: new FormControl('', textFieldValidators(1, 20)),
+      plate: new FormControl('', [
+        Validators.required,
+        lengthValidator(5, 10),
+        Validators.pattern(/^[A-Z0-9-]+$/i),
+      ]),
+      motorNumber: new FormControl('', textFieldValidators(5, 30)),
+      serialNumber: new FormControl('', textFieldValidators(5, 30)),
+      chassisNumber: new FormControl('', textFieldValidators(5, 30)),
+      color: new FormControl('', textFieldValidators(3, 20)),
+      cityRegistered: new FormControl('', textFieldValidators(3, 30)),
+      year: new FormControl(null, [
+        Validators.required,
+        Validators.min(1950),
+        Validators.max(2050),
+      ]),
+      mileage: new FormControl(null, [Validators.required, Validators.min(0)]),
+      transmission: new FormControl('', textFieldValidators(3, 20)),
+      purchasePrice: new FormControl(null, [
+        Validators.required,
+        Validators.min(0),
+      ]),
+      salePrice: new FormControl(null, [Validators.min(0)]),
+      status: new FormControl(VehicleStatus.AVAILABLE, Validators.required),
+      photoUrl: new FormControl(''),
+      bodyType: new FormControl(''),
+      fuelType: new FormControl(''),
+      numberOfDoors: new FormControl(4),
+      motorcycleType: new FormControl(''),
     });
   }
 
   private applyTypeSpecificValidators(): void {
-    const bodyType = this.formGroup.get('bodyType')!;
-    const fuelType = this.formGroup.get('fuelType')!;
-    const numberOfDoors = this.formGroup.get('numberOfDoors')!;
-    const motorcycleType = this.formGroup.get('motorcycleType')!;
+    const { bodyType, fuelType, numberOfDoors, motorcycleType } =
+      this.formGroup.controls;
 
     if (this.vehicleType === 'CAR') {
-      bodyType.setValidators([
-        Validators.required,
-        lengthValidator(3, 20),
-        noWhitespaceValidator(),
-      ]);
-      fuelType.setValidators([
-        Validators.required,
-        lengthValidator(3, 20),
-        noWhitespaceValidator(),
-      ]);
+      bodyType.setValidators(textFieldValidators(3, 20));
+      fuelType.setValidators(textFieldValidators(3, 20));
       numberOfDoors.setValidators([
         Validators.required,
         Validators.min(2),
@@ -629,11 +522,7 @@ export class VehicleFormComponent implements OnInit, OnDestroy {
       motorcycleType.clearValidators();
       motorcycleType.reset('');
     } else {
-      motorcycleType.setValidators([
-        Validators.required,
-        lengthValidator(3, 20),
-        noWhitespaceValidator(),
-      ]);
+      motorcycleType.setValidators(textFieldValidators(3, 20));
       bodyType.clearValidators();
       fuelType.clearValidators();
       numberOfDoors.clearValidators();
@@ -649,35 +538,7 @@ export class VehicleFormComponent implements OnInit, OnDestroy {
   }
 
   private normalizeType(raw: unknown): VehicleFormType {
-    if (raw === 'motorcycle') {
-      return 'MOTORCYCLE';
-    }
-    return 'CAR';
-  }
-
-  private resolveContentType(file: File): string {
-    if (file.type === 'image/jpg') {
-      return 'image/jpeg';
-    }
-    return file.type || 'image/jpeg';
-  }
-
-  private shouldRetryUpload(error: Error): boolean {
-    const errWithCustomProps = error as Error & {
-      status?: number;
-      error?: string;
-    };
-    if (errWithCustomProps?.status === 0) return true;
-    const msg =
-      typeof errWithCustomProps?.error === 'string'
-        ? errWithCustomProps.error
-        : '';
-    return (
-      msg.includes('SignatureDoesNotMatch') ||
-      msg.includes('MissingContentLength') ||
-      msg.includes('expired') ||
-      msg.includes('Request has expired')
-    );
+    return raw === 'motorcycle' ? 'MOTORCYCLE' : 'CAR';
   }
 
   private loadVehicleImages(vehicleId: number): void {

@@ -1,5 +1,5 @@
 <app-form-shell
-  [loading]="isLoading()"
+  [loading]="loading()"
   [title]="titleText"
   [subtitle]="subtitleText"
   [icon]="headerIcon"
@@ -72,8 +72,9 @@
                 [readonly]="isEditMode"
                 [ngClass]="{
                   'is-invalid':
-                    nationalId?.invalid &&
-                    (nationalId?.dirty || nationalId?.touched),
+                    formGroup.controls.nationalId.invalid &&
+                    (formGroup.controls.nationalId.dirty ||
+                      formGroup.controls.nationalId.touched),
                 }"
               />
               <label for="nationalId"
@@ -81,13 +82,13 @@
                 cédula</label
               >
               <div class="invalid-feedback">
-                @if (nationalId?.hasError("required")) {
+                @if (formGroup.controls.nationalId.hasError("required")) {
                   <div>La cédula es requerida.</div>
                 }
-                @if (nationalId?.hasError("pattern")) {
+                @if (formGroup.controls.nationalId.hasError("pattern")) {
                   <div>Solo se permiten números.</div>
                 }
-                @if (nationalId?.hasError("invalidLength")) {
+                @if (formGroup.controls.nationalId.hasError("invalidLength")) {
                   <div>Debe tener entre 7 y 10 dígitos.</div>
                 }
               </div>
@@ -103,21 +104,22 @@
                 formControlName="firstName"
                 [ngClass]="{
                   'is-invalid':
-                    firstName?.invalid &&
-                    (firstName?.dirty || firstName?.touched),
+                    formGroup.controls.firstName.invalid &&
+                    (formGroup.controls.firstName.dirty ||
+                      formGroup.controls.firstName.touched),
                 }"
               />
               <label for="firstName"
                 ><i class="bi bi-person-fill me-2"></i>Nombres</label
               >
               <div class="invalid-feedback">
-                @if (firstName?.hasError("required")) {
+                @if (formGroup.controls.firstName.hasError("required")) {
                   <div>El nombre es requerido.</div>
                 }
-                @if (firstName?.hasError("invalidLength")) {
+                @if (formGroup.controls.firstName.hasError("invalidLength")) {
                   <div>Debe tener entre 3 y 30 caracteres.</div>
                 }
-                @if (firstName?.hasError("whitespace")) {
+                @if (formGroup.controls.firstName.hasError("whitespace")) {
                   <div>No se permiten espacios en blanco.</div>
                 }
               </div>
@@ -133,20 +135,22 @@
                 formControlName="lastName"
                 [ngClass]="{
                   'is-invalid':
-                    lastName?.invalid && (lastName?.dirty || lastName?.touched),
+                    formGroup.controls.lastName.invalid &&
+                    (formGroup.controls.lastName.dirty ||
+                      formGroup.controls.lastName.touched),
                 }"
               />
               <label for="lastName"
                 ><i class="bi bi-person-lines-fill me-2"></i>Apellidos</label
               >
               <div class="invalid-feedback">
-                @if (lastName?.hasError("required")) {
+                @if (formGroup.controls.lastName.hasError("required")) {
                   <div>El apellido es requerido.</div>
                 }
-                @if (lastName?.hasError("invalidLength")) {
+                @if (formGroup.controls.lastName.hasError("invalidLength")) {
                   <div>Debe tener entre 3 y 40 caracteres.</div>
                 }
-                @if (lastName?.hasError("whitespace")) {
+                @if (formGroup.controls.lastName.hasError("whitespace")) {
                   <div>No se permiten espacios en blanco.</div>
                 }
               </div>
@@ -173,7 +177,9 @@
                 [readonly]="isEditMode"
                 [ngClass]="{
                   'is-invalid':
-                    taxId?.invalid && (taxId?.dirty || taxId?.touched),
+                    formGroup.controls.taxId.invalid &&
+                    (formGroup.controls.taxId.dirty ||
+                      formGroup.controls.taxId.touched),
                 }"
               />
               <label for="taxId"
@@ -181,13 +187,13 @@
                 Identificación</label
               >
               <div class="invalid-feedback">
-                @if (taxId?.hasError("required")) {
+                @if (formGroup.controls.taxId.hasError("required")) {
                   <div>El NIT es requerido.</div>
                 }
-                @if (taxId?.hasError("pattern")) {
+                @if (formGroup.controls.taxId.hasError("pattern")) {
                   <div>Solo se permiten números.</div>
                 }
-                @if (taxId?.hasError("invalidLength")) {
+                @if (formGroup.controls.taxId.hasError("invalidLength")) {
                   <div>Debe tener entre 10 y 13 dígitos.</div>
                 }
               </div>
@@ -203,21 +209,22 @@
                 formControlName="companyName"
                 [ngClass]="{
                   'is-invalid':
-                    companyName?.invalid &&
-                    (companyName?.dirty || companyName?.touched),
+                    formGroup.controls.companyName.invalid &&
+                    (formGroup.controls.companyName.dirty ||
+                      formGroup.controls.companyName.touched),
                 }"
               />
               <label for="companyName"
                 ><i class="bi bi-buildings me-2"></i>Razón social</label
               >
               <div class="invalid-feedback">
-                @if (companyName?.hasError("required")) {
+                @if (formGroup.controls.companyName.hasError("required")) {
                   <div>La razón social es requerida.</div>
                 }
-                @if (companyName?.hasError("invalidLength")) {
+                @if (formGroup.controls.companyName.hasError("invalidLength")) {
                   <div>Debe tener entre 3 y 60 caracteres.</div>
                 }
-                @if (companyName?.hasError("whitespace")) {
+                @if (formGroup.controls.companyName.hasError("whitespace")) {
                   <div>No se permiten espacios en blanco.</div>
                 }
               </div>
@@ -242,21 +249,22 @@
               formControlName="phoneNumber"
               [ngClass]="{
                 'is-invalid':
-                  phoneNumber?.invalid &&
-                  (phoneNumber?.dirty || phoneNumber?.touched),
+                  formGroup.controls.phoneNumber.invalid &&
+                  (formGroup.controls.phoneNumber.dirty ||
+                    formGroup.controls.phoneNumber.touched),
               }"
             />
             <label for="phoneNumber"
               ><i class="bi bi-telephone me-2"></i>Número de teléfono</label
             >
             <div class="invalid-feedback">
-              @if (phoneNumber?.hasError("required")) {
+              @if (formGroup.controls.phoneNumber.hasError("required")) {
                 <div>El teléfono es requerido.</div>
               }
-              @if (phoneNumber?.hasError("pattern")) {
+              @if (formGroup.controls.phoneNumber.hasError("pattern")) {
                 <div>Solo se permiten números.</div>
               }
-              @if (phoneNumber?.hasError("invalidLength")) {
+              @if (formGroup.controls.phoneNumber.hasError("invalidLength")) {
                 <div>Debe tener exactamente 10 dígitos.</div>
               }
             </div>
@@ -272,20 +280,22 @@
               formControlName="email"
               [ngClass]="{
                 'is-invalid':
-                  email?.invalid && (email?.dirty || email?.touched),
+                  formGroup.controls.email.invalid &&
+                  (formGroup.controls.email.dirty ||
+                    formGroup.controls.email.touched),
               }"
             />
             <label for="email"
               ><i class="bi bi-envelope-at me-2"></i>Correo electrónico</label
             >
             <div class="invalid-feedback">
-              @if (email?.hasError("required")) {
+              @if (formGroup.controls.email.hasError("required")) {
                 <div>El correo es requerido.</div>
               }
-              @if (email?.hasError("email")) {
+              @if (formGroup.controls.email.hasError("email")) {
                 <div>Ingrese un correo válido.</div>
               }
-              @if (email?.hasError("invalidLength")) {
+              @if (formGroup.controls.email.hasError("invalidLength")) {
                 <div>Debe tener entre 6 y 80 caracteres.</div>
               }
             </div>
@@ -317,20 +327,32 @@
               formControlName="street"
               [ngClass]="{
                 'is-invalid':
-                  street?.invalid && (street?.dirty || street?.touched),
+                  formGroup.controls.address.controls.street.invalid &&
+                  (formGroup.controls.address.controls.street.dirty ||
+                    formGroup.controls.address.controls.street.touched),
               }"
             />
             <label for="street"
               ><i class="bi bi-geo-alt me-2"></i>Calle principal</label
             >
             <div class="invalid-feedback">
-              @if (street?.hasError("required")) {
+              @if (
+                formGroup.controls.address.controls.street.hasError("required")
+              ) {
                 <div>La calle es requerida.</div>
               }
-              @if (street?.hasError("invalidLength")) {
+              @if (
+                formGroup.controls.address.controls.street.hasError(
+                  "invalidLength"
+                )
+              ) {
                 <div>Debe tener entre 5 y 80 caracteres.</div>
               }
-              @if (street?.hasError("whitespace")) {
+              @if (
+                formGroup.controls.address.controls.street.hasError(
+                  "whitespace"
+                )
+              ) {
                 <div>No se permiten espacios en blanco.</div>
               }
             </div>
@@ -346,18 +368,30 @@
               formControlName="number"
               [ngClass]="{
                 'is-invalid':
-                  number?.invalid && (number?.dirty || number?.touched),
+                  formGroup.controls.address.controls.number.invalid &&
+                  (formGroup.controls.address.controls.number.dirty ||
+                    formGroup.controls.address.controls.number.touched),
               }"
             />
             <label for="number"><i class="bi bi-hash me-2"></i>Número</label>
             <div class="invalid-feedback">
-              @if (number?.hasError("required")) {
+              @if (
+                formGroup.controls.address.controls.number.hasError("required")
+              ) {
                 <div>El número es requerido.</div>
               }
-              @if (number?.hasError("invalidLength")) {
+              @if (
+                formGroup.controls.address.controls.number.hasError(
+                  "invalidLength"
+                )
+              ) {
                 <div>Debe tener entre 1 y 10 caracteres.</div>
               }
-              @if (number?.hasError("whitespace")) {
+              @if (
+                formGroup.controls.address.controls.number.hasError(
+                  "whitespace"
+                )
+              ) {
                 <div>No se permiten espacios en blanco.</div>
               }
             </div>
@@ -372,18 +406,29 @@
               placeholder="Ciudad"
               formControlName="city"
               [ngClass]="{
-                'is-invalid': city?.invalid && (city?.dirty || city?.touched),
+                'is-invalid':
+                  formGroup.controls.address.controls.city.invalid &&
+                  (formGroup.controls.address.controls.city.dirty ||
+                    formGroup.controls.address.controls.city.touched),
               }"
             />
             <label for="city"><i class="bi bi-geo me-2"></i>Ciudad</label>
             <div class="invalid-feedback">
-              @if (city?.hasError("required")) {
+              @if (
+                formGroup.controls.address.controls.city.hasError("required")
+              ) {
                 <div>La ciudad es requerida.</div>
               }
-              @if (city?.hasError("invalidLength")) {
+              @if (
+                formGroup.controls.address.controls.city.hasError(
+                  "invalidLength"
+                )
+              ) {
                 <div>Debe tener entre 3 y 60 caracteres.</div>
               }
-              @if (city?.hasError("whitespace")) {
+              @if (
+                formGroup.controls.address.controls.city.hasError("whitespace")
+              ) {
                 <div>No se permiten espacios en blanco.</div>
               }
             </div>
@@ -401,9 +446,9 @@
       type="submit"
       class="btn btn-primary"
       (click)="onSubmit()"
-      [disabled]="formGroup.invalid || isSubmitting"
+      [disabled]="formGroup.invalid || submitting()"
     >
-      @if (isSubmitting) {
+      @if (submitting()) {
         <span
           class="spinner-border spinner-border-sm me-2"
           aria-hidden="true"
