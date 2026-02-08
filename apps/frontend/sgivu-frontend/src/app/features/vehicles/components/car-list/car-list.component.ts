@@ -64,15 +64,11 @@ export class CarListComponent implements OnInit {
   private queryParams: Params | null = null;
   private readonly priceDecimals = 0;
 
-  // ─── Propiedades del template ──────────────────────────
-
   readonly pagerUrl = '/vehicles/cars/page';
 
   get activePagerQueryParams(): Params | null {
     return this.queryParams;
   }
-
-  // ─── Lifecycle ─────────────────────────────────────────
 
   ngOnInit(): void {
     combineLatest([this.route.paramMap, this.route.queryParamMap])
@@ -94,8 +90,6 @@ export class CarListComponent implements OnInit {
         this.loadCars(page, this.activeFilters ?? undefined);
       });
   }
-
-  // ─── Acciones del template ─────────────────────────────
 
   protected applyFilters(): void {
     this.syncPriceFilters();
@@ -191,8 +185,6 @@ export class CarListComponent implements OnInit {
     return Number.isNaN(parsed) ? null : parsed;
   }
 
-  // ─── Privados ──────────────────────────────────────────
-
   private static computeVehicleCounts(items: Car[]): {
     active: number;
     inactive: number;
@@ -253,8 +245,6 @@ export class CarListComponent implements OnInit {
     this.onPriceInput('minSalePrice', this.priceInputs.minSalePrice);
     this.onPriceInput('maxSalePrice', this.priceInputs.maxSalePrice);
   }
-
-  // ─── Filtros ───────────────────────────────────────────
 
   private createFilterState(): CarSearchFilters {
     return {

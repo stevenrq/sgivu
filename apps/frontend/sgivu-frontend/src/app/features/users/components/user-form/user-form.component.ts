@@ -183,8 +183,6 @@ export class UserFormComponent implements OnInit {
     void this.router.navigate(this.submitCopy.redirectCommand);
   }
 
-  // ── Construcción del formulario ────────────────────────────────
-
   private buildForm(): FormGroup<UserFormControls> {
     return this.formBuilder.group({
       nationalId: new FormControl<string | null>('', [
@@ -228,8 +226,6 @@ export class UserFormComponent implements OnInit {
     });
   }
 
-  // ── Configuración de contraseña ────────────────────────────────
-
   private configurePasswordWatcher(): void {
     const passwordControl = this.formGroup.controls.password;
 
@@ -250,8 +246,6 @@ export class UserFormComponent implements OnInit {
         passwordControl.updateValueAndValidity({ emitEvent: false });
       });
   }
-
-  // ── Modo edición ───────────────────────────────────────────────
 
   private activateEditMode(id: number): void {
     if (this.currentUserId === id && this.isEditMode) return;
@@ -326,8 +320,6 @@ export class UserFormComponent implements OnInit {
     ]);
     pw.updateValueAndValidity({ emitEvent: false });
   }
-
-  // ── Submit config y payload ────────────────────────────────────
 
   private buildSubmitConfig(): SubmitConfig {
     const payload = this.buildUserPayload();

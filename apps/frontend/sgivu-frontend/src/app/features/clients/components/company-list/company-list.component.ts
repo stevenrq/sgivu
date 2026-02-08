@@ -55,16 +55,12 @@ export class CompanyListComponent implements OnInit {
   private activeFilters: CompanySearchFilters | null = null;
   private queryParams: Params | null = null;
 
-  // ─── Propiedades del template ──────────────────────────
-
   readonly pagerUrl = '/clients/companies/page';
   readonly pagerLabel = 'empresas';
 
   get activePagerQueryParams(): Params | null {
     return this.queryParams;
   }
-
-  // ─── Lifecycle ─────────────────────────────────────────
 
   ngOnInit(): void {
     combineLatest([this.route.paramMap, this.route.queryParamMap])
@@ -85,8 +81,6 @@ export class CompanyListComponent implements OnInit {
         this.loadCompanies(page, this.activeFilters ?? undefined);
       });
   }
-
-  // ─── Acciones del template ─────────────────────────────
 
   protected applyFilters(): void {
     const filters = this.buildFilters();
@@ -121,8 +115,6 @@ export class CompanyListComponent implements OnInit {
       company.companyName,
     );
   }
-
-  // ─── Privados ──────────────────────────────────────────
 
   private loadCompanies(page: number, filters?: CompanySearchFilters): void {
     const activeFilters =
@@ -177,8 +169,6 @@ export class CompanyListComponent implements OnInit {
       void this.router.navigate(commands);
     }
   }
-
-  // ─── Filtros ───────────────────────────────────────────
 
   private createFilterState(): CompanySearchFilters & {
     enabled?: FilterEnabled;

@@ -55,16 +55,12 @@ export class PersonListComponent implements OnInit {
   private activeFilters: PersonSearchFilters | null = null;
   private queryParams: Params | null = null;
 
-  // ─── Propiedades del template ──────────────────────────
-
   readonly pagerUrl = '/clients/persons/page';
   readonly pagerLabel = 'personas';
 
   get activePagerQueryParams(): Params | null {
     return this.queryParams;
   }
-
-  // ─── Lifecycle ─────────────────────────────────────────
 
   ngOnInit(): void {
     combineLatest([this.route.paramMap, this.route.queryParamMap])
@@ -85,8 +81,6 @@ export class PersonListComponent implements OnInit {
         this.loadPersons(page, this.activeFilters ?? undefined);
       });
   }
-
-  // ─── Acciones del template ─────────────────────────────
 
   protected applyFilters(): void {
     const filters = this.buildFilters();
@@ -121,8 +115,6 @@ export class PersonListComponent implements OnInit {
       `${person.firstName} ${person.lastName}`.trim(),
     );
   }
-
-  // ─── Privados ──────────────────────────────────────────
 
   private loadPersons(page: number, filters?: PersonSearchFilters): void {
     const activeFilters =
@@ -172,8 +164,6 @@ export class PersonListComponent implements OnInit {
       void this.router.navigate(commands);
     }
   }
-
-  // ─── Filtros ───────────────────────────────────────────
 
   private createFilterState(): PersonSearchFilters & {
     enabled?: FilterEnabled;

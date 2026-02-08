@@ -211,8 +211,6 @@ export class ClientFormComponent implements OnInit {
     void this.router.navigate(this.getRedirectCommand(this.clientType));
   }
 
-  // ── Configuración de submit ────────────────────────────────────
-
   private buildSubmitConfig(): SubmitConfig {
     if (this.clientType === 'PERSON') {
       const payload = this.buildPersonPayload();
@@ -243,8 +241,6 @@ export class ClientFormComponent implements OnInit {
     return [...this.submitMessages[type].redirectCommand];
   }
 
-  // ── Construcción del formulario ────────────────────────────────
-
   private buildForm(): FormGroup<ClientFormControls> {
     return this.formBuilder.group({
       type: new FormControl<ClientType>('PERSON', { nonNullable: true }),
@@ -267,8 +263,6 @@ export class ClientFormComponent implements OnInit {
       enabled: new FormControl<boolean>(true, { nonNullable: true }),
     });
   }
-
-  // ── Configuración por tipo de cliente ──────────────────────────
 
   private applyTypeSpecificSetup(type: ClientType): void {
     if (type === 'PERSON') {
@@ -342,8 +336,6 @@ export class ClientFormComponent implements OnInit {
     companyName.disable({ emitEvent: false });
   }
 
-  // ── Construcción de payloads ───────────────────────────────────
-
   private buildPersonPayload(): PersonPayload {
     const { nationalId, firstName, lastName, phoneNumber, email, enabled } =
       this.formGroup.getRawValue();
@@ -391,8 +383,6 @@ export class ClientFormComponent implements OnInit {
     return payload;
   }
 
-  // ── Utilidades de ruta ─────────────────────────────────────────
-
   private extractClientTypeFromRoute(): ClientType {
     const snapshotData = this.route.snapshot.data?.['clientType'] as
       | string
@@ -406,8 +396,6 @@ export class ClientFormComponent implements OnInit {
     if (!value) return 'PERSON';
     return value.toUpperCase() === 'COMPANY' ? 'COMPANY' : 'PERSON';
   }
-
-  // ── Carga de datos para edición ────────────────────────────────
 
   private loadClientForEdit(id: number, hintedType: ClientType): void {
     this.loading.set(true);

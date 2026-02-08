@@ -4,8 +4,6 @@ import { PaymentMethod } from './payment-method.enum';
 import { VehicleKind } from './vehicle-kind.enum';
 import { VehicleCreationPayload } from './purchase-sale.model';
 
-// ── Interfaces ───────────────────────────────────────────────────
-
 export interface ContractFormModel {
   clientId: number | null;
   userId: number | null;
@@ -42,8 +40,6 @@ export interface VehicleFormModel {
   numberOfDoors: number | null;
   motorcycleType: string;
 }
-
-// ── Factory Functions ────────────────────────────────────────────
 
 export function createDefaultContractForm(
   contractType: ContractType = ContractType.PURCHASE,
@@ -89,8 +85,6 @@ export function createDefaultVehicleForm(
     motorcycleType: '',
   };
 }
-
-// ── Payload Builder ──────────────────────────────────────────────
 
 export function buildVehiclePayload(
   form: VehicleFormModel,

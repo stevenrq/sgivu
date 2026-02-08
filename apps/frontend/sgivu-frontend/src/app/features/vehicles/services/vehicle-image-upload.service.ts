@@ -20,12 +20,14 @@ export class VehicleImageUploadService {
 
   readonly uploading = signal(false);
 
-  // ── Selección de archivos ──────────────────────────────────────
-
   /**
    * Valida y retorna los archivos de imagen seleccionados.
    * Retorna null si la selección es inválida.
+   *
+   * @param event - Evento de selección de archivos.
+   * @returns Objeto con archivos válidos y URL de previsualización, o null.
    */
+
   processFileSelection(event: Event): {
     files: File[];
     previewUrl: string;
@@ -54,11 +56,14 @@ export class VehicleImageUploadService {
     };
   }
 
-  // ── Subida de imágenes ─────────────────────────────────────────
-
   /**
    * Sube una lista de archivos al vehículo indicado.
    * Maneja reintentos, alertas de éxito/error, y actualiza la lista de imágenes.
+   *
+   * @param vehicleId - ID del vehículo al que se subirán las imágenes.
+   * @param files - Lista de archivos a subir.
+   * @param currentImages - Imágenes actuales del vehículo para determinar la primaria.
+   * @returns Objeto indicando si la subida fue exitosa.
    */
   async uploadFiles(
     vehicleId: number,
@@ -92,10 +97,12 @@ export class VehicleImageUploadService {
     }
   }
 
-  // ── Eliminación de imágenes ────────────────────────────────────
-
   /**
    * Elimina una imagen del vehículo. Retorna true si se eliminó correctamente.
+   *
+   * @param vehicleId - ID del vehículo.
+   * @param imageId - ID de la imagen a eliminar.
+   * @returns `true` si la imagen fue eliminada exitosamente, `false` en caso contrario.
    */
   async deleteImage(vehicleId: number, imageId: number): Promise<boolean> {
     try {
@@ -112,8 +119,6 @@ export class VehicleImageUploadService {
       return false;
     }
   }
-
-  // ── Helpers privados ───────────────────────────────────────────
 
   private async uploadSingleFile(
     vehicleId: number,

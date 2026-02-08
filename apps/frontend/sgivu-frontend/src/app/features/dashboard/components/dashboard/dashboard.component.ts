@@ -79,7 +79,6 @@ export class DashboardComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
   readonly lookupService = inject(PurchaseSaleLookupService);
 
-  // ── Señales de estado ──────────────────────────────────────────────
   private readonly latestModel = signal<ModelMetadata | null>(null);
   private readonly allContracts = signal<PurchaseSale[]>([]);
 
@@ -126,14 +125,10 @@ export class DashboardComponent implements OnInit {
 
   readonly latestModelValue = computed(() => this.latestModel());
 
-  // ── Ciclo de vida ──────────────────────────────────────────────────
-
   ngOnInit(): void {
     this.restoreSavedPrediction();
     this.loadDashboardData();
   }
-
-  // ── Carga de datos del dashboard ───────────────────────────────────
 
   private loadDashboardData(): void {
     this.isLoading.set(true);
@@ -191,8 +186,6 @@ export class DashboardComponent implements OnInit {
       });
   }
 
-  // ── Restauración de predicción guardada ────────────────────────────
-
   private restoreSavedPrediction(): void {
     const savedState = this.dashboardStateService.getLastPrediction();
     if (!savedState?.payload || !savedState?.response) {
@@ -244,8 +237,6 @@ export class DashboardComponent implements OnInit {
     }
   }
 
-  // ── Conteos de vehículos y gráfico de inventario ──────────────────
-
   private applyVehicleCounts(counts: {
     cars: VehicleCount;
     motorcycles: VehicleCount;
@@ -256,16 +247,12 @@ export class DashboardComponent implements OnInit {
     this.inventoryData.set(result.chartData);
   }
 
-  // ── Métricas de ventas ─────────────────────────────────────────────
-
   private applySalesMetrics(contracts: PurchaseSale[]): void {
     const metrics = computeSalesMetrics(contracts);
     this.salesHistoryCount.set(metrics.salesHistoryCount);
     this.monthlyRevenue.set(metrics.monthlyRevenue);
     this.monthlySales.set(metrics.monthlySales);
   }
-
-  // ── Formulario de predicción ───────────────────────────────────────
 
   private buildPredictionForm(): FormGroup {
     return this.fb.group({
@@ -279,8 +266,6 @@ export class DashboardComponent implements OnInit {
       ],
     });
   }
-
-  // ── Opciones de vehículos (vía lookup service) ────────────────────
 
   private loadVehicleOptions(): void {
     this.contractedVehiclesLoading.set(true);
@@ -301,8 +286,6 @@ export class DashboardComponent implements OnInit {
     }, 10000);
   }
 
-  // ── Segmentos ─────────────────────────────────────────────────────
-
   applySegment(segment: SegmentOption, autoRun = false): void {
     this.predictionForm.patchValue({
       vehicleType: segment.vehicleType,
@@ -314,8 +297,6 @@ export class DashboardComponent implements OnInit {
       this.onSubmitPrediction();
     }
   }
-
-  // ── Envío de predicción ────────────────────────────────────────────
 
   onSubmitPrediction(): void {
     const formValue = this.predictionForm.value;
@@ -398,8 +379,6 @@ export class DashboardComponent implements OnInit {
       });
   }
 
-  // ── Persistencia de estado ─────────────────────────────────────────
-
   private persistPredictionState(
     payload: DemandPredictionRequest,
     response: DemandPredictionResponse,
@@ -432,8 +411,6 @@ export class DashboardComponent implements OnInit {
     });
   }
 
-  // ── Auxiliar de escala de demanda ──────────────────────────────────
-
   private updateDemandScale(
     chartResult: ChartConfiguration<'line'>['data'] | null,
   ): void {
@@ -448,8 +425,6 @@ export class DashboardComponent implements OnInit {
       );
     }
   }
-
-  // ── Búsqueda rápida de vehículos ───────────────────────────────────
 
   filterVehicleOptions(term: string | null): void {
     const normalized = (term ?? '').trim().toUpperCase();
@@ -495,8 +470,6 @@ export class DashboardComponent implements OnInit {
     this.quickVehicleTerm = vehicle.label;
     this.onSubmitPrediction();
   }
-
-  // ── Reentrenamiento ───────────────────────────────────────────────
 
   onRetrain(): void {
     if (this.retrainLoading()) {

@@ -72,8 +72,6 @@ export class UserListComponent implements OnInit {
     return this.queryParams;
   }
 
-  // ─── Lifecycle ─────────────────────────────────────────
-
   ngOnInit(): void {
     combineLatest([this.route.paramMap, this.route.queryParamMap])
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -93,8 +91,6 @@ export class UserListComponent implements OnInit {
         this.loadUsers(page, this.activeFilters ?? undefined);
       });
   }
-
-  // ─── Acciones del template ─────────────────────────────
 
   protected search(): void {
     const filters = this.buildActiveFilters();
@@ -121,8 +117,6 @@ export class UserListComponent implements OnInit {
       ),
     );
   }
-
-  // ─── Privados ──────────────────────────────────────────
 
   private loadUsers(page: number, filters?: UserSearchFilters): void {
     const activeFilters =
@@ -167,8 +161,6 @@ export class UserListComponent implements OnInit {
       void this.router.navigate(commands);
     }
   }
-
-  // ─── Filtros ───────────────────────────────────────────
 
   private createDefaultFilters(): UserSearchFilters & {
     enabled?: boolean | null;

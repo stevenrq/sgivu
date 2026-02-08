@@ -2,6 +2,9 @@ import Swal, { SweetAlertResult } from 'sweetalert2';
 
 /**
  * Muestra una alerta de éxito con título "Operación exitosa".
+ *
+ * @param message - Mensaje a mostrar en la alerta.
+ * @returns Promise que resuelve con el resultado de la alerta.
  */
 export function showSuccessAlert(message: string): Promise<SweetAlertResult> {
   return Swal.fire({
@@ -14,6 +17,9 @@ export function showSuccessAlert(message: string): Promise<SweetAlertResult> {
 
 /**
  * Muestra una alerta de error con título "Ha ocurrido un error".
+ *
+ * @param message - Mensaje a mostrar en la alerta.
+ * @returns Promise que resuelve con el resultado de la alerta.
  */
 export function showErrorAlert(message: string): Promise<SweetAlertResult> {
   return Swal.fire({
@@ -26,6 +32,9 @@ export function showErrorAlert(message: string): Promise<SweetAlertResult> {
 
 /**
  * Muestra un diálogo de confirmación con botones de confirmar/cancelar.
+ *
+ * @param options - Configuración del diálogo, incluyendo título, texto, y opciones de botones.
+ * @return Promise que resuelve con el resultado de la alerta, indicando si se confirmó o canceló.
  */
 export function showConfirmDialog(options: {
   title: string;
@@ -46,6 +55,9 @@ export function showConfirmDialog(options: {
 
 /**
  * Muestra una alerta con icono y título personalizados.
+ *
+ * @param options - Configuración de la alerta, incluyendo icono, título y texto.
+ * @returns Promise que resuelve con el resultado de la alerta.
  */
 export function showAlert(options: {
   icon: 'success' | 'error' | 'warning' | 'info';
@@ -61,6 +73,10 @@ export function showAlert(options: {
 
 /**
  * Muestra una alerta de éxito temporizada que se cierra automáticamente.
+ *
+ * @param message - Mensaje a mostrar en la alerta.
+ * @param timer - Duración en milisegundos antes de cerrar la alerta (por defecto, 2200ms).
+ * @returns Promise que resuelve con el resultado de la alerta.
  */
 export function showTimedSuccessAlert(
   message: string,

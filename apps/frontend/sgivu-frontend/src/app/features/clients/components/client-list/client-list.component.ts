@@ -27,7 +27,10 @@ export class ClientListComponent implements OnInit {
 
   readonly activeTab = signal<ClientTab>('person');
 
-  private readonly tabConfig: Record<ClientTab, { createPermission: string; createLink: string[]; createLabel: string }> = {
+  private readonly tabConfig: Record<
+    ClientTab,
+    { createPermission: string; createLink: string[]; createLabel: string }
+  > = {
     person: {
       createPermission: 'person:create',
       createLink: ['/clients/persons/create'],
@@ -64,9 +67,10 @@ export class ClientListComponent implements OnInit {
     if (this.activeTab() === tab) {
       return;
     }
-    const route = tab === 'person'
-      ? ['/clients/persons/page', 0]
-      : ['/clients/companies/page', 0];
+    const route =
+      tab === 'person'
+        ? ['/clients/persons/page', 0]
+        : ['/clients/companies/page', 0];
     void this.router.navigate(route);
   }
 

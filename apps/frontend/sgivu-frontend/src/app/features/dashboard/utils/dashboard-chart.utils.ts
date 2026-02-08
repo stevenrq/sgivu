@@ -8,8 +8,6 @@ import {
   parseMonthKey,
 } from './dashboard-date.utils';
 
-// ── Constantes de opciones de gráficos ───────────────────────────────
-
 export const DEMAND_CHART_OPTIONS: ChartOptions<'line'> = {
   responsive: true,
   maintainAspectRatio: false,
@@ -85,8 +83,6 @@ export const INVENTORY_CHART_OPTIONS: ChartOptions<'doughnut'> = {
     },
   },
 };
-
-// ── Constructor del gráfico de pronóstico de demanda ────────────────
 
 export function buildForecastChartData(
   predictions: DemandPredictionPoint[],
@@ -175,8 +171,6 @@ export function buildForecastChartData(
   };
 }
 
-// ── Cálculo del rango de escala de demanda ──────────────────────────
-
 export function computeDemandScaleRange(
   baseOptions: ChartOptions<'line'>,
   values: (number | null)[],
@@ -208,8 +202,6 @@ export function computeDemandScaleRange(
     },
   };
 }
-
-// ── Constructor del gráfico de inventario (dona) ────────────────────
 
 export interface InventoryBreakdown {
   totalInventory: number;

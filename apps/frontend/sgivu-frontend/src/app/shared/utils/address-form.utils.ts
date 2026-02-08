@@ -11,7 +11,7 @@ import {
 } from '../validators/form.validator';
 
 /**
- * Controles del formulario de dirección compartido entre client-form y user-form.
+ * Controles del formulario de dirección compartido.
  */
 export interface AddressFormControls {
   street: FormControl<string | null>;
@@ -29,7 +29,7 @@ export interface AddressFieldLimits {
   city: { min: number; max: number; whitespace?: boolean };
 }
 
-/** Límites por defecto usados en client-form */
+/** Límites por defecto usados en el formulario de dirección */
 const DEFAULT_LIMITS: AddressFieldLimits = {
   street: { min: 5, max: 80, whitespace: true },
   number: { min: 1, max: 10, whitespace: true },
@@ -38,6 +38,10 @@ const DEFAULT_LIMITS: AddressFieldLimits = {
 
 /**
  * Construye un FormGroup<AddressFormControls> con validadores configurables.
+ *
+ * @param fb - FormBuilder para crear el grupo de formularios.
+ * @param limits - Límites de validación para cada campo de dirección.
+ * @returns FormGroup configurado para el formulario de dirección.
  */
 export function buildAddressFormGroup(
   fb: FormBuilder,
@@ -62,6 +66,10 @@ export function buildAddressFormGroup(
 
 /**
  * Normaliza los valores del grupo de dirección: recorta espacios y preserva el ID en modo edición.
+ *
+ * @param addressGroup - Grupo de formulario de dirección.
+ * @param editAddressId - ID de la dirección en modo edición (opcional).
+ * @returns Objeto Address normalizado.
  */
 export function normalizeAddress(
   addressGroup: FormGroup<AddressFormControls> | null,

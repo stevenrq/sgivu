@@ -96,8 +96,6 @@ export class PurchaseSaleCreateComponent implements OnInit {
   private readonly priceDecimals = 0;
   private readonly salePurchaseCache = new Map<number, number>();
 
-  // ── Funciones delegadas a módulos externos ─────────────────────
-
   readonly getStatusLabel = getStatusLabel;
   readonly getContractTypeLabel = getContractTypeLabel;
   readonly getPaymentMethodLabel = getPaymentMethodLabel;
@@ -110,8 +108,6 @@ export class PurchaseSaleCreateComponent implements OnInit {
     return this.contractForm.contractType === ContractType.SALE;
   }
 
-  // ── Ciclo de vida ──────────────────────────────────────────────
-
   ngOnInit(): void {
     this.loadLookups();
     this.refreshSummary();
@@ -120,8 +116,6 @@ export class PurchaseSaleCreateComponent implements OnInit {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((params) => this.applyQueryParams(params));
   }
-
-  // ── Submit ─────────────────────────────────────────────────────
 
   submitContract(contractFormRef: NgForm): void {
     this.formSubmitted = true;
@@ -177,8 +171,6 @@ export class PurchaseSaleCreateComponent implements OnInit {
       });
   }
 
-  // ── Cambios de tipo ────────────────────────────────────────────
-
   onContractTypeChange(type: ContractType): void {
     this.contractForm.contractType = type;
     this.contractForm.salePrice = null;
@@ -187,8 +179,6 @@ export class PurchaseSaleCreateComponent implements OnInit {
     this.purchasePriceInput = '';
     this.salePriceInput = '';
   }
-
-  // ── Selección de vehículo (venta) ──────────────────────────────
 
   onVehicleSelectionChange(vehicleId: number | null): void {
     if (!this.isSaleType) return;
@@ -229,8 +219,6 @@ export class PurchaseSaleCreateComponent implements OnInit {
       });
   }
 
-  // ── Precio / moneda ────────────────────────────────────────────
-
   formatCurrency(value: number | null | undefined): string {
     return formatCopCurrency(value, {
       minimumFractionDigits: 0,
@@ -253,8 +241,6 @@ export class PurchaseSaleCreateComponent implements OnInit {
     }
   }
 
-  // ── Control de errores del formulario ──────────────────────────
-
   showControlErrors(control: NgModel | null): boolean {
     if (!control) return false;
     return (
@@ -262,8 +248,6 @@ export class PurchaseSaleCreateComponent implements OnInit {
       (control.touched || control.dirty || this.formSubmitted)
     );
   }
-
-  // ── Reset ──────────────────────────────────────────────────────
 
   resetContractForm(form?: NgForm, keepSelections = false): void {
     const selectedContractType = keepSelections
@@ -281,8 +265,6 @@ export class PurchaseSaleCreateComponent implements OnInit {
     this.vehicleFormComp?.resetDisplayInputs();
     this.formSubmitted = false;
   }
-
-  // ── Carga de datos ─────────────────────────────────────────────
 
   private loadLookups(): void {
     this.isLoadingLookups.set(true);
@@ -316,8 +298,6 @@ export class PurchaseSaleCreateComponent implements OnInit {
           this.summaryState.set({ total: 0, purchases: 0, sales: 0 }),
       });
   }
-
-  // ── Lógica de elegibilidad de venta ────────────────────────────
 
   private applyPrefilledPurchasePrice(value = 0): void {
     this.contractForm.purchasePrice = value;
@@ -359,8 +339,6 @@ export class PurchaseSaleCreateComponent implements OnInit {
       ) ?? null
     );
   }
-
-  // ── Alertas ────────────────────────────────────────────────────
 
   private showVehicleSaleRestriction(vehicleId: number): void {
     const label = this.getVehicleLabelById(vehicleId);
@@ -422,8 +400,6 @@ export class PurchaseSaleCreateComponent implements OnInit {
       void showAlert({ icon: 'error', title: 'Oops...', text: message });
     }
   }
-
-  // ── Helpers privados ───────────────────────────────────────────
 
   private applyQueryParams(queryParams: ParamMap): void {
     const typeParam = queryParams.get('contractType');

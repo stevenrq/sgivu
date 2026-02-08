@@ -49,6 +49,10 @@ export function passwordStrengthValidator(): ValidatorFn {
 
 /**
  * Preset de validadores para campos de texto: required + longitud + sin espacios en blanco.
+ *
+ * @param min - Longitud mínima permitida.
+ * @param max - Longitud máxima permitida.
+ * @returns Array de ValidatorFn para aplicar a un control de formulario.
  */
 export function textFieldValidators(min: number, max: number): ValidatorFn[] {
   return [
@@ -60,6 +64,10 @@ export function textFieldValidators(min: number, max: number): ValidatorFn[] {
 
 /**
  * Preset de validadores para campos numéricos como texto: required + longitud.
+ *
+ * @param min - Longitud mínima permitida (en dígitos).
+ * @param max - Longitud máxima permitida (en dígitos).
+ * @returns Array de ValidatorFn para aplicar a un control de formulario.
  */
 export function numericFieldValidators(
   min: number,

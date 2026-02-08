@@ -45,7 +45,6 @@ export interface FallbackCountsResult<T> {
  * ```
  */
 export class ListPageManager<T> {
-  // --- Signals de estado ---
   private readonly _items = signal<T[]>([]);
   private readonly _pager = signal<PaginatedResponse<T> | undefined>(undefined);
   private readonly _active = signal(0);
@@ -55,7 +54,6 @@ export class ListPageManager<T> {
   private readonly _error = signal<string | null>(null);
   private readonly _currentPage = signal(0);
 
-  // --- Lecturas públicas (readonly signals) ---
   readonly items = this._items.asReadonly();
   readonly pager = this._pager.asReadonly();
   readonly active = this._active.asReadonly();
@@ -77,11 +75,12 @@ export class ListPageManager<T> {
 
   constructor(private readonly destroyRef: DestroyRef) {}
 
-  // ─── API pública ─────────────────────────────────────
-
   /**
    * Carga una página. Combina paginación + conteos en un solo forkJoin,
    * aplica fallback a dataset completo si los conteos del API son inconsistentes.
+   *
+   * @param config - Configuración para cargar la página.
+   * @param page - Número de página a cargar.
    */
   loadPage(config: LoadPageConfig<T>, page: number): void {
     this._loading.set(true);
@@ -194,8 +193,6 @@ export class ListPageManager<T> {
       });
   }
 
-  // ─── Utilidades estáticas (reutilizables fuera del manager) ──
-
   static parsePage(pageParam: string | null): number {
     if (!pageParam) {
       return 0;
@@ -241,8 +238,6 @@ export class ListPageManager<T> {
     const active = items.filter((item) => item.enabled).length;
     return { active, inactive: items.length - active };
   }
-
-  // ─── Internals ───────────────────────────────────────
 
   private static extractCounts(
     counts: unknown,

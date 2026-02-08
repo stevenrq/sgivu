@@ -2,8 +2,6 @@ import { ContractStatus } from './contract-status.enum';
 import { ContractType } from './contract-type.enum';
 import { PaymentMethod } from './payment-method.enum';
 
-// ── Mapas de etiquetas ───────────────────────────────────────────
-
 export const STATUS_LABELS: Record<ContractStatus, string> = {
   [ContractStatus.PENDING]: 'Pendiente',
   [ContractStatus.ACTIVE]: 'Activo',
@@ -27,8 +25,6 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   [PaymentMethod.TRADE_IN]: 'Permuta',
   [PaymentMethod.INSTALLMENT_PAYMENT]: 'Pago a plazos',
 };
-
-// ── Funciones de etiqueta ────────────────────────────────────────
 
 export function getStatusLabel(status: ContractStatus): string {
   return STATUS_LABELS[status] ?? status;

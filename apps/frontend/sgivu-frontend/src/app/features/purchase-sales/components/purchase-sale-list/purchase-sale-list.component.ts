@@ -109,8 +109,6 @@ export class PurchaseSaleListComponent implements OnInit {
   private currentPage = 0;
   private activeSearchFilters: PurchaseSaleSearchFilters | null = null;
 
-  // ── Lifecycle ──────────────────────────────────────────────────────
-
   ngOnInit(): void {
     this.lookupService.loadAll(this.destroyRef, (err) =>
       this.handleError(err, 'cargar la información auxiliar'),
@@ -140,8 +138,6 @@ export class PurchaseSaleListComponent implements OnInit {
     this.refreshSummary();
   }
 
-  // ── Getters ────────────────────────────────────────────────────────
-
   get pager(): PaginatedResponse<PurchaseSale> | undefined {
     return this.listState.pager;
   }
@@ -170,15 +166,11 @@ export class PurchaseSaleListComponent implements OnInit {
     return this.summaryState().sales;
   }
 
-  // ── Labels & badges (delegated) ───────────────────────────────────
-
   readonly getStatusLabel = getStatusLabel;
   readonly getContractTypeLabel = getContractTypeLabel;
   readonly getPaymentMethodLabel = getPaymentMethodLabel;
   readonly getStatusBadgeClass = getStatusBadgeClass;
   readonly getVehicleBadgeClass = getVehicleBadgeClass;
-
-  // ── Entity labels (summary + lookup fallback) ─────────────────────
 
   getClientLabel(contract: PurchaseSale): string {
     const summary = contract.clientSummary;
@@ -235,8 +227,6 @@ export class PurchaseSaleListComponent implements OnInit {
     return contract.createdAt ?? vehicle?.updatedAt ?? null;
   }
 
-  // ── Actions ────────────────────────────────────────────────────────
-
   navigateToCreate(): void {
     void this.router.navigate(['/purchase-sales/register']);
   }
@@ -254,8 +244,6 @@ export class PurchaseSaleListComponent implements OnInit {
       this.reportEndDate,
     );
   }
-
-  // ── Filter actions ─────────────────────────────────────────────────
 
   applyFilters(): void {
     this.quickSuggestions = [];
@@ -277,8 +265,6 @@ export class PurchaseSaleListComponent implements OnInit {
   onPriceFilterChange(field: PriceFilterKey, rawValue: string): void {
     this.filters[field] = normalizePriceInput(rawValue);
   }
-
-  // ── Quick search ───────────────────────────────────────────────────
 
   onQuickSearchChange(term: string): void {
     this.filters.term = term;
@@ -308,8 +294,6 @@ export class PurchaseSaleListComponent implements OnInit {
     this.quickSuggestions = [];
     this.applyFilters();
   }
-
-  // ── Delete & status ────────────────────────────────────────────────
 
   deleteContract(contract: PurchaseSale): void {
     if (!contract.id) {
@@ -397,8 +381,6 @@ export class PurchaseSaleListComponent implements OnInit {
         });
     });
   }
-
-  // ── Private helpers ────────────────────────────────────────────────
 
   private getVehicleOption(contract: PurchaseSale): VehicleOption | undefined {
     return contract.vehicleId

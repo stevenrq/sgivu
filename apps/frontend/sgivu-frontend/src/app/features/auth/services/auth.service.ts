@@ -23,6 +23,11 @@ interface AuthSessionResponse {
   isAdmin: boolean;
 }
 
+/**
+ * Servicio de autenticación que maneja el estado de sesión del usuario.
+ * Proporciona métodos para iniciar el flujo de login, cerrar sesión,
+ * y obtener información del usuario autenticado.
+ */
 @Injectable({
   providedIn: 'root',
 })
@@ -165,9 +170,6 @@ export class AuthService {
     return window.location.pathname.includes('/callback');
   }
 
-  /**
-   * Navega a la URL almacenada en sesión después del login, o al dashboard por defecto.
-   */
   private navigateAfterLogin(): void {
     const redirectUrl =
       sessionStorage.getItem('postLoginRedirectUrl') ?? '/dashboard';

@@ -33,6 +33,11 @@ export interface ViewCopy {
 
 /**
  * Compone un SubmitConfig a partir de un SubmitCopy y el modo de edición.
+ *
+ * @param copy - Textos de éxito y error.
+ * @param request$ - Observable que representa la solicitud a realizar.
+ * @param isEditMode - Indica si el formulario está en modo edición.
+ * @returns Configuración completa para el submit del formulario.
  */
 export function composeSubmitConfig(
   copy: SubmitCopy,

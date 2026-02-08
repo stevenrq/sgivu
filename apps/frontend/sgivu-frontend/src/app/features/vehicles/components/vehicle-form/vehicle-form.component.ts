@@ -212,8 +212,6 @@ export class VehicleFormComponent implements OnInit {
     return this.statusLabels[status] ?? status;
   }
 
-  // ── Submit ─────────────────────────────────────────────────────
-
   onSubmit(): void {
     if (this.formGroup.invalid) {
       this.formGroup.markAllAsTouched();
@@ -270,8 +268,6 @@ export class VehicleFormComponent implements OnInit {
         },
       });
   }
-
-  // ── Imágenes ───────────────────────────────────────────────────
 
   onImageSelected(event: Event): void {
     const result = this.imageUploadService.processFileSelection(event);
@@ -337,8 +333,6 @@ export class VehicleFormComponent implements OnInit {
     }
   }
 
-  // ── Inputs de precio y kilometraje ─────────────────────────────
-
   onPriceInput(
     field: 'purchasePrice' | 'salePrice',
     rawValue: string | null | undefined = '',
@@ -366,8 +360,6 @@ export class VehicleFormComponent implements OnInit {
     this.mileageInput = displayValue;
     this.formGroup.controls.mileage.setValue(numericValue);
   }
-
-  // ── Payloads y submit helpers ──────────────────────────────────
 
   private submitCar() {
     const c = this.formGroup.controls;
@@ -418,8 +410,6 @@ export class VehicleFormComponent implements OnInit {
     };
   }
 
-  // ── Carga de datos ─────────────────────────────────────────────
-
   private loadVehicle(id: number): void {
     this.loading.set(true);
     const service$ = (
@@ -467,8 +457,6 @@ export class VehicleFormComponent implements OnInit {
       maximumFractionDigits: 0,
     });
   }
-
-  // ── Construcción del formulario ────────────────────────────────
 
   private buildForm(): FormGroup<VehicleFormControls> {
     return this.formBuilder.group<VehicleFormControls>({

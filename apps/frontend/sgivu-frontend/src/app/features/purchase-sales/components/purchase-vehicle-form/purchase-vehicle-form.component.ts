@@ -39,8 +39,6 @@ export class PurchaseVehicleFormComponent {
     return this.vehicleForm.vehicleType === VehicleKind.MOTORCYCLE;
   }
 
-  // ── Eventos del formulario ─────────────────────────────────────
-
   onVehicleTypeChange(kind: VehicleKind): void {
     this.vehicleForm.vehicleType = kind;
     if (kind === VehicleKind.CAR) {
@@ -73,8 +71,6 @@ export class PurchaseVehicleFormComponent {
     this.vehicleMileageInput = this.formatMileage(sanitized);
   }
 
-  // ── Formateadores ──────────────────────────────────────────────
-
   formatCurrency(value: number | null | undefined): string {
     return formatCopCurrency(value, {
       minimumFractionDigits: 0,
@@ -98,8 +94,6 @@ export class PurchaseVehicleFormComponent {
       (control.touched || control.dirty || this.formSubmitted)
     );
   }
-
-  // ── API pública ────────────────────────────────────────────────
 
   buildPayload(): VehicleCreationPayload {
     return buildVehiclePayload(this.vehicleForm);
