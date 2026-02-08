@@ -58,3 +58,19 @@ export function showAlert(options: {
     text: options.text,
   });
 }
+
+/**
+ * Muestra una alerta de éxito temporizada que se cierra automáticamente.
+ */
+export function showTimedSuccessAlert(
+  message: string,
+  timer = 2200,
+): Promise<SweetAlertResult> {
+  return Swal.fire({
+    icon: 'success',
+    title: 'Operación exitosa',
+    text: message,
+    timer,
+    showConfirmButton: false,
+  });
+}

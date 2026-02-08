@@ -6,7 +6,7 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { forkJoin, map } from 'rxjs';
+import { finalize, forkJoin, map } from 'rxjs';
 import { PersonService } from '../../clients/services/person.service';
 import { CompanyService } from '../../clients/services/company.service';
 import { UserService } from '../../users/services/user.service';
@@ -72,7 +72,11 @@ export class PurchaseSaleLookupService {
     });
   }
 
-  loadAll(destroyRef: DestroyRef, onError?: (err: unknown) => void): void {
+  loadAll(
+    destroyRef: DestroyRef,
+    onError?: (err: unknown) => void,
+    onComplete?: () => void,
+  ): void {
     const clients$ = forkJoin([
       this.personService.getAll(),
       this.companyService.getAll(),
@@ -96,7 +100,10 @@ export class PurchaseSaleLookupService {
     );
 
     forkJoin([clients$, users$, vehicles$])
-      .pipe(takeUntilDestroyed(destroyRef))
+      .pipe(
+        finalize(() => onComplete?.()),
+        takeUntilDestroyed(destroyRef),
+      )
       .subscribe({
         next: ([clientOptions, userOptions, vehicleOptions]) => {
           this.clients.set(clientOptions.slice().sort(sortByLabel));
