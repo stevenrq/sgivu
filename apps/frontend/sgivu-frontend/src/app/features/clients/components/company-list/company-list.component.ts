@@ -153,12 +153,13 @@ export class CompanyListComponent implements OnInit {
             'inactive',
           ],
         },
+        computeCountsFn: ListPageManager.computeEnabledCounts,
         fallbackCounts: activeFilters
           ? undefined
           : () =>
               this.companyService.getAll().pipe(
                 map((companies) => ({
-                  ...ListPageManager.computeCounts(companies),
+                  ...ListPageManager.computeEnabledCounts(companies),
                   total: companies.length,
                   items: companies,
                 })),

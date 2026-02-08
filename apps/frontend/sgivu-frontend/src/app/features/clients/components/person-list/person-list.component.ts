@@ -148,12 +148,13 @@ export class PersonListComponent implements OnInit {
             'inactive',
           ],
         },
+        computeCountsFn: ListPageManager.computeEnabledCounts,
         fallbackCounts: activeFilters
           ? undefined
           : () =>
               this.personService.getAll().pipe(
                 map((persons) => ({
-                  ...ListPageManager.computeCounts(persons),
+                  ...ListPageManager.computeEnabledCounts(persons),
                   total: persons.length,
                   items: persons,
                 })),

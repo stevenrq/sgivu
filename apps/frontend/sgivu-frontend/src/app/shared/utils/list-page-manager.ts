@@ -24,6 +24,7 @@ export interface LoadPageConfig<T> {
   fetchCounts: () => Observable<unknown>;
   errorMessage: string;
   countKeys: { active: string[]; inactive: string[] };
+  computeCountsFn: (items: T[]) => { active: number; inactive: number };
   fallbackCounts?: () => Observable<FallbackCountsResult<T>>;
 }
 
@@ -43,7 +44,7 @@ export interface FallbackCountsResult<T> {
  * listManager = new ListPageManager<Person>(inject(DestroyRef));
  * ```
  */
-export class ListPageManager<T extends { enabled: boolean }> {
+export class ListPageManager<T> {
   // --- Signals de estado ---
   private readonly _items = signal<T[]>([]);
   private readonly _pager = signal<PaginatedResponse<T> | undefined>(undefined);
@@ -97,7 +98,7 @@ export class ListPageManager<T extends { enabled: boolean }> {
       .subscribe({
         next: ({ pager, counts }) => {
           const items = pager.content ?? [];
-          const pageCounts = ListPageManager.computeCounts(items);
+          const pageCounts = config.computeCountsFn(items);
           this._items.set(items);
           this._pager.set(pager);
 
@@ -234,7 +235,7 @@ export class ListPageManager<T extends { enabled: boolean }> {
     return value === true || value === 'true';
   }
 
-  static computeCounts<U extends { enabled: boolean }>(
+  static computeEnabledCounts<U extends { enabled: boolean }>(
     items: U[],
   ): { active: number; inactive: number } {
     const active = items.filter((item) => item.enabled).length;
