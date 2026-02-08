@@ -8,6 +8,7 @@ import {
   parseMonthKey,
 } from './dashboard-date.utils';
 
+/** Opciones base del gráfico de líneas de demanda. Separadas del componente para reutilización y testing. */
 export const DEMAND_CHART_OPTIONS: ChartOptions<'line'> = {
   responsive: true,
   maintainAspectRatio: false,
@@ -84,6 +85,15 @@ export const INVENTORY_CHART_OPTIONS: ChartOptions<'doughnut'> = {
   },
 };
 
+/**
+ * Construye los datasets del gráfico de pronóstico uniendo historia y predicciones
+ * en un eje temporal continuo. Los meses se normalizan a una key común (`YYYY-MM`)
+ * para alinear ambas series aunque tengan formatos de fecha distintos.
+ *
+ * @param predictions Puntos de predicción de demanda futura.
+ * @param history Puntos de demanda histórica.
+ * @returns Datos formateados para el gráfico de líneas de demanda.
+ */
 export function buildForecastChartData(
   predictions: DemandPredictionPoint[],
   history: { month: string; salesCount: number }[],
@@ -171,6 +181,14 @@ export function buildForecastChartData(
   };
 }
 
+/**
+ * Calcula el rango del eje Y a partir de todos los valores (historia + predicción + intervalos de confianza)
+ * para que la escala se ajuste automáticamente al rango real de los datos.
+ *
+ * @param baseOptions Opciones base del gráfico.
+ * @param values Valores numéricos a considerar para calcular el rango.
+ * @returns Nuevas opciones del gráfico con el rango ajustado.
+ */
 export function computeDemandScaleRange(
   baseOptions: ChartOptions<'line'>,
   values: (number | null)[],
@@ -203,12 +221,18 @@ export function computeDemandScaleRange(
   };
 }
 
+/** Desglose de inventario para el widget del dashboard. */
 export interface InventoryBreakdown {
   totalInventory: number;
   vehiclesToSell: number;
   chartData: ChartConfiguration<'doughnut'>['data'];
 }
 
+/** Construye los datos del gráfico de rosquilla de inventario a partir de conteos de carros y motos.
+ *
+ * @param counts Conteos de vehículos por tipo (total y disponibles).
+ * @returns Datos formateados para el gráfico de rosquilla de inventario.
+ */
 export function buildInventoryChartData(counts: {
   cars: VehicleCount;
   motorcycles: VehicleCount;

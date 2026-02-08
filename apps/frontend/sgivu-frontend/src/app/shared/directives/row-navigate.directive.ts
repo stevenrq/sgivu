@@ -7,6 +7,11 @@ import {
 } from '@angular/core';
 import { NavigationExtras, Router } from '@angular/router';
 
+/**
+ * Hace que un `<tr>` o cualquier elemento sea navegable por click.
+ * Ignora clicks en elementos interactivos hijos (`a`, `button`, `input`, etc.)
+ * para evitar navegación accidental al interactuar con controles dentro de la fila.
+ */
 @Directive({
   selector: '[appRowNavigate]',
   standalone: true,

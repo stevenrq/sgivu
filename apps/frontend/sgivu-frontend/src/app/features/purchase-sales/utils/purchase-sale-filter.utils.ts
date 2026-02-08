@@ -16,6 +16,12 @@ export type PriceFilterKey =
   | 'minSalePrice'
   | 'maxSalePrice';
 
+/**
+ * Modelo de filtros de UI para la lista de contratos.
+ * Los strings vacíos representan "sin filtro"; `'ALL'` en enums indica "todos".
+ * Este modelo se serializa a query params para que los filtros sean compartibles
+ * y sobrevivan a recarga de página.
+ */
 export interface PurchaseSaleUiFilters {
   contractType: ContractTypeFilter;
   contractStatus: ContractStatusFilter;
@@ -55,6 +61,11 @@ export function normalizePriceInput(rawValue: string): string {
   return displayValue;
 }
 
+/** Serializa los filtros de UI a query params para la URL, omitiendo valores por defecto.
+ *
+ * @param filters Filtros de UI a serializar.
+ * @returns Objeto de query params o `undefined` si no hay filtros activos.
+ */
 export function buildQueryParamsFromFilters(
   filters: PurchaseSaleUiFilters,
 ): Params | undefined {
@@ -100,6 +111,14 @@ export function buildQueryParamsFromFilters(
   return Object.keys(params).length ? params : undefined;
 }
 
+/**
+ * Deserializa query params de la URL a filtros de UI y filtros de request.
+ * Valida enum values para ignorar parámetros con valores inválidos (ej: manipulación manual de URL).
+ * Los precios se re-formatean con `normalizeMoneyInput` para mostrar el formato COP en el input.
+ *
+ * @param query Query params de la URL a deserializar.
+ * @returns Filtros de UI (para el formulario), filtros de request (para la API) y query params limpios.
+ */
 export function extractFiltersFromQuery(query: ParamMap): {
   uiFilters: PurchaseSaleUiFilters;
   requestFilters: PurchaseSaleSearchFilters | null;

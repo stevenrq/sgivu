@@ -17,6 +17,11 @@ import { Permission } from '../../../shared/models/permission.model';
 import { Role } from '../../../shared/models/role.model';
 import { HttpClient } from '@angular/common/http';
 
+/**
+ * Servicio de permisos del usuario autenticado.
+ * Los permisos no se obtienen directamente de un endpoint; se derivan aplanando
+ * la jerarquía `User → Role[] → Permission[]` del usuario actual.
+ */
 @Injectable({
   providedIn: 'root',
 })
@@ -37,6 +42,13 @@ export class PermissionService {
       .pipe(tap((permissions) => this.permissionsState.set(permissions)));
   }
 
+  /**
+   * Espera a que la autenticación termine de cargarse antes de extraer permisos.
+   * Sin este `filter + take(1)`, el observable se resolvería antes de que `AuthService`
+   * complete la validación de sesión, devolviendo un `Set` vacío erróneamente.
+   *
+   * @returns Set de nombres de permisos del usuario autenticado. Empty si no hay sesión.
+   */
   public getUserPermissions(): Observable<Set<string>> {
     return combineLatest([
       this.authService.isAuthenticated$,
@@ -59,6 +71,11 @@ export class PermissionService {
     );
   }
 
+  /** Aplana `roles → permissions` en un `Set<string>` para lookup O(1) en guards y directivas.
+   *
+   * @param user Usuario del que extraer permisos.
+   * @returns Set de nombres de permisos del usuario.
+   */
   private extractPermissionsFromUser(user: User): Set<string> {
     const permissions = new Set<string>();
     user.roles.forEach((role: Role) => {

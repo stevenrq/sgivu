@@ -2,6 +2,11 @@ import { PurchaseSale } from '../../purchase-sales/models/purchase-sale.model';
 import { VehicleKind } from '../../purchase-sales/models/vehicle-kind.enum';
 import { normalizeVehicleType } from './vehicle-kind.utils';
 
+/**
+ * Opción de segmento para el selector de predicción ML.
+ * `occurrences` indica cuántos contratos históricos tiene el segmento,
+ * permitiendo ordenar por relevancia (más contratos = más datos para el modelo).
+ */
 export interface SegmentOption {
   vehicleType: VehicleKind;
   brand: string;
@@ -10,6 +15,14 @@ export interface SegmentOption {
   occurrences: number;
 }
 
+/**
+ * Genera sugerencias de segmento a partir de contratos históricos.
+ * Agrupa por tipo/marca/modelo/línea, cuenta ocurrencias y devuelve
+ * los 6 segmentos más frecuentes (más datos = predicciones más fiables).
+ *
+ * @param contracts Lista de contratos históricos para extraer segmentos.
+ * @returns Lista de opciones de segmento ordenadas por relevancia.
+ */
 export function buildSegmentSuggestions(
   contracts: PurchaseSale[],
 ): SegmentOption[] {

@@ -5,6 +5,12 @@ import {
   Validators,
 } from '@angular/forms';
 
+/** Valida que la longitud (como string) esté entre `minLength` y `maxLength`. Aplica a campos de texto y numéricos.
+ *
+ * @param minLength Longitud mínima permitida (en caracteres o dígitos).
+ * @param maxLength Longitud máxima permitida (en caracteres o dígitos).
+ * @returns Un ValidatorFn que valida la longitud del control.
+ */
 export function lengthValidator(
   minLength: number,
   maxLength: number,
@@ -22,6 +28,10 @@ export function lengthValidator(
   };
 }
 
+/** Rechaza valores que sean solo espacios en blanco; complementa `Validators.required` que acepta strings de espacios.
+ *
+ * @returns Un ValidatorFn que valida que el control no sea solo espacios en blanco.
+ */
 export function noWhitespaceValidator(): ValidatorFn {
   return (control: AbstractControl): ValidationErrors | null => {
     const isWhitespace = (control.value || '').trim().length === 0;
@@ -30,6 +40,10 @@ export function noWhitespaceValidator(): ValidatorFn {
   };
 }
 
+/** Rechaza cualquier carácter que no sea alfanumérico. Útil para campos como nombres de usuario.
+ *
+ * @returns Un ValidatorFn que valida que el control no contenga caracteres especiales.
+ */
 export function noSpecialCharactersValidator(): ValidatorFn {
   const specialCharacters = /[^a-zA-Z0-9]/;
   return (control: AbstractControl): ValidationErrors | null => {
@@ -38,6 +52,10 @@ export function noSpecialCharactersValidator(): ValidatorFn {
   };
 }
 
+/** Exige mínimo una mayúscula, una minúscula, un dígito y un carácter especial (6+ caracteres).
+ *
+ * @returns Un ValidatorFn que valida la fortaleza de la contraseña.
+ */
 export function passwordStrengthValidator(): ValidatorFn {
   const strongPassword =
     /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{6,}$/;

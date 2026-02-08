@@ -1,5 +1,7 @@
 /**
- * Representa una respuesta paginada genérica.
+ * Representación genérica del contrato `Page<T>` de Spring Data.
+ * La estructura (`sort`, `pageable`, `first/last`) refleja la serialización
+ * por defecto de Spring Boot, no un diseño propio del frontend.
  */
 export class PaginatedResponse<T> {
   content!: T[];

@@ -11,6 +11,11 @@ import {
   RetrainResponse,
 } from '../models/demand-prediction.model';
 
+/**
+ * DTO de respuesta de la API FastAPI (snake_case).
+ * Existe separada de `DemandPredictionResponse` (camelCase) porque
+ * el servicio hace el mapeo explícito en lugar de usar un interceptor global.
+ */
 interface PredictionResponseDto {
   predictions: {
     month: string;
@@ -33,6 +38,7 @@ interface PredictionResponseDto {
   metrics?: DemandMetrics;
 }
 
+/** DTO del endpoint `/models/latest` (snake_case). Se mapea a `ModelMetadata`. */
 interface LatestModelDto {
   version?: string;
   trained_at?: string;
@@ -42,6 +48,11 @@ interface LatestModelDto {
   candidates?: Record<string, unknown>[];
 }
 
+/**
+ * Puente entre Angular (camelCase) y la API FastAPI de ML (snake_case).
+ * Se encarga de normalizar payloads, acotar parámetros a rangos válidos
+ * y transformar las respuestas al modelo de dominio del frontend.
+ */
 @Injectable({
   providedIn: 'root',
 })
@@ -72,6 +83,13 @@ export class DemandPredictionService {
     return this.http.post<RetrainResponse>(`${this.apiUrl}/retrain`, {});
   }
 
+  /**
+   * Construye el payload para la API acotando `horizonMonths` a [1, 24] y
+   * `confidence` a [0.5, 0.99] para evitar errores de validación en el modelo ML.
+   *
+   * @param payload - Datos de entrada del usuario para la predicción de demanda.
+   * @returns Objeto formateado para la API FastAPI.
+   */
   private buildPayload(payload: DemandPredictionRequest) {
     const horizon = Math.min(Math.max(payload.horizonMonths ?? 6, 1), 24);
     const confidence = Math.min(

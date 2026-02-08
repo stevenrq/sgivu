@@ -4,6 +4,11 @@ import { PaymentMethod } from './payment-method.enum';
 import { VehicleKind } from './vehicle-kind.enum';
 import { VehicleCreationPayload } from './purchase-sale.model';
 
+/**
+ * Modelo del formulario reactivo de contrato.
+ * Separado de `PurchaseSale` porque los formularios necesitan `null` para campos no seleccionados,
+ * mientras que el modelo de API usa tipos estrictos.
+ */
 export interface ContractFormModel {
   clientId: number | null;
   userId: number | null;
@@ -18,6 +23,11 @@ export interface ContractFormModel {
   observations: string;
 }
 
+/**
+ * Modelo del formulario reactivo de vehículo dentro de un contrato de compra.
+ * Incluye campos de carro y moto en una sola interfaz; `buildVehiclePayload()` filtra
+ * los campos según `vehicleType` antes de enviar al backend.
+ */
 export interface VehicleFormModel {
   vehicleType: VehicleKind;
   brand: string;
@@ -41,6 +51,11 @@ export interface VehicleFormModel {
   motorcycleType: string;
 }
 
+/** Crea un `ContractFormModel` con valores por defecto seguros para inicializar el formulario reactivo.
+ *
+ * @param contractType Tipo de contrato (compra o venta) para inicializar el formulario con el tipo correcto.
+ * @returns Modelo de formulario con valores por defecto.
+ */
 export function createDefaultContractForm(
   contractType: ContractType = ContractType.PURCHASE,
 ): ContractFormModel {
@@ -59,6 +74,11 @@ export function createDefaultContractForm(
   };
 }
 
+/** Crea un `VehicleFormModel` con valores por defecto seguros para inicializar el formulario reactivo.
+ *
+ * @param vehicleType Tipo de vehículo (carro o moto) para inicializar el formulario con el tipo correcto.
+ * @returns Modelo de formulario con valores por defecto.
+ */
 export function createDefaultVehicleForm(
   vehicleType: VehicleKind = VehicleKind.CAR,
 ): VehicleFormModel {
@@ -86,6 +106,14 @@ export function createDefaultVehicleForm(
   };
 }
 
+/**
+ * Transforma el modelo de formulario al payload de API, sanitizando valores y
+ * filtrando campos exclusivos de carro o moto según `vehicleType`.
+ * Los campos string se trimmean y la placa se convierte a mayúsculas.
+ *
+ * @param form Modelo del formulario reactivo.
+ * @returns Payload formateado para enviar al backend.
+ */
 export function buildVehiclePayload(
   form: VehicleFormModel,
 ): VehicleCreationPayload {

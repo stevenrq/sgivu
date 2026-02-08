@@ -2,12 +2,21 @@ import { ContractType } from '../../purchase-sales/models/contract-type.enum';
 import { PurchaseSale } from '../../purchase-sales/models/purchase-sale.model';
 import { formatCopCurrency } from '../../../shared/utils/currency.utils';
 
+/** Métricas de ventas para los KPI cards del dashboard. */
 export interface SalesMetrics {
   salesHistoryCount: number;
   monthlyRevenue: number;
   monthlySales: number;
 }
 
+/**
+ * Calcula métricas de ventas a partir de contratos.
+ * `monthlyRevenue` y `monthlySales` se calculan sobre el mes en curso
+ * usando `updatedAt` (o `createdAt` como fallback) para detectar el mes.
+ *
+ * @param contracts Lista de contratos históricos.
+ * @returns Métricas de ventas para mostrar en el dashboard.
+ */
 export function computeSalesMetrics(contracts: PurchaseSale[]): SalesMetrics {
   const salesHistoryCount = contracts.filter(
     (contract) => contract.contractType === ContractType.SALE,

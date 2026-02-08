@@ -11,6 +11,7 @@ import {
 } from './purchase-sale-labels.utils';
 import { PurchaseSaleUiFilters } from './purchase-sale-filter.utils';
 
+/** Tipo de entidad que originó una sugerencia, permite al componente aplicar el filtro correcto. */
 export type QuickSuggestionType =
   | 'client'
   | 'user'
@@ -18,6 +19,7 @@ export type QuickSuggestionType =
   | 'status'
   | 'type';
 
+/** Sugerencia de autocompletado con metadatos para que el componente sepa qué filtro aplicar. */
 export interface QuickSuggestion {
   label: string;
   context: string;
@@ -25,6 +27,11 @@ export interface QuickSuggestion {
   value: string;
 }
 
+/**
+ * Contexto necesario para generar sugerencias. Los `linked*Ids` son IDs de entidades
+ * que aparecen en contratos existentes; se usan para filtrar sugerencias irrelevantes
+ * (ej: clientes sin contratos no aparecen como sugerencia).
+ */
 interface QuickSearchContext {
   clients: ClientOption[];
   users: UserOption[];
@@ -40,6 +47,15 @@ const MAX_PER_GROUP = 3;
 const MAX_SUGGESTIONS = 9;
 const MIN_TERM_LENGTH = 2;
 
+/**
+ * Genera sugerencias de autocompletado buscando en clientes, usuarios, vehículos,
+ * estados y tipos de contrato simultáneamente. Limita a 3 por grupo y 9 total
+ * para no saturar el dropdown.
+ *
+ * @param term Término de búsqueda libre ingresado por el usuario.
+ * @param ctx Contexto con datos de referencia para generar sugerencias relevantes.
+ * @returns Lista de sugerencias para mostrar en el dropdown de búsqueda rápida.
+ */
 export function buildQuickSuggestions(
   term: string,
   ctx: QuickSearchContext,
@@ -119,6 +135,14 @@ export function buildQuickSuggestions(
   return matches.slice(0, MAX_SUGGESTIONS);
 }
 
+/**
+ * Intenta inferir filtros de entidad a partir del término de búsqueda libre.
+ * Si el texto coincide con un vehículo/cliente/usuario vinculado a contratos,
+ * pre-llena el filtro correspondiente para refinar la búsqueda automáticamente.
+ *
+ * @param filters Filtros de UI que se actualizarán con sugerencias inferidas.
+ * @param ctx Contexto con datos de referencia para generar sugerencias relevantes.
+ */
 export function hintQuickSearchFilters(
   filters: PurchaseSaleUiFilters,
   ctx: QuickSearchContext,

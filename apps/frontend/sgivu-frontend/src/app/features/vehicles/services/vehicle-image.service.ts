@@ -10,6 +10,12 @@ import { VehicleImageConfirmUploadRequest } from '../models/vehicle-image-confir
 import { defer, from } from 'rxjs';
 import { map } from 'rxjs/operators';
 
+/**
+ * Servicio de bajo nivel para el flujo de subida de imágenes a S3 en 3 pasos:
+ * 1. Solicitar presigned URL al backend
+ * 2. Subir el archivo directamente a S3
+ * 3. Confirmar la subida al backend para registrar la imagen
+ */
 @Injectable({
   providedIn: 'root',
 })
@@ -18,6 +24,10 @@ export class VehicleImageService {
 
   private readonly apiUrl = `${environment.apiUrl}/v1/vehicles`;
 
+  /**
+   * HttpClient sin interceptores. Se usa para subidas a S3 porque las presigned URLs
+   * rechazan headers de autenticación que el `defaultOAuthInterceptor` añade.
+   */
   private readonly rawHttp: HttpClient = new HttpClient(inject(HttpBackend));
 
   getImages(vehicleId: number) {
@@ -53,6 +63,10 @@ export class VehicleImageService {
     );
   }
 
+  /**
+   * Usa `fetch` nativo en vez de `HttpClient` porque las presigned URLs de S3 requieren
+   * `credentials: 'omit'` y `mode: 'cors'`, que `HttpClient` no permite configurar.
+   */
   private async uploadWithFetch(
     url: string,
     file: File,

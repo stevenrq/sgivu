@@ -3,6 +3,10 @@ import { ContractType } from '../models/contract-type.enum';
 import { PaymentMethod } from '../models/payment-method.enum';
 import { PurchaseSale } from '../models/purchase-sale.model';
 
+/**
+ * Mapas de labels en español para enums del backend.
+ * Centralizados aquí para evitar duplicación entre componentes de lista, detalle y filtros.
+ */
 const STATUS_LABELS: Record<ContractStatus, string> = {
   [ContractStatus.PENDING]: 'Pendiente',
   [ContractStatus.ACTIVE]: 'Activo',
