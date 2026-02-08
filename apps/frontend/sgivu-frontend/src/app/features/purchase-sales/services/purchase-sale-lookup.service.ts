@@ -50,6 +50,28 @@ export class PurchaseSaleLookupService {
     () => new Map<number, VehicleOption>(this.vehicles().map((v) => [v.id, v])),
   );
 
+  loadVehiclesOnly(
+    destroyRef: DestroyRef,
+    onError?: (err: unknown) => void,
+  ): void {
+    const vehicles$ = forkJoin([
+      this.carService.getAll(),
+      this.motorcycleService.getAll(),
+    ]).pipe(
+      map(([cars, motorcycles]) => [
+        ...mapCarsToVehicles(cars),
+        ...mapMotorcyclesToVehicles(motorcycles),
+      ]),
+    );
+
+    vehicles$.pipe(takeUntilDestroyed(destroyRef)).subscribe({
+      next: (vehicleOptions) => {
+        this.vehicles.set(vehicleOptions.slice().sort(sortByLabel));
+      },
+      error: (err) => onError?.(err),
+    });
+  }
+
   loadAll(destroyRef: DestroyRef, onError?: (err: unknown) => void): void {
     const clients$ = forkJoin([
       this.personService.getAll(),
