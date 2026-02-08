@@ -54,7 +54,7 @@ export class DashboardStateService {
     try {
       localStorage.setItem(this.storageKey, JSON.stringify(state));
     } catch {
-      // Silently ignore storage errors (quota exceeded, private browsing, etc.)
+      // Ignorar silenciosamente los errores de almacenamiento (cuota excedida, navegación privada, etc.)
     }
   }
 
@@ -81,7 +81,7 @@ export class DashboardStateService {
     try {
       localStorage.removeItem(this.storageKey);
     } catch {
-      // Silently ignore storage errors (quota exceeded, private browsing, etc.)
+      // Ignorar silenciosamente los errores de almacenamiento (cuota excedida, navegación privada, etc.)
     }
   }
 
