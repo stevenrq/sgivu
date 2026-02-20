@@ -1,0 +1,49 @@
+@startuml
+title Arquitectura general de SGIVU
+left to right direction
+
+skinparam shadowing false
+skinparam componentStyle rectangle
+skinparam packageStyle rectangle
+
+actor "Usuario" as usuario
+component "Cliente Web\n(sgivu-frontend)" as frontend
+component "API Gateway\n(sgivu-gateway)" as gateway
+
+package "Microservicios SGIVU" as ms {
+  component "Autenticacion\n(sgivu-auth)" as auth
+  component "Usuarios\n(sgivu-user)" as user
+  component "Clientes\n(sgivu-client)" as client
+  component "Vehiculos\n(sgivu-vehicle)" as vehicle
+  component "Compras/Ventas\n(sgivu-purchase-sale)" as purchase_sale
+  component "ML\n(sgivu-ml)" as ml
+}
+
+package "Infraestructura" as infra {
+  component "Config Server\n(sgivu-config)" as config
+  component "Config Repo\n(sgivu-config-repo)" as config_repo
+  component "Discovery\n(sgivu-discovery)" as discovery
+  database "Sesiones (Redis)\n(sgivu-redis)" as redis
+}
+
+database "Bases de datos" as db
+
+usuario --> frontend
+frontend --> gateway
+gateway --> ms
+gateway --> redis
+
+ms --> db
+
+note right of ms
+  Cada microservicio
+  tiene su propia
+  base de datos.
+end note
+
+config_repo --> config
+gateway ..> config
+ms ..> config
+gateway ..> discovery
+ms ..> discovery
+@enduml

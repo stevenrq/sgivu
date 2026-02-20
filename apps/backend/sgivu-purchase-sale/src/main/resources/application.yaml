@@ -1,0 +1,5 @@
+spring:
+  application:
+    name: sgivu-purchase-sale
+  config:
+    import: configserver:http://sgivu-config:8888

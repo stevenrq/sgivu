@@ -1,0 +1,349 @@
+<div class="row g-4 mb-4">
+  <div class="col-md-4">
+    <app-kpi-card
+      [value]="listManager.total()"
+      icon="bi-bicycle"
+      label="Inventario total"
+      variant="primary"
+    ></app-kpi-card>
+  </div>
+  <div class="col-md-4">
+    <app-kpi-card
+      [value]="listManager.active()"
+      icon="bi-check-circle-fill"
+      label="Disponibles"
+      variant="success"
+    ></app-kpi-card>
+  </div>
+  <div class="col-md-4">
+    <app-kpi-card
+      [value]="listManager.inactive()"
+      icon="bi-exclamation-triangle-fill"
+      label="No disponibles"
+      variant="warning"
+    ></app-kpi-card>
+  </div>
+</div>
+
+<div class="card">
+  <div
+    class="card-header bg-white py-3 d-flex flex-wrap align-items-center justify-content-between gap-3"
+  >
+    <div>
+      <h5 class="card-title mb-1">Motocicletas registradas</h5>
+      <p class="text-muted small mb-0">
+        Consulta, filtra y administra el estado de las motocicletas registradas
+        en el inventario.
+      </p>
+    </div>
+
+    <div aria-label="Filtros" class="filters-panel mt-3">
+      <div class="row g-2 g-md-3 align-items-end">
+        <div class="col-6 col-md-3 col-xl-2">
+          <label class="form-label filter-label" for="motoPlate">Placa</label>
+          <input
+            [(ngModel)]="filters.plate"
+            class="form-control form-control-sm"
+            id="motoPlate"
+            placeholder="Ej: ABC12D"
+            type="search"
+          />
+        </div>
+        <div class="col-6 col-md-3 col-xl-2">
+          <label class="form-label filter-label" for="motoBrand">Marca</label>
+          <input
+            [(ngModel)]="filters.brand"
+            class="form-control form-control-sm"
+            id="motoBrand"
+            placeholder="Honda"
+            type="search"
+          />
+        </div>
+        <div class="col-6 col-md-3 col-xl-2">
+          <label class="form-label filter-label" for="motoLine">Línea</label>
+          <input
+            [(ngModel)]="filters.line"
+            class="form-control form-control-sm"
+            id="motoLine"
+            placeholder="Repsol Edition"
+            type="search"
+          />
+        </div>
+        <div class="col-6 col-md-3 col-xl-2">
+          <label class="form-label filter-label" for="motoModel">Modelo</label>
+          <input
+            [(ngModel)]="filters.model"
+            class="form-control form-control-sm"
+            id="motoModel"
+            placeholder="CB160F"
+            type="search"
+          />
+        </div>
+        <div class="col-6 col-md-3 col-xl-2">
+          <label class="form-label filter-label" for="motoType">Tipo</label>
+          <input
+            [(ngModel)]="filters.motorcycleType"
+            class="form-control form-control-sm"
+            id="motoType"
+            placeholder="Sport"
+            type="search"
+          />
+        </div>
+        <div class="col-6 col-md-3 col-xl-2">
+          <label class="form-label filter-label" for="motoTransmission"
+            >Transmisión</label
+          >
+          <input
+            [(ngModel)]="filters.transmission"
+            class="form-control form-control-sm"
+            id="motoTransmission"
+            placeholder="Manual"
+            type="search"
+          />
+        </div>
+        <div class="col-6 col-md-3 col-xl-2">
+          <label class="form-label filter-label" for="motoCity">Ciudad</label>
+          <input
+            [(ngModel)]="filters.cityRegistered"
+            class="form-control form-control-sm"
+            id="motoCity"
+            placeholder="Medellín"
+            type="search"
+          />
+        </div>
+        <div class="col-6 col-md-3 col-xl-2">
+          <label class="form-label filter-label" for="motoStatus">Estado</label>
+          <select
+            [(ngModel)]="filters.status"
+            class="form-select form-select-sm"
+            id="motoStatus"
+          >
+            <option value="">Todos</option>
+            @for (status of vehicleStatuses; track status) {
+              <option [ngValue]="status">
+                {{ statusLabel(status) }}
+              </option>
+            }
+          </select>
+        </div>
+        <div class="col-6 col-md-3 col-xl-2">
+          <label class="form-label filter-label" for="motoYearFrom"
+            >Año desde</label
+          >
+          <input
+            (ngModelChange)="filters.minYear = toNumber($event)"
+            [ngModel]="filters.minYear"
+            class="form-control form-control-sm"
+            id="motoYearFrom"
+            min="1950"
+            type="number"
+          />
+        </div>
+        <div class="col-6 col-md-3 col-xl-2">
+          <label class="form-label filter-label" for="motoYearTo"
+            >Año hasta</label
+          >
+          <input
+            (ngModelChange)="filters.maxYear = toNumber($event)"
+            [ngModel]="filters.maxYear"
+            class="form-control form-control-sm"
+            id="motoYearTo"
+            min="1950"
+            type="number"
+          />
+        </div>
+        <div class="col-6 col-md-3 col-xl-2">
+          <label class="form-label filter-label" for="motoMinPrice"
+            >Precio mínimo</label
+          >
+          <input
+            (ngModelChange)="onPriceInput('minSalePrice', $event)"
+            [ngModel]="priceInputs.minSalePrice"
+            class="form-control form-control-sm"
+            id="motoMinPrice"
+            placeholder="$"
+            inputmode="decimal"
+            pattern="^[0-9.,\\s$]*$"
+            type="text"
+          />
+        </div>
+        <div class="col-6 col-md-3 col-xl-2">
+          <label class="form-label filter-label" for="motoMaxPrice"
+            >Precio máximo</label
+          >
+          <input
+            (ngModelChange)="onPriceInput('maxSalePrice', $event)"
+            [ngModel]="priceInputs.maxSalePrice"
+            class="form-control form-control-sm"
+            id="motoMaxPrice"
+            placeholder="$"
+            inputmode="decimal"
+            pattern="^[0-9.,\\s$]*$"
+            type="text"
+          />
+        </div>
+        <div class="col-12 col-md-auto filter-actions mt-2 mt-md-0">
+          <button
+            (click)="applyFilters()"
+            class="btn btn-primary btn-sm px-3"
+            type="button"
+          >
+            <i class="bi bi-funnel me-1"></i>Aplicar filtros
+          </button>
+          <button
+            (click)="clearFilters()"
+            class="btn btn-outline-secondary btn-sm px-3"
+            type="button"
+          >
+            <i class="bi bi-arrow-counterclockwise me-1"></i>Limpiar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  @if (listManager.error()) {
+    <div class="alert alert-danger rounded-0 mb-0">
+      {{ listManager.error() }}
+    </div>
+  }
+
+  <div class="card-body p-0">
+    <app-data-table
+      [loading]="listManager.loading()"
+      [minHeight]="360"
+      loadingLabel="Cargando motocicletas..."
+    >
+      <ng-container table-head>
+        <tr>
+          <th scope="col">Placa</th>
+          <th scope="col">Marca / Línea</th>
+          <th scope="col">Modelo</th>
+          <th scope="col">Tipo</th>
+          <th scope="col">Estado</th>
+          <th class="text-end" scope="col">Precio venta</th>
+          <th
+            *appHasPermission="'motorcycle:update'"
+            class="text-center"
+            scope="col"
+          >
+            Acciones
+          </th>
+        </tr>
+      </ng-container>
+      <ng-container table-body>
+        @if (!listManager.loading() && listManager.items().length === 0) {
+          <tr>
+            <td class="text-center text-muted py-4" colspan="8">
+              No hay motocicletas registradas para los filtros actuales.
+            </td>
+          </tr>
+        }
+        @for (motorcycle of listManager.items(); track motorcycle.id) {
+          <tr
+            appRowNavigate
+            [appRowNavigate]="[
+              '/vehicles/motorcycles',
+              motorcycle.id,
+              'details',
+            ]"
+            [appRowNavigateDisabled]="listManager.loading()"
+          >
+            <td class="fw-semibold">{{ motorcycle.plate }}</td>
+            <td>
+              <span class="d-inline-flex flex-column">
+                <span class="fw-semibold">{{ motorcycle.brand }}</span>
+                <small class="text-muted">{{ motorcycle.line }}</small>
+              </span>
+            </td>
+            <td>{{ motorcycle.model }}</td>
+            <td>{{ motorcycle.motorcycleType }}</td>
+            <td>
+              <div *appHasPermission="'motorcycle:update'" class="mt-2">
+                <select
+                  (ngModelChange)="changeStatus(motorcycle, $event)"
+                  [ngModel]="motorcycle.status"
+                  class="form-select form-select-sm"
+                >
+                  @for (status of vehicleStatuses; track status) {
+                    <option [value]="status">
+                      {{ statusLabel(status) }}
+                    </option>
+                  }
+                </select>
+              </div>
+            </td>
+            <td class="text-end">
+              {{ motorcycle.salePrice | copCurrency }}
+            </td>
+            <td *appHasPermission="'motorcycle:update'" class="text-center">
+              <div class="dropdown">
+                <button
+                  aria-expanded="false"
+                  class="btn btn-outline-secondary btn-sm btn-icon"
+                  data-bs-toggle="dropdown"
+                  type="button"
+                >
+                  <i class="bi bi-three-dots"></i>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                  <li>
+                    <a
+                      [routerLink]="[
+                        '/vehicles/motorcycles',
+                        motorcycle.id,
+                        'details',
+                      ]"
+                      class="dropdown-item"
+                    >
+                      <i class="bi bi-eye me-2"></i>Ver detalle
+                    </a>
+                  </li>
+                  <li>
+                    <a
+                      [routerLink]="['/vehicles/motorcycles', motorcycle.id]"
+                      class="dropdown-item"
+                    >
+                      <i class="bi bi-pencil-square me-2"></i>Editar
+                    </a>
+                  </li>
+                  <li>
+                    <button
+                      (click)="toggleAvailability(motorcycle)"
+                      class="dropdown-item d-flex align-items-center"
+                      type="button"
+                    >
+                      <i
+                        [ngClass]="
+                          motorcycle.status === VehicleStatus.INACTIVE
+                            ? 'bi-toggle-off'
+                            : 'bi-toggle-on'
+                        "
+                        class="bi me-2"
+                      ></i>
+                      {{
+                        motorcycle.status === VehicleStatus.INACTIVE
+                          ? "Activar"
+                          : "Desactivar"
+                      }}
+                    </button>
+                  </li>
+                </ul>
+              </div>
+            </td>
+          </tr>
+        }
+      </ng-container>
+    </app-data-table>
+  </div>
+
+  @if (listManager.pager()) {
+    <div class="card-footer d-flex justify-content-end">
+      <app-pager
+        [pager]="listManager.pager()!"
+        [url]="pagerUrl"
+        [queryParams]="activePagerQueryParams"
+      ></app-pager>
+    </div>
+  }
+</div>

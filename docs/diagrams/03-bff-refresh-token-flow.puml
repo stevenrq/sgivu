@@ -1,0 +1,119 @@
+@startuml
+title Flujo BFF con refresh token (SPA)
+skinparam shadowing false
+skinparam componentStyle rectangle
+skinparam packageStyle rectangle
+
+actor "Usuario" as usuario
+participant "SPA\n(Angular)" as spa
+participant "Nginx\n(Reverse Proxy)" as nginx
+participant "BFF\n(sgivu-gateway)" as bff
+database "Redis" as redis
+participant "Auth Server\n(sgivu-auth)" as auth
+database "PostgreSQL\n(Auth Session)" as authdb
+participant "Microservicios" as ms
+
+== Verificacion inicial de sesion ==
+usuario -> spa : abre la app
+spa -> nginx : /auth/session
+nginx -> bff : proxy /auth/session
+bff -> redis : busca sesion (cookie SESSION)
+bff -> spa : 401 Unauthorized (sin sesion)
+spa -> spa : inicia flujo OAuth2
+
+== Login (Authorization Code + PKCE) ==
+spa -> nginx : /oauth2/authorization/sgivu-gateway
+nginx -> bff : proxy al Gateway
+bff -> bff : genera state, nonce, PKCE
+bff -> redis : persiste state/PKCE en sesion
+bff -> spa : 302 redirect a Auth Server
+
+spa -> nginx : /oauth2/authorize?...&code_challenge=...
+nginx -> auth : proxy al Auth Server
+auth -> authdb : crea sesion (cookie AUTH_SESSION)
+auth -> spa : 302 redirect a /login
+
+usuario -> spa : ingresa credenciales
+spa -> nginx : POST /login (username, password)
+nginx -> auth : proxy al Auth Server
+auth -> auth : valida credenciales
+auth -> authdb : actualiza sesion con usuario
+auth -> spa : 302 redirect con authorization code
+
+spa -> nginx : /login/oauth2/code/sgivu-gateway?code=...&state=...
+nginx -> bff : proxy al Gateway
+bff -> redis : valida state/PKCE
+bff -> auth : POST /oauth2/token (code + code_verifier)
+auth -> auth : valida code y PKCE
+auth -> bff : access_token + refresh_token + id_token
+bff -> redis : persiste tokens en sesion
+bff -> spa : 302 redirect a /callback + Set-Cookie (SESSION)
+
+== Sesion activa ==
+spa -> nginx : /auth/session (cookie SESSION)
+nginx -> bff : proxy al Gateway
+bff -> redis : recupera sesion y tokens
+bff -> spa : 200 OK {authenticated: true, claims}
+
+== Request a APIs protegidas ==
+spa -> nginx : /v1/vehicles (cookie SESSION)
+nginx -> bff : proxy al Gateway
+bff -> redis : recupera access_token
+bff -> bff : valida expiracion del token
+bff -> ms : request + Authorization: Bearer {access_token}
+ms -> bff : respuesta
+bff -> spa : respuesta
+
+== Refresh automatico de tokens ==
+spa -> nginx : /v1/vehicles (cookie SESSION)
+nginx -> bff : proxy al Gateway
+bff -> redis : recupera tokens
+bff -> bff : detecta access_token expirado
+bff -> auth : POST /oauth2/token (refresh_token)
+auth -> auth : valida refresh_token
+auth -> bff : access_token nuevo + refresh_token rotado
+bff -> redis : actualiza tokens en sesion
+bff -> ms : request + Authorization: Bearer {nuevo_token}
+ms -> bff : respuesta
+bff -> spa : respuesta
+
+== Logout (OIDC RP-Initiated) ==
+usuario -> spa : click en logout
+spa -> nginx : /logout (cookie SESSION)
+nginx -> bff : proxy al Gateway
+bff -> redis : recupera id_token
+bff -> redis : invalida sesion
+bff -> spa : 302 redirect a /connect/logout?id_token_hint=...
+
+spa -> nginx : /connect/logout?id_token_hint=...&post_logout_redirect_uri=/login
+nginx -> auth : proxy al Auth Server
+auth -> authdb : invalida sesion del Auth Server
+auth -> spa : 302 redirect a /login
+
+spa -> nginx : /login
+nginx -> auth : proxy al Auth Server
+auth -> spa : 200 OK (formulario de login)
+
+note over spa,nginx
+La SPA no almacena tokens. El refresh_token vive en el BFF
+como parte de la sesion del servidor (persistida en Redis).
+Todas las rutas pasan por Nginx como reverse proxy.
+end note
+
+note over bff,redis
+Cookies de sesion:
+- SESSION (Gateway/Redis): SameSite=Lax, HttpOnly, Path=/
+- AUTH_SESSION (Auth/PostgreSQL): SameSite=Lax, HttpOnly, Path=/
+end note
+
+note over spa,bff
+Si el refresh_token expira o es invalido, el BFF responde 401
+y la SPA reinicia el login con /oauth2/authorization/sgivu-gateway.
+end note
+
+note over auth
+Solo el cliente confidencial (sgivu-gateway) recibe refresh_token
+gracias al scope offline_access. Los clientes publicos usan
+Authorization Code + PKCE sin refresh.
+end note
+@enduml

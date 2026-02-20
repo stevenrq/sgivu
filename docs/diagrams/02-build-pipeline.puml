@@ -1,0 +1,27 @@
+@startuml
+title Pipeline de build/push (visión general)
+left to right direction
+
+skinparam shadowing false
+skinparam componentStyle rectangle
+skinparam packageStyle rectangle
+
+actor "Desarrollador" as dev
+component "Script\nbuild-and-push-images.bash" as script
+component "Build por servicio\n(build-image.bash / mvnw)" as build
+component "Docker Engine" as docker
+cloud "Registry\n(Docker Hub)" as registry
+component "Servidor\n(EC2 / Docker Compose)" as server
+
+dev --> script : ejecuta
+script --> build : recorre servicios
+build --> docker : docker build
+
+docker --> registry : docker push
+server --> registry : docker pull
+
+note bottom of script
+  El despliegue puede hacerse manualmente
+  (p. ej. docker compose en el servidor).
+end note
+@enduml
