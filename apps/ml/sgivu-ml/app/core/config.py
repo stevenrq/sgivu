@@ -38,8 +38,8 @@ class Settings(BaseSettings):
     app_version: str = "1.0.0"
     environment: str = "prod"
 
-    sgivu_purchase_sale_url: str = "http://sgivu-vehicle"
-    sgivu_vehicle_url: str = "http://sgivu-purchase-sale"
+    sgivu_purchase_sale_url: str = "http://sgivu-purchase-sale"
+    sgivu_vehicle_url: str = "http://sgivu-vehicle"
 
     sgivu_auth_discovery_url: str | None = None
     service_internal_secret_key: str | None = None
