@@ -1,0 +1,398 @@
+---
+title: Configuración del Servicio Auth
+description: Configuración del Authorization Server OAuth2 para la plataforma SGIVU
+---
+
+El servicio Auth (`sgivu-auth`) es el Authorization Server OAuth2/OpenID Connect que gestiona la autenticación y la emisión de tokens para toda la plataforma SGIVU.
+
+## Resumen del Servicio
+
+<CardGroup cols={2}>
+  <Card title="Puerto" icon="network-wired">
+    9000
+  </Card>
+  <Card title="Base de Datos" icon="database">
+    PostgreSQL
+  </Card>
+  <Card title="Almacén de Sesiones" icon="table">
+    JDBC (PostgreSQL)
+  </Card>
+  <Card title="Rol" icon="shield-halved">
+    OAuth2 Authorization Server
+  </Card>
+</CardGroup>
+
+## Características Principales
+
+- OAuth2 Authorization Server con Spring Authorization Server
+- Generación de tokens JWT mediante firma basada en keystore
+- Gestión de sesiones con persistencia JDBC
+- Autenticación y autorización de usuarios
+- Integración con el servicio de usuarios para obtener datos de usuario
+- Migraciones de base de datos con Flyway
+
+## Configuración Base
+
+### Configuración del Servidor
+
+```yaml
+server:
+  port: ${PORT:9000}
+  forward-headers-strategy: framework
+```
+
+<Info>
+La propiedad `forward-headers-strategy: framework` habilita el manejo correcto de los headers de proxy provenientes del gateway.
+</Info>
+
+### Gestión de Sesiones
+
+El servicio Auth utiliza almacenamiento de sesiones basado en JDBC:
+
+```yaml
+spring:
+  session:
+    store-type: jdbc
+    jdbc:
+      initialize-schema: never
+      table-name: SPRING_SESSION
+      cleanup-cron: 0 */15 * * * *
+      flush-mode: on_save
+      save-mode: on_get_attribute
+```
+
+<Accordion title="Detalles de la Configuración de Sesiones">
+- **store-type: jdbc** — Sesiones almacenadas en PostgreSQL
+- **cleanup-cron: 0 */15 * * * *** — Limpia sesiones expiradas cada 15 minutos
+- **flush-mode: on_save** — Escribe en la base de datos solo cuando se guarda explícitamente
+- **save-mode: on_get_attribute** — La sesión se guarda cuando se accede a sus atributos
+</Accordion>
+
+### Configuración JWT
+
+El servicio utiliza un keystore para firmar los tokens JWT:
+
+```yaml
+sgivu:
+  jwt:
+    keystore:
+      location: ${JWT_KEYSTORE_LOCATION}
+      password: ${JWT_KEYSTORE_PASSWORD}
+    key:
+      alias: ${JWT_KEY_ALIAS}
+      password: ${JWT_KEY_PASSWORD}
+```
+
+<Warning>
+Estas credenciales deben mantenerse seguras y nunca deben versionarse en el control de código fuente. Utilice variables de entorno o un sistema seguro de gestión de secretos.
+</Warning>
+
+### Configuración del Issuer
+
+```yaml
+issuer:
+  url: ${ISSUER_URL:http://sgivu-auth:9000}
+```
+
+Esta URL se utiliza en los tokens JWT como el claim `iss` y debe ser accesible por todos los servicios.
+
+## Configuración de Base de Datos
+
+### Configuración JPA
+
+```yaml
+spring:
+  jpa:
+    open-in-view: false
+```
+
+<Note>
+`open-in-view: false` previene problemas de lazy loading al asegurar que todas las operaciones de base de datos ocurran dentro de los límites de una transacción.
+</Note>
+
+### Migraciones Flyway
+
+```yaml
+spring:
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: ${FLYWAY_BASELINE_ON_MIGRATE:false}
+    baseline-version: 0
+    validate-on-migrate: true
+```
+
+<Tabs>
+  <Tab title="Desarrollo">
+    ```yaml
+    spring:
+      datasource:
+        url: jdbc:postgresql://${DEV_AUTH_DB_HOST:host.docker.internal}:${DEV_AUTH_DB_PORT:5432}/${DEV_AUTH_DB_NAME}
+        username: ${DEV_AUTH_DB_USERNAME}
+        password: ${DEV_AUTH_DB_PASSWORD}
+        driver-class-name: org.postgresql.Driver
+      jpa:
+        hibernate:
+          ddl-auto: validate
+        show-sql: true
+        properties:
+          hibernate:
+            format_sql: true
+      flyway:
+        baseline-on-migrate: true
+        clean-disabled: false
+    ```
+    
+    En desarrollo se habilita el logging de SQL y se permiten operaciones de limpieza de Flyway para pruebas.
+  </Tab>
+  <Tab title="Producción">
+    ```yaml
+    spring:
+      datasource:
+        url: jdbc:postgresql://${PROD_AUTH_DB_HOST:host.docker.internal}:${PROD_AUTH_DB_PORT:5432}/${PROD_AUTH_DB_NAME}
+        username: ${PROD_AUTH_DB_USERNAME}
+        password: ${PROD_AUTH_DB_PASSWORD}
+        driver-class-name: org.postgresql.Driver
+      jpa:
+        hibernate:
+          ddl-auto: validate
+      flyway:
+        clean-disabled: true
+        baseline-on-migrate: ${FLYWAY_BASELINE_ON_MIGRATE:false}
+    ```
+    
+    En producción se deshabilita el logging de SQL y se previenen las operaciones de limpieza de Flyway por seguridad.
+  </Tab>
+</Tabs>
+
+## Integración con Servicios
+
+### Registro en Eureka
+
+```yaml
+eureka:
+  instance:
+    instance-id: ${spring.cloud.client.hostname}:${spring.application.name}:${random.value}
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://sgivu-discovery:8761/eureka}
+```
+
+### Mapa de Descubrimiento de Servicios
+
+```yaml
+services:
+  map:
+    sgivu-user:
+      name: sgivu-user
+      url: ${SGIVU_USER_URL:http://sgivu-user:8081}
+```
+
+El servicio Auth se comunica con el servicio de usuarios para obtener los datos del usuario durante la autenticación.
+
+### Configuración del Cliente Gateway
+
+```yaml
+gateway-client:
+  url: ${SGIVU_GATEWAY_URL:http://sgivu-gateway:8080}
+  secret: ${SGIVU_GATEWAY_SECRET}
+```
+
+Esta configuración define las credenciales del cliente OAuth2 para el gateway.
+
+## Configuración de Seguridad
+
+### Autenticación Interna entre Servicios
+
+```yaml
+service:
+  internal:
+    secret-key: ${SERVICE_INTERNAL_SECRET_KEY}
+```
+
+Este secreto compartido autentica las llamadas internas entre servicios a través de la API.
+
+## Configuración de Sesiones
+
+<Tabs>
+  <Tab title="Desarrollo">
+    ```yaml
+    spring:
+      session:
+        timeout: 2h
+    ```
+    
+    Las sesiones en desarrollo duran 2 horas por comodidad.
+  </Tab>
+  <Tab title="Producción">
+    ```yaml
+    spring:
+      session:
+        timeout: 2h
+    ```
+    
+    En producción también se utilizan sesiones de 2 horas con limpieza automática.
+  </Tab>
+</Tabs>
+
+## Configuración del Cliente
+
+<Tabs>
+  <Tab title="Desarrollo">
+    ```yaml
+    angular-client:
+      url: ${DEV_ANGULAR_APP_URL}
+    ```
+  </Tab>
+  <Tab title="Producción">
+    ```yaml
+    angular-client:
+      url: ${PROD_ANGULAR_APP_URL}
+    ```
+  </Tab>
+</Tabs>
+
+Define las URIs de redirección permitidas para la aplicación frontend Angular.
+
+## Observabilidad
+
+### Endpoints de Actuator
+
+<Tabs>
+  <Tab title="Desarrollo">
+    ```yaml
+    management:
+      endpoints:
+        web:
+          exposure:
+            include: "*"
+      endpoint:
+        health:
+          show-details: always
+    ```
+    
+    Todos los endpoints de Actuator están expuestos para depuración.
+  </Tab>
+  <Tab title="Producción">
+    ```yaml
+    management:
+      endpoints:
+        web:
+          exposure:
+            include: health, info, prometheus
+      endpoint:
+        health:
+          show-details: never
+    ```
+    
+    Endpoints limitados expuestos por seguridad.
+  </Tab>
+</Tabs>
+
+### Trazabilidad Distribuida
+
+```yaml
+management:
+  tracing:
+    sampling:
+      probability: 0.1
+  zipkin:
+    tracing:
+      endpoint: http://sgivu-zipkin:9411/api/v2/spans
+```
+
+<Info>
+Se muestrea el 10% de las solicitudes para reducir la sobrecarga manteniendo la visibilidad del comportamiento del sistema.
+</Info>
+
+### Logging
+
+```yaml
+logging:
+  level:
+    root: INFO
+```
+
+## Documentación de la API
+
+```yaml
+springdoc:
+  swagger-ui:
+    url: /docs/auth/v3/api-docs
+    configUrl: /docs/auth/v3/api-docs/swagger-config
+```
+
+<Tabs>
+  <Tab title="Producción">
+    ```yaml
+    openapi:
+      server:
+        url: ${OPENAPI_SERVER_URL}
+    ```
+    
+    En producción se sobrescribe la URL del servidor para la documentación pública de la API.
+  </Tab>
+</Tabs>
+
+## Variables de Entorno Requeridas
+
+### Todos los Entornos
+
+| Variable | Descripción | Ejemplo |
+|----------|-------------|----------|
+| `SERVICE_INTERNAL_SECRET_KEY` | Secreto compartido para APIs internas | `your-secret-key` |
+| `JWT_KEYSTORE_LOCATION` | Ruta al keystore JWT | `classpath:keystore.jks` |
+| `JWT_KEYSTORE_PASSWORD` | Contraseña del keystore | `changeit` |
+| `JWT_KEY_ALIAS` | Alias de la clave en el keystore | `sgivu-jwt` |
+| `JWT_KEY_PASSWORD` | Contraseña de la clave | `changeit` |
+| `SGIVU_GATEWAY_SECRET` | Secreto del cliente OAuth2 del gateway | `gateway-secret` |
+
+### Desarrollo
+
+| Variable | Descripción |
+|----------|-------------|
+| `DEV_AUTH_DB_HOST` | Host de la base de datos |
+| `DEV_AUTH_DB_PORT` | Puerto de la base de datos |
+| `DEV_AUTH_DB_NAME` | Nombre de la base de datos |
+| `DEV_AUTH_DB_USERNAME` | Usuario de la base de datos |
+| `DEV_AUTH_DB_PASSWORD` | Contraseña de la base de datos |
+| `DEV_ANGULAR_APP_URL` | URL de la aplicación Angular |
+
+### Producción
+
+| Variable | Descripción |
+|----------|-------------|
+| `PROD_AUTH_DB_HOST` | Host de la base de datos |
+| `PROD_AUTH_DB_PORT` | Puerto de la base de datos |
+| `PROD_AUTH_DB_NAME` | Nombre de la base de datos |
+| `PROD_AUTH_DB_USERNAME` | Usuario de la base de datos |
+| `PROD_AUTH_DB_PASSWORD` | Contraseña de la base de datos |
+| `PROD_ANGULAR_APP_URL` | URL de la aplicación Angular |
+| `OPENAPI_SERVER_URL` | URL pública de la documentación de la API |
+
+### Opcionales
+
+| Variable | Descripción | Valor por Defecto |
+|----------|-------------|----------|
+| `PORT` | Puerto del servicio | `9000` |
+| `EUREKA_URL` | URL del servidor Eureka | `http://sgivu-discovery:8761/eureka` |
+| `ISSUER_URL` | URL del issuer JWT | `http://sgivu-auth:9000` |
+| `SGIVU_USER_URL` | URL del servicio de usuarios | `http://sgivu-user:8081` |
+| `FLYWAY_BASELINE_ON_MIGRATE` | Crear baseline en BD existente | `false` |
+
+## Archivos de Configuración
+
+- `sgivu-auth.yml` — Configuración base
+- `sgivu-auth-dev.yml` — Sobrescrituras para desarrollo
+- `sgivu-auth-prod.yml` — Sobrescrituras para producción
+
+## Servicios Relacionados
+
+<CardGroup cols={2}>
+  <Card title="Servicio Gateway" icon="door-open" href="/config/services/gateway">
+    Configuración del cliente OAuth2
+  </Card>
+  <Card title="Servicio de Usuarios" icon="user" href="/config/services/user">
+    Proveedor de datos de usuario
+  </Card>
+</CardGroup>

@@ -1,0 +1,466 @@
+---
+title: Actualización de Configuración
+description: Actualizar la configuración de microservicios sin reiniciar servicios usando refresh de Spring Cloud Config
+---
+
+## Descripción General
+
+Spring Cloud Config permite actualizar la configuración en tiempo de ejecución sin reiniciar los servicios. Esto es fundamental para realizar cambios rápidos en feature flags, cadenas de conexión o parámetros operacionales.
+
+<Info>
+  La actualización de configuración es compatible cuando los servicios tienen `spring-boot-starter-actuator` y las anotaciones `@RefreshScope` en los beans que consumen propiedades de configuración.
+</Info>
+
+## Estrategias de Refresh
+
+Existen dos enfoques principales para actualizar la configuración:
+
+<CardGroup cols={2}>
+  <Card title="Refresh Individual por Servicio" icon="rotate">
+    Llamar a `/actuator/refresh` en cada servicio que necesite configuración actualizada.
+  </Card>
+  
+  <Card title="Refresh por Difusión (Spring Cloud Bus)" icon="broadcast-tower">
+    Disparar un único refresh que se propaga a todos los servicios a través del bus de mensajes.
+  </Card>
+</CardGroup>
+
+## Refresh Individual por Servicio
+
+### Uso del Endpoint /actuator/refresh
+
+El endpoint de refresh debe exponerse explícitamente en la configuración:
+
+```yaml
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, refresh
+```
+
+<Warning>
+  Por defecto, el endpoint de refresh no está expuesto en configuraciones de producción por seguridad. Agrégalo explícitamente solo cuando sea necesario.
+</Warning>
+
+### Flujo de Trabajo del Refresh
+
+<Steps>
+  <Step title="Actualizar Configuración en Git">
+    Realizar cambios en los archivos YAML del `sgivu-config-repo` y confirmarlos:
+    
+    ```bash
+    cd ~/workspace/source
+    # Edit configuration file
+    vim sgivu-auth-dev.yml
+    
+    # Commit changes
+    git add sgivu-auth-dev.yml
+    git commit -m "Update auth service timeout configuration"
+    git push
+    ```
+  </Step>
+  
+  <Step title="Refrescar Config Server (si es necesario)">
+    El Config Server detecta automáticamente los cambios en Git, pero se puede forzar un refresh:
+    
+    ```bash
+    docker restart sgivu-config
+    ```
+    
+    O usando `/actuator/refresh` en el propio Config Server:
+    
+    ```bash
+    curl -X POST http://localhost:8888/actuator/refresh
+    ```
+  </Step>
+  
+  <Step title="Refrescar el Microservicio">
+    Disparar un refresh en el servicio que necesita la configuración actualizada:
+    
+    ```bash
+    curl -X POST http://localhost:9000/actuator/refresh
+    ```
+    
+    La respuesta muestra qué claves de configuración fueron actualizadas:
+    
+    ```json
+    [
+      "management.endpoints.web.exposure.include",
+      "service.internal.timeout"
+    ]
+    ```
+  </Step>
+  
+  <Step title="Verificar los Cambios">
+    Confirmar que la nueva configuración está activa revisando el comportamiento del servicio o los logs.
+  </Step>
+</Steps>
+
+### Refrescar Múltiples Servicios
+
+Si se actualizó configuración compartida que afecta a múltiples servicios, refrescar cada uno:
+
+```bash
+# Refresh auth service
+curl -X POST http://localhost:9000/actuator/refresh
+
+# Refresh gateway
+curl -X POST http://localhost:8080/actuator/refresh
+
+# Refresh user service
+curl -X POST http://localhost:8081/actuator/refresh
+
+# Refresh client service
+curl -X POST http://localhost:8082/actuator/refresh
+
+# Refresh vehicle service
+curl -X POST http://localhost:8083/actuator/refresh
+```
+
+## Spring Cloud Bus para Refresh por Difusión
+
+### Descripción General
+
+Spring Cloud Bus utiliza un broker de mensajes (RabbitMQ o Kafka) para difundir eventos de refresh a todos los servicios simultáneamente.
+
+```
+┌─────────────┐
+│   Config    │
+│   Server    │  POST /actuator/bus-refresh
+└──────┬──────┘
+       │
+       ▼
+  ┌────────────┐
+  │  RabbitMQ  │
+  │     or     │
+  │   Kafka    │
+  └─────┬──────┘
+        │
+   ┌────┴─────┬────────┬────────┐
+   ▼          ▼        ▼        ▼
+┌──────┐  ┌──────┐ ┌──────┐ ┌──────┐
+│ Auth │  │  GW  │ │ User │ │Vehicle│
+└──────┘  └──────┘ └──────┘ └──────┘
+```
+
+### Configuración de Spring Cloud Bus
+
+<Steps>
+  <Step title="Agregar Dependencias">
+    Agregar Spring Cloud Bus a cada microservicio:
+    
+    ```xml
+    <dependency>
+      <groupId>org.springframework.cloud</groupId>
+      <artifactId>spring-cloud-starter-bus-amqp</artifactId>
+    </dependency>
+    ```
+  </Step>
+  
+  <Step title="Configurar el Broker de Mensajes">
+    Agregar la configuración de RabbitMQ a los archivos YAML base:
+    
+    ```yaml
+    spring:
+      rabbitmq:
+        host: ${RABBITMQ_HOST:localhost}
+        port: ${RABBITMQ_PORT:5672}
+        username: ${RABBITMQ_USERNAME:guest}
+        password: ${RABBITMQ_PASSWORD:guest}
+    ```
+  </Step>
+  
+  <Step title="Exponer el Endpoint bus-refresh">
+    Habilitar el endpoint bus-refresh en el Config Server:
+    
+    ```yaml
+    management:
+      endpoints:
+        web:
+          exposure:
+            include: health, info, bus-refresh
+    ```
+  </Step>
+  
+  <Step title="Disparar Refresh por Difusión">
+    Enviar un único evento de refresh que se propaga a todos los servicios:
+    
+    ```bash
+    curl -X POST http://localhost:8888/actuator/bus-refresh
+    ```
+  </Step>
+</Steps>
+
+<Info>
+  Con Spring Cloud Bus, solo es necesario llamar a un endpoint para refrescar todos los servicios conectados.
+</Info>
+
+## ¿Qué Se Puede Refrescar?
+
+### Configuración Actualizable
+
+Los beans anotados con `@RefreshScope` pueden ser recargados:
+
+```java
+@Component
+@RefreshScope
+public class ServiceConfiguration {
+    @Value("${service.timeout}")
+    private int timeout;
+    
+    @Value("${service.retry.attempts}")
+    private int retryAttempts;
+}
+```
+
+Propiedades típicas que se pueden refrescar:
+- Feature flags
+- Timeouts y configuración de reintentos
+- URLs de endpoints de API
+- Niveles de logging (con algunas limitaciones)
+- Umbrales de rate limiting
+- Valores TTL de caché
+
+### Configuración No Actualizable
+
+<Warning>
+  Los siguientes tipos de configuración **no pueden** ser refrescados sin un reinicio:
+</Warning>
+
+- **Puerto del servidor** (`server.port`)
+- **Configuración de instancia Eureka** (hostname, instance ID)
+- **Pools de conexión a base de datos** (URL, username, password)
+- **Registro de cliente OAuth2** (client ID, secret, scopes)
+- **Configuración del keystore JWT** (ubicación, contraseñas)
+- **Tipo de almacén de Spring Session** (Redis vs JDBC)
+
+## Cuándo Usar Refresh vs Reinicio
+
+### Usar Refresh Para
+
+<CardGroup cols={2}>
+  <Card title="Feature Toggles" icon="toggle-on">
+    Habilitar o deshabilitar funcionalidades sin tiempo de inactividad.
+  </Card>
+  
+  <Card title="Ajuste Operacional" icon="sliders">
+    Modificar timeouts, reintentos o límites de rate limiting.
+  </Card>
+  
+  <Card title="Cambios de URL" icon="link">
+    Actualizar URLs de servicios downstream.
+  </Card>
+  
+  <Card title="Niveles de Log" icon="file-lines">
+    Aumentar el detalle de logging para depuración.
+  </Card>
+</CardGroup>
+
+### Requiere Reinicio
+
+<CardGroup cols={2}>
+  <Card title="Cambios de Seguridad" icon="shield">
+    Configuración OAuth2, rutas de keystore, credenciales.
+  </Card>
+  
+  <Card title="Configuración de Base de Datos" icon="database">
+    Cadenas de conexión, tamaños de pool, drivers.
+  </Card>
+  
+  <Card title="Configuración del Servidor" icon="server">
+    Números de puerto, configuración SSL, context paths.
+  </Card>
+  
+  <Card title="Cambios de Discovery" icon="network-wired">
+    Configuración del cliente Eureka, metadatos de instancia.
+  </Card>
+</CardGroup>
+
+## Guía de Refresh Paso a Paso
+
+### Escenario: Actualizar la Tasa de Muestreo de Zipkin
+
+A continuación se muestra cómo actualizar la tasa de muestreo de trazas distribuidas del 10% al 50%:
+
+<Steps>
+  <Step title="Identificar la Configuración">
+    Configuración actual en `sgivu-auth.yml`:
+    
+    ```yaml
+    management:
+      tracing:
+        sampling:
+          probability: 0.1
+    ```
+  </Step>
+  
+  <Step title="Actualizar y Confirmar">
+    ```bash
+    cd ~/workspace/source
+    
+    # Edit the file
+    sed -i 's/probability: 0.1/probability: 0.5/' sgivu-auth.yml
+    
+    # Commit to Git
+    git add sgivu-auth.yml
+    git commit -m "Increase Zipkin sampling to 50% for debugging"
+    git push
+    ```
+  </Step>
+  
+  <Step title="Verificar el Config Server">
+    Comprobar que el Config Server detecta el cambio:
+    
+    ```bash
+    curl http://localhost:8888/sgivu-auth/dev | grep probability
+    ```
+    
+    Debería mostrar:
+    ```json
+    "management.tracing.sampling.probability": 0.5
+    ```
+  </Step>
+  
+  <Step title="Refrescar el Servicio">
+    ```bash
+    curl -X POST http://localhost:9000/actuator/refresh
+    ```
+    
+    Respuesta:
+    ```json
+    [
+      "management.tracing.sampling.probability"
+    ]
+    ```
+  </Step>
+  
+  <Step title="Confirmar el Cambio">
+    El servicio de autenticación ahora traza el 50% de las solicitudes. Verificar en Zipkin el aumento en el volumen de trazas.
+  </Step>
+</Steps>
+
+## Refresh en Producción
+
+### Buenas Prácticas
+
+<CardGroup cols={2}>
+  <Card title="Probar Primero" icon="flask">
+    Siempre probar los cambios de configuración en desarrollo antes de producción.
+  </Card>
+  
+  <Card title="Refresh Progresivo" icon="arrows-rotate">
+    Refrescar una instancia a la vez en despliegues con múltiples instancias.
+  </Card>
+  
+  <Card title="Monitorear el Impacto" icon="chart-line">
+    Observar métricas y logs después del refresh para detectar problemas tempranamente.
+  </Card>
+  
+  <Card title="Documentar los Cambios" icon="file-pen">
+    Registrar qué se cambió y por qué en los mensajes de commit.
+  </Card>
+</CardGroup>
+
+### Consideraciones de Seguridad
+
+<Warning>
+  Restringir el acceso a los endpoints de refresh en producción:
+</Warning>
+
+```yaml
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, refresh
+  endpoint:
+    refresh:
+      enabled: true
+spring:
+  security:
+    user:
+      name: ${ACTUATOR_USERNAME}
+      password: ${ACTUATOR_PASSWORD}
+```
+
+Luego usar autenticación al llamar al endpoint:
+
+```bash
+curl -u admin:secret -X POST http://prod-service:8080/actuator/refresh
+```
+
+## Limitaciones y Consideraciones
+
+### Limitaciones del Refresh
+
+1. **Los beans deben tener `@RefreshScope`** — Solo los beans anotados son recargados
+2. **El estado se pierde** — El estado en memoria de los beans refrescados se reinicia
+3. **No hay actualizaciones atómicas** — Cada servicio se refresca de forma independiente
+4. **Los pools de conexión persisten** — Las conexiones a base de datos/Redis no se recrean
+5. **Las tareas programadas continúan** — Los métodos `@Scheduled` usan la configuración anterior hasta la siguiente ejecución
+
+### Cuando las Cosas Fallan
+
+<Accordion title="El refresh devuelve un array vacío">
+  **Causa:** No hubo cambios reales en la configuración, o las propiedades no están en beans con `@RefreshScope`.
+  
+  **Solución:** Verificar que la ruta de la propiedad sea correcta y que los beans que la consumen estén anotados.
+</Accordion>
+
+<Accordion title="El comportamiento del servicio no cambia">
+  **Causa:** La configuración está cacheada o solo se usa durante el arranque.
+  
+  **Solución:** Verificar si la propiedad requiere un reinicio. Considerar usar `@RefreshScope` en los beans relevantes.
+</Accordion>
+
+<Accordion title="El endpoint de refresh devuelve 404">
+  **Causa:** El endpoint no está expuesto en `management.endpoints.web.exposure.include`.
+  
+  **Solución:** Agregar `refresh` a la lista de inclusión y reiniciar el servicio una vez.
+</Accordion>
+
+<Accordion title="El Config Server no detecta los cambios en Git">
+  **Causa:** El Config Server puede estar cacheando o no ha descargado los últimos commits.
+  
+  **Solución:** Reiniciar el Config Server o configurar refresh basado en webhooks.
+</Accordion>
+
+## Automatización del Refresh con Git Webhooks
+
+Para configuraciones avanzadas, configurar Git webhooks para disparar automáticamente el refresh cuando cambia la configuración:
+
+```bash
+# GitHub webhook example
+# POST to: http://config-server:8888/monitor
+# Payload: Git push event
+
+# Config Server automatically:
+# 1. Detects which services are affected
+# 2. Publishes refresh event to Spring Cloud Bus
+# 3. All services refresh automatically
+```
+
+<Info>
+  Esto requiere la dependencia `spring-cloud-config-monitor` y un bus de mensajes (RabbitMQ/Kafka).
+</Info>
+
+## Recursos Relacionados
+
+<CardGroup cols={2}>
+  <Card title="Monitoreo" href="/config/operations/monitoring" icon="chart-line">
+    Monitorear servicios después de una actualización de configuración
+  </Card>
+  
+  <Card title="Validación" href="/config/operations/validation" icon="circle-check">
+    Validar la configuración antes del refresh
+  </Card>
+  
+  <Card title="Seguridad" href="/config/operations/security" icon="shield">
+    Proteger los endpoints de refresh en producción
+  </Card>
+  
+  <Card title="Probar Cambios" href="/config/operations/validation" icon="vial">
+    Probar cambios de configuración localmente
+  </Card>
+</CardGroup>

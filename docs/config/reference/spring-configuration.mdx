@@ -1,0 +1,251 @@
+---
+title: Configuración de Spring Boot
+description: Patrones comunes de configuración de Spring Boot utilizados en los microservicios de SGIVU
+---
+
+Esta página documenta los patrones estándar de configuración de Spring Boot utilizados en toda la plataforma SGIVU.
+
+## Identidad de la Aplicación
+
+### Nombre de la Aplicación
+
+Cada servicio debe definir su nombre de aplicación, el cual se utiliza para el descubrimiento e identificación del servicio:
+
+<ParamField path="spring.application.name" type="string" required>
+  Identificador único del servicio dentro del ecosistema de microservicios. Utilizado por Eureka para el registro y descubrimiento de servicios.
+</ParamField>
+
+```yaml
+spring:
+  application:
+    name: sgivu-user
+```
+
+<Note>
+  El nombre de la aplicación debe seguir la convención `sgivu-{servicio}` para mantener consistencia en toda la plataforma.
+</Note>
+
+## Configuración del Servidor
+
+### Configuración de Puertos
+
+Los servicios utilizan configuración de puertos basada en variables de entorno con valores predeterminados:
+
+<ParamField path="server.port" type="integer" required>
+  El puerto HTTP en el que escucha el servicio. Utiliza la variable de entorno `PORT` con valores predeterminados específicos por servicio.
+</ParamField>
+
+```yaml
+server:
+  port: ${PORT:8081}
+```
+
+<CardGroup cols={2}>
+  <Card title="Servicio Auth" icon="lock">
+    Por defecto: `9000`
+  </Card>
+  <Card title="Servicio Gateway" icon="gateway">
+    Por defecto: `8080`
+  </Card>
+  <Card title="Servicio User" icon="user">
+    Por defecto: `8081`
+  </Card>
+  <Card title="Servicio Client" icon="building">
+    Por defecto: `8082`
+  </Card>
+  <Card title="Servicio Vehicle" icon="car">
+    Por defecto: `8083`
+  </Card>
+  <Card title="Servicio Purchase-Sale" icon="receipt">
+    Por defecto: `8084`
+  </Card>
+  <Card title="Servicio Discovery" icon="compass">
+    Por defecto: `8761`
+  </Card>
+</CardGroup>
+
+### Estrategia de Encabezados Reenviados
+
+Los servicios detrás de proxies utilizan la estrategia de encabezados reenviados para manejar correctamente los headers del proxy:
+
+<ParamField path="server.forward-headers-strategy" type="string">
+  Configura cómo el servidor maneja los encabezados reenviados (X-Forwarded-*). Se establece en `framework` para que Spring los gestione automáticamente.
+</ParamField>
+
+```yaml
+server:
+  forward-headers-strategy: framework
+```
+
+<Info>
+  Esta configuración es crítica para los servicios detrás del gateway o balanceadores de carga, ya que permite identificar correctamente las direcciones IP de los clientes y las URLs originales de las solicitudes.
+</Info>
+
+## Configuración de JPA
+
+### Open In View
+
+Todos los servicios con acceso a datos desactivan el patrón Open Session In View:
+
+<ParamField path="spring.jpa.open-in-view" type="boolean">
+  Controla si las sesiones JPA permanecen abiertas durante el renderizado de vistas. Se establece en `false` en todos los servicios de SGIVU para prevenir problemas de carga diferida y mejorar el rendimiento.
+</ParamField>
+
+```yaml
+spring:
+  jpa:
+    open-in-view: false
+```
+
+<Warning>
+  Mantener `open-in-view: false` es una buena práctica para APIs REST. Previene la carga diferida accidental en controladores y asegura límites de transacción explícitos.
+</Warning>
+
+### Propiedades JPA (Específicas por Profile)
+
+Los entornos de desarrollo habilitan el registro de consultas SQL:
+
+```yaml
+spring:
+  jpa:
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+```
+
+Los entornos de producción utilizan un registro mínimo:
+
+```yaml
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+```
+
+## Gestión de Sesiones
+
+### Tipos de Almacenamiento de Sesiones
+
+SGIVU utiliza dos estrategias de almacenamiento de sesiones dependiendo de los requisitos del servicio:
+
+#### Sesiones en Redis (Servicios sin Estado)
+
+El **Gateway** utiliza Redis para la gestión distribuida de sesiones:
+
+```yaml
+spring:
+  session:
+    store-type: redis
+    timeout: 1h
+    redis:
+      namespace: spring:session:sgivu-gateway
+  data:
+    redis:
+      host: ${REDIS_HOST:sgivu-redis}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD}
+```
+
+<ParamField path="spring.session.store-type" type="string">
+  Mecanismo de almacenamiento de sesiones. Utilizar `redis` para sesiones distribuidas entre instancias del gateway.
+</ParamField>
+
+<ParamField path="spring.session.redis.namespace" type="string">
+  Prefijo de clave Redis para los datos de sesión. Previene colisiones de claves cuando múltiples servicios comparten la misma instancia de Redis.
+</ParamField>
+
+#### Sesiones JDBC (Servicios con Estado)
+
+El **Servicio Auth** utiliza sesiones respaldadas por base de datos:
+
+```yaml
+spring:
+  session:
+    store-type: jdbc
+    jdbc:
+      initialize-schema: never
+      table-name: SPRING_SESSION
+      cleanup-cron: 0 */15 * * * *
+      flush-mode: on_save
+      save-mode: on_get_attribute
+```
+
+<ParamField path="spring.session.jdbc.initialize-schema" type="string">
+  Controla la creación de la tabla de sesiones. Se establece en `never` ya que Flyway gestiona el esquema.
+</ParamField>
+
+<ParamField path="spring.session.jdbc.cleanup-cron" type="string">
+  Expresión cron para la limpieza de sesiones expiradas. Se ejecuta cada 15 minutos por defecto.
+</ParamField>
+
+<Accordion title="Guía de Decisión para Almacenamiento de Sesiones">
+  **Usar Redis cuando:**
+  - El servicio requiere escalado horizontal
+  - Las sesiones son ligeras y temporales
+  - El servicio no mantiene estado (como el gateway)
+
+  **Usar JDBC cuando:**
+  - El servicio ya tiene acceso a base de datos
+  - Las sesiones contienen datos críticos
+  - El servicio requiere persistencia de sesiones entre reinicios
+</Accordion>
+
+## Documentación de API (SpringDoc)
+
+Todos los servicios utilizan SpringDoc OpenAPI 3 con enrutamiento centralizado de documentación:
+
+<ParamField path="springdoc.swagger-ui.url" type="string">
+  Ubicación de la especificación JSON de OpenAPI para este servicio.
+</ParamField>
+
+<ParamField path="springdoc.swagger-ui.configUrl" type="string">
+  Ubicación de la configuración de Swagger UI.
+</ParamField>
+
+### Configuraciones Específicas por Servicio
+
+```yaml
+# Auth Service
+springdoc:
+  swagger-ui:
+    url: /docs/auth/v3/api-docs
+    configUrl: /docs/auth/v3/api-docs/swagger-config
+```
+
+```yaml
+# User Service
+springdoc:
+  swagger-ui:
+    url: /docs/user/v3/api-docs
+    configUrl: /docs/user/v3/api-docs/swagger-config
+```
+
+```yaml
+# Vehicle Service
+springdoc:
+  swagger-ui:
+    url: /docs/vehicle/v3/api-docs
+    configUrl: /docs/vehicle/v3/api-docs/swagger-config
+```
+
+<Info>
+  Toda la documentación de API es accesible a través del gateway en `/docs/{servicio}/v3/api-docs`. Esto proporciona una ubicación centralizada para la exploración de las APIs.
+</Info>
+
+## Configuración Relacionada
+
+<CardGroup cols={2}>
+  <Card title="Configuración de Eureka" icon="broadcast-tower" href="/config/reference/eureka-settings">
+    Configuración de descubrimiento y registro de servicios
+  </Card>
+  <Card title="Configuración de Base de Datos" icon="database" href="/config/reference/database-config">
+    Configuración de conexión a base de datos y migraciones
+  </Card>
+  <Card title="Observabilidad" icon="chart-line" href="/config/reference/observability">
+    Configuración de monitoreo, trazas y registro de logs
+  </Card>
+  <Card title="Variables de Entorno" icon="code" href="/config/environments/variables">
+    Variables de entorno requeridas y opcionales
+  </Card>
+</CardGroup>

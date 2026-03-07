@@ -1,0 +1,185 @@
+---
+title: Gestión de Usuarios
+description: Crea y administra cuentas de usuario, roles y permisos en SGIVU
+---
+
+## Descripción General
+
+La gestión de usuarios permite a los administradores crear cuentas de usuario, asignar roles y permisos, y administrar la información personal de todas las personas que acceden a la plataforma SGIVU.
+
+## Administración de Usuarios
+
+### Crear un Nuevo Usuario
+
+<Steps>
+  <Step title="Navegar a Gestión de Usuarios">
+    Desde el panel principal, acceda a la sección de Gestión de Usuarios. Debe contar con el permiso `user:create` para crear nuevos usuarios.
+  </Step>
+  
+  <Step title="Ingresar Información Personal">
+    Complete los datos personales del usuario:
+    - Nombre completo (nombre y apellido)
+    - Dirección de correo electrónico
+    - Número de teléfono
+    - Información de domicilio
+    - Fecha de nacimiento
+  </Step>
+  
+  <Step title="Establecer Nombre de Usuario y Contraseña">
+    Elija un nombre de usuario único para la cuenta y establezca una contraseña segura. El sistema aplica requisitos de fortaleza de contraseña que incluyen:
+    - Requisitos de longitud mínima
+    - Combinación de tipos de caracteres
+    - Sin patrones comunes
+  </Step>
+  
+  <Step title="Asignar Roles">
+    Seleccione uno o más roles para el usuario. Los roles determinan a qué funcionalidades y datos puede acceder el usuario. Los roles comunes incluyen:
+    - **Admin**: Acceso completo al sistema
+    - **Manager**: Puede gestionar inventario y transacciones
+    - **Sales**: Puede ver y crear contratos de compra/venta
+    - **Viewer**: Acceso de solo lectura a los datos
+  </Step>
+  
+  <Step title="Guardar y Activar">
+    Revise toda la información y guarde la nueva cuenta de usuario. El usuario podrá iniciar sesión con sus credenciales.
+  </Step>
+</Steps>
+
+### Actualizar Información del Usuario
+
+<Card title="Editar Datos del Usuario" icon="pen-to-square">
+  Puede actualizar la información del usuario en cualquier momento buscándolo y seleccionando la opción de edición. Los cambios en la información personal, roles o permisos se aplican de inmediato.
+</Card>
+
+### Búsqueda de Usuarios
+
+SGIVU ofrece capacidades de búsqueda avanzadas:
+
+<CardGroup cols={2}>
+  <Card title="Por Nombre de Usuario" icon="magnifying-glass">
+    Busque usuarios por su nombre de usuario para acceder rápidamente a su perfil.
+  </Card>
+  
+  <Card title="Por Correo Electrónico" icon="envelope">
+    Encuentre usuarios por su dirección de correo electrónico registrada.
+  </Card>
+  
+  <Card title="Por Nombre" icon="user">
+    Busque por nombre o apellido para localizar personas específicas.
+  </Card>
+  
+  <Card title="Filtros Avanzados" icon="filter">
+    Combine múltiples criterios para refinar los resultados de búsqueda.
+  </Card>
+</CardGroup>
+
+## Roles y Permisos
+
+### Comprender los Roles
+
+Los roles son conjuntos predefinidos de permisos que determinan lo que los usuarios pueden hacer en SGIVU. Cada rol contiene múltiples permisos agrupados por área funcional.
+
+### Tipos de Permisos
+
+Los permisos en SGIVU siguen un patrón consistente en todos los módulos:
+
+<AccordionGroup>
+  <Accordion title="Permisos de Usuario">
+    - `user:create` - Crear nuevas cuentas de usuario
+    - `user:read` - Ver información de usuarios
+    - `user:update` - Modificar datos de usuarios
+    - `user:delete` - Eliminar cuentas de usuario
+  </Accordion>
+  
+  <Accordion title="Permisos de Vehículos">
+    - `vehicle:create` - Agregar nuevos vehículos al inventario
+    - `vehicle:read` - Ver información de vehículos
+    - `vehicle:update` - Modificar datos de vehículos
+    - `vehicle:delete` - Eliminar vehículos del sistema
+  </Accordion>
+  
+  <Accordion title="Permisos de Clientes">
+    - `person:create` / `company:create` - Agregar nuevos clientes
+    - `person:read` / `company:read` - Ver información de clientes
+    - `person:update` / `company:update` - Modificar datos de clientes
+    - `person:delete` / `company:delete` - Eliminar clientes
+  </Accordion>
+  
+  <Accordion title="Permisos de Contratos">
+    - `purchase-sale:create` - Crear contratos de compra/venta
+    - `purchase-sale:read` - Ver detalles de contratos
+    - `purchase-sale:update` - Modificar información de contratos
+    - `purchase-sale:delete` - Cancelar o eliminar contratos
+  </Accordion>
+</AccordionGroup>
+
+### Gestión de Roles
+
+<Steps>
+  <Step title="Ver Roles Disponibles">
+    Navegue a la sección de Roles para ver todos los roles definidos en el sistema y sus permisos asociados.
+  </Step>
+  
+  <Step title="Asignar Roles a Usuarios">
+    Al crear o editar un usuario, seleccione los roles apropiados. Los usuarios pueden tener múltiples roles, y sus permisos efectivos serán la combinación de todos los roles asignados.
+  </Step>
+  
+  <Step title="Revisar Permisos">
+    Audite regularmente los roles y permisos de los usuarios para asegurar que tengan niveles de acceso apropiados según sus responsabilidades.
+  </Step>
+</Steps>
+
+## Gestión de Información Personal
+
+### Información de Domicilio
+
+Almacene los datos completos de domicilio de los usuarios, incluyendo:
+- Dirección
+- Ciudad
+- Estado/Provincia
+- Código postal
+- País
+
+<Card title="Validación de Domicilio" icon="location-dot">
+  El sistema valida la información de domicilio para garantizar la calidad y consistencia de los datos en toda la plataforma.
+</Card>
+
+## Consideraciones de Seguridad
+
+<CardGroup cols={2}>
+  <Card title="Fortaleza de Contraseña" icon="key">
+    SGIVU aplica requisitos estrictos de contraseña para proteger las cuentas de usuario. Las contraseñas deben cumplir estándares mínimos de complejidad.
+  </Card>
+  
+  <Card title="Validación de Caracteres" icon="check-circle">
+    La validación de caracteres especiales asegura que los nombres de usuario y la información personal sigan reglas de formato consistentes.
+  </Card>
+  
+  <Card title="Principio de Mínimo Privilegio" icon="user-shield">
+    Otorgue a los usuarios solo los permisos mínimos necesarios para desempeñar sus funciones laborales.
+  </Card>
+  
+  <Card title="Auditorías Regulares" icon="clipboard-list">
+    Revise periódicamente las cuentas de usuario, roles y patrones de acceso para mantener la seguridad.
+  </Card>
+</CardGroup>
+
+## Solución de Problemas
+
+<AccordionGroup>
+  <Accordion title="No se pueden crear nuevos usuarios">
+    Verifique que cuenta con el permiso `user:create`. Compruebe que todos los campos obligatorios estén completados correctamente y que el nombre de usuario sea único.
+  </Accordion>
+  
+  <Accordion title="Los requisitos de contraseña no están claros">
+    Pase el cursor sobre el campo de contraseña para ver los requisitos detallados. Las contraseñas deben incluir mayúsculas, minúsculas, números y caracteres especiales.
+  </Accordion>
+  
+  <Accordion title="El usuario no puede acceder a funcionalidades tras la asignación de roles">
+    Cierre sesión y vuelva a iniciarla para que los cambios de permisos surtan efecto. Si el problema persiste, verifique que el rol contenga los permisos necesarios.
+  </Accordion>
+  
+  <Accordion title="La búsqueda no devuelve resultados">
+    Intente con términos de búsqueda más amplios o revise la configuración de filtros. Asegúrese de tener permiso para ver los usuarios que está buscando.
+  </Accordion>
+</AccordionGroup>

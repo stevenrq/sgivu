@@ -1,0 +1,384 @@
+---
+title: Servidor de Descubrimiento
+description: Registro y descubrimiento de servicios con Netflix Eureka
+---
+
+## Descripción General
+
+`sgivu-discovery` es el servidor de Service Discovery (Eureka Server) del ecosistema SGIVU. Registra y muestra las instancias de los microservicios, habilita la resolución de nombres de servicio y sirve como fuente central para el Load Balancing simple entre servicios.
+
+## Tecnologías
+
+- **Java**: 21
+- **Spring Boot**: 3.5.8
+- **Spring Cloud Netflix Eureka Server**: Registro de servicios
+- **Spring Cloud Config**: Cliente para configuración centralizada
+- **Spring Boot Devtools**: Recarga en caliente durante el desarrollo
+
+## Configuración de Puerto
+
+- **Puerto por defecto**: 8761
+- **Dashboard**: `http://localhost:8761/`
+
+## Prerrequisitos
+
+- JDK 21
+- Maven 3.9+
+- Docker & docker-compose
+- **Recomendado**: Levantar el stack completo con `infra/compose/sgivu-docker-compose/docker-compose.dev.yml` incluyendo `sgivu-config`
+
+## Endpoints
+
+<ResponseField name="http://<host>:8761/" type="UI">
+  Dashboard de Eureka que muestra todas las aplicaciones registradas y sus instancias
+</ResponseField>
+
+<ResponseField name="GET /eureka/apps" type="XML/JSON">
+  API REST que lista todas las aplicaciones registradas
+</ResponseField>
+
+<ResponseField name="GET /eureka/apps/{appName}" type="XML/JSON">
+  Información sobre una aplicación específica y sus instancias
+</ResponseField>
+
+<ResponseField name="GET /eureka/apps/{appName}/{instanceId}" type="XML/JSON">
+  Información detallada sobre una instancia específica
+</ResponseField>
+
+<ResponseField name="GET /actuator/health" type="JSON">
+  Estado de salud del servicio (si Actuator está habilitado)
+</ResponseField>
+
+## Ejecución del Servicio
+
+### Desarrollo con Docker Compose
+
+```bash
+cd infra/compose/sgivu-docker-compose
+docker compose -f docker-compose.dev.yml up -d
+```
+
+Esto inicia `sgivu-config` (modo nativo) y `sgivu-discovery` junto con otros servicios.
+
+### Ejecución Local
+
+```bash
+./mvnw clean package
+./mvnw spring-boot:run
+```
+
+### Construcción Docker
+
+```bash
+./build-image.bash
+docker build -t stevenrq/sgivu-discovery:v1 .
+docker run -p 8761:8761 stevenrq/sgivu-discovery:v1
+```
+
+## Interfaz del Dashboard
+
+Accede al dashboard de Eureka en `http://localhost:8761/`:
+
+<img src="/images/eureka-dashboard.png" alt="Eureka Dashboard" />
+
+**El dashboard muestra**:
+- Estado del sistema e información del entorno
+- Instancias registradas por aplicación
+- Estado de las instancias (UP, DOWN, OUT_OF_SERVICE)
+- Umbral de renovación y última hora de renovación
+- Información general sobre réplicas (si están configuradas)
+
+## Configuración del Cliente
+
+Los microservicios se registran en Eureka usando esta configuración:
+
+```yaml
+spring:
+  application:
+    name: sgivu-user  # Unique name per service
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://sgivu-discovery:8761/eureka/
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 30
+    lease-expiration-duration-in-seconds: 90
+```
+
+<Info>
+Asegúrate de que cada servicio tenga un `spring.application.name` único — este se usa como identificador del servicio en Eureka.
+</Info>
+
+## Flujo de Registro de Servicios
+
+1. **Inicio**: El servicio arranca y lee la configuración de Eureka
+2. **Registro**: El servicio envía una solicitud de registro al servidor Eureka
+3. **Heartbeat**: El servicio envía renovaciones cada 30 segundos (por defecto)
+4. **Descubrimiento**: Otros servicios consultan el registro para localizar instancias del servicio
+5. **Desregistro**: El servicio se desregistra durante un apagado ordenado
+
+## Load Balancing
+
+Eureka habilita el Load Balancing del lado del cliente:
+
+```java
+// Spring Cloud LoadBalancer automatically uses Eureka registry
+@LoadBalanced
+@Bean
+public WebClient.Builder webClientBuilder() {
+    return WebClient.builder();
+}
+
+// Use service name in URL
+webClient.get()
+    .uri("http://sgivu-user/v1/users/{id}", userId)
+    .retrieve()
+    .bodyToMono(User.class);
+```
+
+## Alta Disponibilidad
+
+### Modo Standalone (Desarrollo)
+
+```yaml
+eureka:
+  client:
+    register-with-eureka: false
+    fetch-registry: false
+```
+
+### Modo Clúster (Producción)
+
+Múltiples instancias de Eureka se registran entre sí:
+
+```yaml
+# Eureka instance 1
+eureka:
+  client:
+    service-url:
+      defaultZone: http://eureka2:8761/eureka/,http://eureka3:8761/eureka/
+```
+
+<Info>
+Para despliegues en producción, ejecuta al menos 2 instancias de Eureka para alta disponibilidad.
+</Info>
+
+## Seguridad
+
+### Seguridad de Red
+
+- El servidor Eureka debe ser accesible únicamente dentro de la red privada
+- Usa VPC/grupos de seguridad para restringir el acceso en despliegues en la nube
+- Considera agregar Spring Security para autenticación si se expone el dashboard
+
+### Autenticación de Clientes
+
+Asegúrate de que los clientes de Eureka:
+- Tengan la configuración correcta de `defaultZone`
+- Usen un `spring.application.name` único por servicio
+- Se registren con los metadatos apropiados para el enrutamiento
+
+## Observabilidad
+
+### Monitoreo de Servicios
+
+**Vía Dashboard**:
+- Monitorear la cantidad de instancias registradas
+- Verificar el estado de las instancias (UP/DOWN)
+- Revisar los tiempos del último heartbeat
+- Verificar el umbral de renovación
+
+**Vía API REST**:
+```bash
+# List all services
+curl http://localhost:8761/eureka/apps
+
+# Check specific service
+curl http://localhost:8761/eureka/apps/SGIVU-USER
+```
+
+### Health Checks
+
+```bash
+curl http://localhost:8761/actuator/health
+```
+
+### Trazabilidad Distribuida
+
+<Info>
+El servidor Eureka no incluye dependencias de trazabilidad por defecto. Habilita Micrometer/Zipkin en los demás servicios y revisa el estado de registro en el dashboard de Eureka.
+</Info>
+
+## Testing
+
+```bash
+./mvnw test
+```
+
+**Tests de integración recomendados**:
+- Simular el registro de instancias
+- Verificar la visibilidad en el Endpoint `/eureka/apps`
+- Probar el comportamiento de heartbeat y expiración
+- Validar el Service Discovery por nombre
+
+## Metadatos de Instancia
+
+Los clientes pueden agregar metadatos personalizados:
+
+```yaml
+eureka:
+  instance:
+    metadata-map:
+      version: 1.0.0
+      region: us-east-1
+      environment: dev
+```
+
+Acceso a los metadatos en los consumidores:
+```java
+List<ServiceInstance> instances = discoveryClient.getInstances("sgivu-user");
+String version = instances.get(0).getMetadata().get("version");
+```
+
+## Modo de Autopreservación
+
+Eureka entra en modo de autopreservación cuando demasiadas instancias fallan en enviar heartbeats:
+
+**Comportamiento**:
+- Eureka deja de desalojar instancias
+- El dashboard muestra un mensaje de advertencia
+- Previene problemas por partición de red
+
+**Desactivar en desarrollo**:
+```yaml
+eureka:
+  server:
+    enable-self-preservation: false
+```
+
+<Warning>
+Mantén siempre el modo de autopreservación habilitado en producción para prevenir fallos en cascada durante problemas de red.
+</Warning>
+
+## Solución de Problemas
+
+<AccordionGroup>
+  <Accordion title="No aparecen servicios en el dashboard">
+    **Síntomas**: El dashboard de Eureka no muestra aplicaciones registradas
+    
+    **Soluciones**:
+    - Verificar que los clientes tengan `eureka.client.service-url.defaultZone` configurado como `http://sgivu-discovery:8761/eureka/`
+    - Comprobar `eureka.client.register-with-eureka: true` en la configuración del cliente
+    - Asegurar que los clientes puedan alcanzar el servidor Eureka (conectividad de red)
+    - Revisar los logs del cliente en busca de errores de registro
+    - Verificar la red de Docker si se usan contenedores
+  </Accordion>
+  
+  <Accordion title="Errores de conectividad de red">
+    **Síntomas**: Los servicios no pueden conectarse al servidor Eureka
+    
+    **Soluciones**:
+    - Verificar la configuración de redes de Docker
+    - Comprobar que `sgivu-config` sea accesible y devuelva la URL correcta de Eureka
+    - Asegurar que el puerto 8761 no esté bloqueado por el firewall
+    - Probar conectividad: `curl http://sgivu-discovery:8761/eureka/apps`
+  </Accordion>
+  
+  <Accordion title="Puerto ya en uso">
+    **Síntomas**: Eureka falla al iniciar con el error "Address already in use"
+    
+    **Soluciones**:
+    - Verificar si otro proceso está usando el puerto 8761: `lsof -i :8761`
+    - Terminar el proceso existente o cambiar el puerto de Eureka
+    - Comprobar que Docker no esté ejecutando contenedores duplicados de Eureka
+  </Accordion>
+  
+  <Accordion title="Los servicios no se descubren entre sí">
+    **Síntomas**: Las llamadas entre servicios fallan con "no such host" o 404
+    
+    **Soluciones**:
+    - Verificar que ambos servicios estén registrados en el dashboard de Eureka
+    - Comprobar que `spring.application.name` coincida con el nombre usado en las URLs
+    - Asegurar que los consumidores tengan `eureka.client.fetch-registry: true`
+    - Verificar la anotación `@LoadBalanced` en RestTemplate/WebClient
+    - Esperar 30-60 segundos después del registro para la actualización de caché
+  </Accordion>
+  
+  <Accordion title="Instancias atascadas en estado DOWN">
+    **Síntomas**: Las instancias se muestran como DOWN a pesar de estar saludables
+    
+    **Soluciones**:
+    - Verificar que el Endpoint de health de la instancia sea accesible
+    - Comprobar la configuración de `eureka.instance.prefer-ip-address`
+    - Revisar la configuración de heartbeat (intervalo de renovación)
+    - Verificar problemas de red entre la instancia y Eureka
+    - Forzar la eliminación y re-registro de la instancia
+  </Accordion>
+</AccordionGroup>
+
+## Variables de Entorno
+
+| Variable | Descripción | Valor por defecto |
+|----------|-------------|-------------------|
+| `PORT` | Puerto del servidor | `8761` |
+| `EUREKA_URL` | URL del servidor Eureka (para clientes) | `http://localhost:8761/eureka/` |
+| `SPRING_APPLICATION_NAME` | Nombre de la aplicación | `sgivu-discovery` |
+
+## Referencia de Configuración
+
+### Configuración del Servidor
+
+```yaml
+eureka:
+  server:
+    enable-self-preservation: true
+    eviction-interval-timer-in-ms: 60000
+    response-cache-update-interval-ms: 30000
+```
+
+### Configuración del Cliente
+
+```yaml
+eureka:
+  client:
+    registry-fetch-interval-seconds: 30
+    instance-info-replication-interval-seconds: 30
+  instance:
+    lease-renewal-interval-in-seconds: 30
+    lease-expiration-duration-in-seconds: 90
+```
+
+## Buenas Prácticas
+
+<CardGroup cols={2}>
+  <Card title="Nombres Únicos" icon="tag">
+    Usa un `spring.application.name` único para cada servicio
+  </Card>
+  <Card title="Configuración HA" icon="server">
+    Ejecuta múltiples instancias de Eureka en producción
+  </Card>
+  <Card title="Health Checks" icon="heart-pulse">
+    Implementa indicadores de salud personalizados para un estado preciso
+  </Card>
+  <Card title="Metadatos" icon="info">
+    Usa metadatos para enrutar y filtrar instancias
+  </Card>
+</CardGroup>
+
+## Servicios Relacionados
+
+<CardGroup cols={2}>
+  <Card title="Config Server" icon="gear" href="/services/config">
+    Configuración centralizada incluyendo URLs de Eureka
+  </Card>
+  <Card title="Gateway" icon="shield" href="/services/gateway">
+    Usa Eureka para enrutar hacia los servicios downstream
+  </Card>
+  <Card title="Todos los Servicios" icon="server" href="/services/overview">
+    Todos los servicios se registran en Eureka
+  </Card>
+</CardGroup>

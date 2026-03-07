@@ -1,0 +1,490 @@
+---
+title: Configuración del Servicio de Compra-Venta
+description: Servicio de orquestación de transacciones que coordina compras y ventas en la plataforma SGIVU
+---
+
+El Servicio de Compra-Venta (`sgivu-purchase-sale`) orquesta las transacciones de compra y venta de vehículos coordinando datos de los servicios de Usuario, Cliente y Vehículo.
+
+## Visión General del Servicio
+
+<CardGroup cols={2}>
+  <Card title="Puerto" icon="network-wired">
+    8084
+  </Card>
+  <Card title="Base de Datos" icon="database">
+    PostgreSQL
+  </Card>
+  <Card title="Tipo" icon="diagram-project">
+    Orquestación
+  </Card>
+  <Card title="Rol" icon="handshake">
+    Gestión de Transacciones
+  </Card>
+</CardGroup>
+
+## Características Principales
+
+- Orquestación de transacciones entre múltiples servicios
+- Gestión de registros de compras y ventas
+- Integración con los servicios de Usuario, Cliente y Vehículo
+- Migración de base de datos con Flyway
+- API RESTful con documentación OpenAPI
+- Autenticación interna entre servicios
+
+## Configuración Base
+
+### Configuración del Servidor
+
+```yaml
+server:
+  port: ${PORT:8084}
+```
+
+### Configuración de JPA
+
+```yaml
+spring:
+  jpa:
+    open-in-view: false
+```
+
+<Info>
+Deshabilitar open-in-view garantiza límites de transacción adecuados en este servicio de orquestación.
+</Info>
+
+### Migración con Flyway
+
+```yaml
+spring:
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: ${FLYWAY_BASELINE_ON_MIGRATE:false}
+    baseline-version: 0
+    validate-on-migrate: true
+```
+
+## Configuración de Base de Datos
+
+<Tabs>
+  <Tab title="Desarrollo">
+    ```yaml
+    spring:
+      datasource:
+        url: jdbc:postgresql://${DEV_PURCHASE_SALE_DB_HOST:host.docker.internal}:${DEV_PURCHASE_SALE_DB_PORT:5432}/${DEV_PURCHASE_SALE_DB_NAME}
+        username: ${DEV_PURCHASE_SALE_DB_USERNAME}
+        password: ${DEV_PURCHASE_SALE_DB_PASSWORD}
+        driver-class-name: org.postgresql.Driver
+      jpa:
+        hibernate:
+          ddl-auto: validate
+        show-sql: true
+        properties:
+          hibernate:
+            format_sql: true
+      flyway:
+        baseline-on-migrate: true
+        clean-disabled: true
+    ```
+    
+    El entorno de desarrollo habilita el registro de SQL con formato para depurar transacciones.
+  </Tab>
+  <Tab title="Producción">
+    ```yaml
+    spring:
+      datasource:
+        url: jdbc:postgresql://${PROD_PURCHASE_SALE_DB_HOST}:${PROD_PURCHASE_SALE_DB_PORT}/${PROD_PURCHASE_SALE_DB_NAME}
+        username: ${PROD_PURCHASE_SALE_DB_USERNAME}
+        password: ${PROD_PURCHASE_SALE_DB_PASSWORD}
+        driver-class-name: org.postgresql.Driver
+      jpa:
+        hibernate:
+          ddl-auto: validate
+      flyway:
+        clean-disabled: true
+        baseline-on-migrate: ${FLYWAY_BASELINE_ON_MIGRATE:false}
+    ```
+    
+    Producción deshabilita el registro de SQL por rendimiento.
+  </Tab>
+</Tabs>
+
+<Note>
+Este servicio mantiene su propia base de datos para registros de transacciones mientras consulta otros servicios para obtener datos relacionados.
+</Note>
+
+## Integración de Servicios
+
+### Registro en Eureka
+
+```yaml
+eureka:
+  instance:
+    instance-id: ${spring.cloud.client.hostname}:${spring.application.name}:${random.value}
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://sgivu-discovery:8761/eureka}
+```
+
+### Mapa de Descubrimiento de Servicios
+
+Este servicio se integra con **todos los servicios de negocio**:
+
+```yaml
+services:
+  map:
+    sgivu-auth:
+      name: sgivu-auth
+      url: ${SGIVU_AUTH_URL:http://sgivu-auth:9000}
+    sgivu-client:
+      name: sgivu-client
+      url: ${SGIVU_CLIENT_URL:http://sgivu-client:8082}
+    sgivu-user:
+      name: sgivu-user
+      url: ${SGIVU_USER_URL:http://sgivu-user:8081}
+    sgivu-vehicle:
+      name: sgivu-vehicle
+      url: ${SGIVU_VEHICLE_URL:http://sgivu-vehicle:8083}
+```
+
+<Accordion title="Dependencias de Servicios">
+- **sgivu-auth**: Validación de tokens y autorización
+- **sgivu-client**: Información de clientes para transacciones
+- **sgivu-user**: Información de usuarios para el registro de transacciones
+- **sgivu-vehicle**: Detalles de vehículos para registros de compra/venta
+</Accordion>
+
+<Info>
+Este es el único servicio que se comunica con todos los demás servicios de negocio, lo que lo convierte en una verdadera capa de orquestación.
+</Info>
+
+### Autenticación Interna entre Servicios
+
+```yaml
+service:
+  internal:
+    secret-key: "${SERVICE_INTERNAL_SECRET_KEY}"
+```
+
+El servicio utiliza este secreto para autenticar las llamadas API hacia los servicios de Usuario, Cliente y Vehículo.
+
+## Orquestación de Transacciones
+
+El Servicio de Compra-Venta coordina transacciones complejas:
+
+### Ejemplo de Flujo de Compra
+
+1. Recibir solicitud de compra vía API
+2. Validar usuario (llamada al Servicio de Usuario)
+3. Validar cliente (llamada al Servicio de Cliente)
+4. Validar disponibilidad del vehículo (llamada al Servicio de Vehículo)
+5. Crear registro de transacción en la base de datos local
+6. Actualizar estado del vehículo (llamada al Servicio de Vehículo)
+7. Retornar confirmación de la transacción
+
+### Ejemplo de Flujo de Venta
+
+1. Recibir solicitud de venta vía API
+2. Validar vendedor (llamada al Servicio de Usuario)
+3. Validar cliente comprador (llamada al Servicio de Cliente)
+4. Validar propiedad del vehículo (llamada al Servicio de Vehículo)
+5. Crear registro de venta en la base de datos local
+6. Transferir propiedad del vehículo (llamada al Servicio de Vehículo)
+7. Generar documentación de la venta
+
+<Note>
+Considere implementar el patrón Saga para la gestión de transacciones distribuidas con acciones compensatorias.
+</Note>
+
+## Observabilidad
+
+### Endpoints de Actuator
+
+<Tabs>
+  <Tab title="Desarrollo">
+    ```yaml
+    management:
+      endpoints:
+        web:
+          exposure:
+            include: "*"
+      endpoint:
+        health:
+          show-details: always
+    ```
+  </Tab>
+  <Tab title="Producción">
+    ```yaml
+    management:
+      endpoints:
+        web:
+          exposure:
+            include: health, info, prometheus
+      endpoint:
+        health:
+          show-details: never
+    ```
+  </Tab>
+</Tabs>
+
+### Trazabilidad Distribuida
+
+```yaml
+management:
+  tracing:
+    sampling:
+      probability: 0.1
+  zipkin:
+    tracing:
+      endpoint: http://sgivu-zipkin:9411/api/v2/spans
+```
+
+<Info>
+La trazabilidad distribuida es especialmente valiosa aquí para rastrear solicitudes a través de los servicios de Usuario, Cliente y Vehículo.
+</Info>
+
+### Logging
+
+```yaml
+logging:
+  level:
+    root: INFO
+```
+
+## Documentación de la API
+
+```yaml
+springdoc:
+  swagger-ui:
+    url: /docs/purchase-sale/v3/api-docs
+    configUrl: /docs/purchase-sale/v3/api-docs/swagger-config
+```
+
+<Tabs>
+  <Tab title="Producción">
+    ```yaml
+    openapi:
+      server:
+        url: ${OPENAPI_SERVER_URL}
+    ```
+  </Tab>
+</Tabs>
+
+## Variables de Entorno Requeridas
+
+### Todos los Entornos
+
+| Variable | Descripción | Ejemplo |
+|----------|-------------|----------|
+| `SERVICE_INTERNAL_SECRET_KEY` | Secreto compartido para APIs internas | `your-secret-key` |
+
+### Desarrollo
+
+| Variable | Descripción | Valor por Defecto |
+|----------|-------------|----------|
+| `DEV_PURCHASE_SALE_DB_HOST` | Host de la base de datos | `host.docker.internal` |
+| `DEV_PURCHASE_SALE_DB_PORT` | Puerto de la base de datos | `5432` |
+| `DEV_PURCHASE_SALE_DB_NAME` | Nombre de la base de datos | Requerido |
+| `DEV_PURCHASE_SALE_DB_USERNAME` | Usuario de la base de datos | Requerido |
+| `DEV_PURCHASE_SALE_DB_PASSWORD` | Contraseña de la base de datos | Requerido |
+
+### Producción
+
+| Variable | Descripción |
+|----------|-------------|
+| `PROD_PURCHASE_SALE_DB_HOST` | Host de la base de datos |
+| `PROD_PURCHASE_SALE_DB_PORT` | Puerto de la base de datos |
+| `PROD_PURCHASE_SALE_DB_NAME` | Nombre de la base de datos |
+| `PROD_PURCHASE_SALE_DB_USERNAME` | Usuario de la base de datos |
+| `PROD_PURCHASE_SALE_DB_PASSWORD` | Contraseña de la base de datos |
+| `OPENAPI_SERVER_URL` | URL pública de documentación de la API |
+
+### Optional
+
+| Variable | Description | Default |
+|----------|-------------|----------|
+| `PORT` | Service port | `8084` |
+| `EUREKA_URL` | Eureka server URL | `http://sgivu-discovery:8761/eureka` |
+| `SGIVU_AUTH_URL` | Auth service URL | `http://sgivu-auth:9000` |
+| `SGIVU_CLIENT_URL` | Client service URL | `http://sgivu-client:8082` |
+| `SGIVU_USER_URL` | User service URL | `http://sgivu-user:8081` |
+| `SGIVU_VEHICLE_URL` | Vehicle service URL | `http://sgivu-vehicle:8083` |
+
+## API Endpoints
+
+Typical Purchase-Sale Service endpoints:
+
+```
+GET    /api/purchase-sales              - List transactions
+GET    /api/purchase-sales/{id}         - Get transaction by ID
+POST   /api/purchase-sales/purchase     - Create purchase
+POST   /api/purchase-sales/sale         - Create sale
+PUT    /api/purchase-sales/{id}         - Update transaction
+DELETE /api/purchase-sales/{id}         - Cancel transaction
+GET    /api/purchase-sales/client/{id}  - Get client transactions
+GET    /api/purchase-sales/vehicle/{id} - Get vehicle history
+```
+
+<Info>
+All endpoints require authentication through the gateway.
+</Info>
+
+## Transaction Data Model
+
+Typical transaction entity includes:
+
+- Transaction ID and type (purchase/sale)
+- User ID (who processed the transaction)
+- Client ID (customer)
+- Vehicle ID
+- Transaction amount and currency
+- Transaction date and status
+- Payment details
+- Notes and metadata
+
+## Error Handling
+
+The orchestration service must handle failures gracefully:
+
+### Circuit Breaker Pattern
+
+Consider implementing circuit breakers for service calls:
+
+```yaml
+resilience4j:
+  circuitbreaker:
+    instances:
+      userService:
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10000
+      clientService:
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10000
+      vehicleService:
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10000
+```
+
+### Retry Strategy
+
+```yaml
+resilience4j:
+  retry:
+    instances:
+      userService:
+        max-attempts: 3
+        wait-duration: 1000
+```
+
+<Warning>
+Always implement timeout and retry logic when calling downstream services to prevent cascade failures.
+</Warning>
+
+## Service Communication
+
+### RestTemplate / WebClient
+
+The service uses Spring's HTTP clients to call other services:
+
+```java
+// Example: Calling Client Service
+ResponseEntity<ClientDto> response = restTemplate.exchange(
+    clientServiceUrl + "/api/clients/" + clientId,
+    HttpMethod.GET,
+    httpEntity,
+    ClientDto.class
+);
+```
+
+### Authentication Headers
+
+Include the internal secret in requests:
+
+```java
+HttpHeaders headers = new HttpHeaders();
+headers.set("X-Internal-Secret", serviceInternalSecretKey);
+```
+
+## Performance Considerations
+
+### Caching
+
+Cache frequently accessed data from other services:
+
+```yaml
+spring:
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=500,expireAfterWrite=10m
+```
+
+### Parallel Service Calls
+
+When data from multiple services is needed, call them in parallel:
+
+```java
+CompletableFuture<User> userFuture = userService.getUserAsync(userId);
+CompletableFuture<Client> clientFuture = clientService.getClientAsync(clientId);
+CompletableFuture<Vehicle> vehicleFuture = vehicleService.getVehicleAsync(vehicleId);
+
+CompletableFuture.allOf(userFuture, clientFuture, vehicleFuture).join();
+```
+
+## Security
+
+### Service-to-Service Authentication
+
+All internal API calls must include the shared secret.
+
+### Transaction Authorization
+
+Verify user permissions before allowing transaction creation:
+
+- Check user role (admin, sales, etc.)
+- Validate transaction limits
+- Audit all operations
+
+## Monitoring
+
+### Key Metrics
+
+Monitor these metrics for the orchestration service:
+
+- Transaction success/failure rates
+- Service call latencies (User, Client, Vehicle)
+- Database query performance
+- Error rates by service
+- Circuit breaker states
+
+### Alerts
+
+Set up alerts for:
+
+- High failure rates
+- Service unavailability
+- Slow transaction processing
+- Circuit breaker opens
+
+## Configuration Files
+
+- `sgivu-purchase-sale.yml` - Base configuration
+- `sgivu-purchase-sale-dev.yml` - Development overrides
+- `sgivu-purchase-sale-prod.yml` - Production overrides
+
+## Related Services
+
+<CardGroup cols={2}>
+  <Card title="User Service" icon="user" href="/config/services/user">
+    User data provider
+  </Card>
+  <Card title="Client Service" icon="users" href="/config/services/client">
+    Client data provider
+  </Card>
+  <Card title="Vehicle Service" icon="car" href="/config/services/vehicle">
+    Vehicle data provider
+  </Card>
+  <Card title="Auth Service" icon="shield-halved" href="/config/services/auth">
+    Token validation
+  </Card>
+</CardGroup>

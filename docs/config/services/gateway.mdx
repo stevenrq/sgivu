@@ -1,0 +1,384 @@
+---
+title: Configuración del Servicio Gateway
+description: API Gateway con cliente OAuth2 y configuración de gestión de sesiones
+---
+
+El servicio Gateway (`sgivu-gateway`) es el punto de entrada para todas las solicitudes de los clientes, encargándose de la autenticación OAuth2, la gestión de sesiones y el enrutamiento hacia los servicios backend.
+
+## Descripción General del Servicio
+
+<CardGroup cols={2}>
+  <Card title="Puerto" icon="network-wired">
+    8080
+  </Card>
+  <Card title="Almacén de Sesiones" icon="database">
+    Redis
+  </Card>
+  <Card title="Protocolo" icon="lock">
+    OAuth2 / WebFlux
+  </Card>
+  <Card title="Rol" icon="door-open">
+    API Gateway
+  </Card>
+</CardGroup>
+
+## Características Principales
+
+- API Gateway reactivo construido con Spring Cloud Gateway
+- Cliente OAuth2 con flujo de código de autorización
+- Gestión de sesiones distribuidas basada en Redis
+- Token Relay hacia servicios downstream
+- Revocación de sesiones y manejo de cierre de sesión
+- Integración con descubrimiento de servicios
+
+## Configuración Base
+
+### Configuración del Servidor
+
+```yaml
+server:
+  port: ${PORT:8080}
+  forward-headers-strategy: framework
+```
+
+<Info>
+El gateway utiliza WebFlux reactivo para el manejo no bloqueante de solicitudes.
+</Info>
+
+## Gestión de Sesiones
+
+El gateway utiliza Redis para el almacenamiento distribuido de sesiones:
+
+```yaml
+spring:
+  session:
+    store-type: redis
+    timeout: 1h
+    redis:
+      namespace: spring:session:sgivu-gateway
+  data:
+    redis:
+      host: ${REDIS_HOST:sgivu-redis}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD}
+```
+
+<Accordion title="Beneficios de Sesiones en Redis">
+- **Escalado horizontal**: Múltiples instancias del gateway pueden compartir sesiones
+- **Acceso rápido**: Rendimiento en memoria para consultas de sesión
+- **Expiración automática**: El TTL de Redis gestiona la limpieza de sesiones
+- **Persistencia**: Las sesiones sobreviven a reinicios del gateway
+</Accordion>
+
+<Warning>
+Asegúrese de que Redis tenga configurada la persistencia adecuada (RDB o AOF) para evitar la pérdida de sesiones ante un reinicio de Redis.
+</Warning>
+
+## Configuración del Cliente OAuth2
+
+### Registro del Cliente
+
+```yaml
+spring:
+  security:
+    oauth2:
+      client:
+        registration:
+          sgivu-gateway:
+            provider: sgivu-auth
+            client-id: sgivu-gateway
+            client-secret: ${SGIVU_GATEWAY_SECRET}
+            client-authentication-method: client_secret_basic
+            authorization-grant-type: authorization_code
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            scope:
+              - openid
+              - profile
+              - email
+              - phone
+              - address
+              - offline_access
+              - api
+              - read
+              - write
+```
+
+<Note>
+El scope `offline_access` habilita la emisión de refresh tokens para la renovación transparente de tokens.
+</Note>
+
+### Configuración del Proveedor
+
+```yaml
+spring:
+  security:
+    oauth2:
+      client:
+        provider:
+          sgivu-auth:
+            issuer-uri: ${SGIVU_AUTH_URL:http://sgivu-auth:9000}
+```
+
+La URI del issuer permite el descubrimiento automático de los endpoints de autorización a través del documento de descubrimiento de OpenID Connect.
+
+## Configuración Reactiva
+
+```yaml
+spring:
+  reactor:
+    context-propagation: auto
+```
+
+<Info>
+Habilita la propagación automática de contexto para seguridad reactiva y trazabilidad.
+</Info>
+
+## Integración de Servicios
+
+### Registro en Eureka
+
+```yaml
+eureka:
+  instance:
+    instance-id: ${spring.cloud.client.hostname}:${spring.application.name}:${random.value}
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://sgivu-discovery:8761/eureka}
+```
+
+### Mapa de Descubrimiento de Servicios
+
+```yaml
+services:
+  map:
+    sgivu-auth:
+      name: sgivu-auth
+      url: ${SGIVU_AUTH_URL:http://sgivu-auth:9000}
+```
+
+## Configuración por Entorno
+
+<Tabs>
+  <Tab title="Desarrollo">
+    ```yaml
+    angular-client:
+      url: ${DEV_ANGULAR_APP_URL}
+
+    logging:
+      level:
+        com.sgivu.gateway.security: DEBUG
+        com.sgivu.gateway.controller: DEBUG
+        com.sgivu.gateway.config: DEBUG
+        org.springframework.security.oauth2.client: DEBUG
+        org.springframework.security.web.server.authentication: DEBUG
+        org.springframework.session.web.server: DEBUG
+    ```
+    
+    **Características de Desarrollo:**
+    - Logging detallado para depuración del flujo OAuth2
+    - Trazabilidad de Token Relay
+    - Visibilidad del ciclo de vida de sesiones
+    - Logging de la cadena de filtros de seguridad
+  </Tab>
+  <Tab title="Producción">
+    ```yaml
+    angular-client:
+      url: ${PROD_ANGULAR_APP_URL}
+
+    openapi:
+      server:
+        url: ${OPENAPI_SERVER_URL}
+    ```
+    
+    **Características de Producción:**
+    - Logging mínimo para optimizar el rendimiento
+    - URL personalizada del servidor OpenAPI
+    - Sin información sensible en los logs
+  </Tab>
+</Tabs>
+
+## Observabilidad
+
+### Endpoints de Actuator
+
+```yaml
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+  endpoint:
+    health:
+      show-details: never
+```
+
+<Warning>
+En producción, los detalles de salud se ocultan para prevenir la divulgación de información.
+</Warning>
+
+### Trazabilidad Distribuida
+
+```yaml
+management:
+  tracing:
+    sampling:
+      probability: 0.1
+  zipkin:
+    tracing:
+      endpoint: http://sgivu-zipkin:9411/api/v2/spans
+```
+
+### Configuración de Logging
+
+```yaml
+logging:
+  level:
+    root: INFO
+    com.sgivu.gateway.security: INFO
+    com.sgivu.gateway.controller: INFO
+```
+
+<Accordion title="Depuración de Problemas de Autenticación">
+Para diagnosticar problemas de OAuth2 o sesiones en desarrollo, habilite estos loggers:
+
+```yaml
+logging:
+  level:
+    com.sgivu.gateway: DEBUG
+    org.springframework.security: DEBUG
+    org.springframework.session: DEBUG
+    org.springframework.security.oauth2: TRACE
+```
+</Accordion>
+
+## Documentación de la API
+
+```yaml
+springdoc:
+  swagger-ui:
+    url: /docs/gateway/v3/api-docs
+    configUrl: /docs/gateway/v3/api-docs/swagger-config
+```
+
+## Variables de Entorno Requeridas
+
+### Todos los Entornos
+
+| Variable | Descripción | Ejemplo |
+|----------|-------------|----------|
+| `REDIS_HOST` | Host del servidor Redis | `sgivu-redis` |
+| `REDIS_PORT` | Puerto del servidor Redis | `6379` |
+| `REDIS_PASSWORD` | Contraseña de Redis | `your-redis-password` |
+| `SGIVU_GATEWAY_SECRET` | Secreto del cliente OAuth2 | `gateway-secret` |
+
+### Desarrollo
+
+| Variable | Descripción |
+|----------|-------------|
+| `DEV_ANGULAR_APP_URL` | URL del frontend Angular |
+
+### Producción
+
+| Variable | Descripción |
+|----------|-------------|
+| `PROD_ANGULAR_APP_URL` | URL del frontend Angular |
+| `OPENAPI_SERVER_URL` | URL pública de la documentación de la API |
+
+### Opcionales
+
+| Variable | Descripción | Valor por Defecto |
+|----------|-------------|----------|
+| `PORT` | Puerto del Gateway | `8080` |
+| `EUREKA_URL` | URL del servidor Eureka | `http://sgivu-discovery:8761/eureka` |
+| `SGIVU_AUTH_URL` | URL del servicio Auth | `http://sgivu-auth:9000` |
+
+## Token Relay
+
+El gateway retransmite automáticamente los tokens de acceso OAuth2 a los servicios downstream. Esto permite:
+
+- Inicio de sesión único (SSO) entre servicios
+- Identidad de usuario consistente
+- Renovación centralizada de tokens
+- Propagación automática de tokens
+
+```yaml
+# Token relay is configured automatically by Spring Cloud Gateway
+# when OAuth2 client is present
+```
+
+## Tiempo de Expiración de Sesión
+
+```yaml
+spring:
+  session:
+    timeout: 1h
+```
+
+<Info>
+Las sesiones expiran después de 1 hora de inactividad. Las sesiones activas se extienden automáticamente.
+</Info>
+
+## Configuración de CORS
+
+El gateway gestiona CORS para todos los servicios backend:
+
+<Tabs>
+  <Tab title="Desarrollo">
+    Normalmente permite todos los orígenes para desarrollo local:
+    ```
+    http://localhost:4200
+    https://localhost:4200
+    ```
+  </Tab>
+  <Tab title="Producción">
+    Restringido únicamente a la URL del frontend de producción.
+  </Tab>
+</Tabs>
+
+## Configuración de Rutas
+
+El gateway enruta las solicitudes a los servicios backend según patrones de ruta:
+
+- `/api/auth/**` → Servicio Auth
+- `/api/users/**` → Servicio User
+- `/api/clients/**` → Servicio Client
+- `/api/vehicles/**` → Servicio Vehicle
+- `/api/purchase-sales/**` → Servicio Purchase-Sale
+
+<Note>
+La configuración de rutas se define típicamente en el código de la aplicación del gateway, no en la configuración externa.
+</Note>
+
+## Características de Seguridad
+
+### Revocación de Sesiones
+
+El gateway soporta cierre de sesión y revocación de tokens:
+- Eliminación local de la sesión en Redis
+- Revocación de tokens en el servidor de autorización
+- Redirección a la página de inicio de sesión
+
+### Protección CSRF
+
+La protección CSRF está habilitada para todas las operaciones que modifican estado.
+
+### Renovación de Tokens
+
+La renovación automática de tokens mediante refresh tokens previene la interrupción de sesiones.
+
+## Archivos de Configuración
+
+- `sgivu-gateway.yml` - Configuración base
+- `sgivu-gateway-dev.yml` - Sobrescrituras de desarrollo
+- `sgivu-gateway-prod.yml` - Sobrescrituras de producción
+
+## Servicios Relacionados
+
+<CardGroup cols={2}>
+  <Card title="Servicio Auth" icon="shield-halved" href="/config/services/auth">
+    Servidor de autorización OAuth2
+  </Card>
+  <Card title="Servicio Discovery" icon="compass" href="/config/services/discovery">
+    Registro de servicios
+  </Card>
+</CardGroup>

@@ -1,0 +1,319 @@
+---
+title: Contratos de Compra y Venta
+description: Crea y gestiona contratos de compra y venta de vehículos
+---
+
+## Descripción General
+
+El módulo de Compra y Venta es donde se documentan y gestionan las transacciones de vehículos. Crea contratos para la adquisición de vehículos a tu inventario o para la venta a clientes, realiza seguimiento del estado de los contratos y genera reportes completos.
+
+## Tipos de Contratos
+
+SGIVU soporta dos tipos de contratos:
+
+<CardGroup cols={2}>
+  <Card title="Contratos de Compra" icon="cart-shopping">
+    Documenta la adquisición de vehículos para tu inventario. Registra los detalles sobre la compra de vehículos a particulares o concesionarios.
+  </Card>
+  
+  <Card title="Contratos de Venta" icon="hand-holding-dollar">
+    Documenta la venta de vehículos de tu inventario a clientes. Realiza seguimiento de las compras de clientes y los detalles de las transacciones.
+  </Card>
+</CardGroup>
+
+## Crear un Contrato
+
+### Contrato de Compra
+
+<Steps>
+  <Step title="Navegar a Contratos">
+    Accede a la sección de Compra y Venta desde tu panel de control. Necesitas el permiso `purchase-sale:create` para crear nuevos contratos.
+  </Step>
+  
+  <Step title="Seleccionar Tipo de Contrato">
+    Elige "Compra" para documentar la adquisición de un vehículo para tu inventario.
+  </Step>
+  
+  <Step title="Seleccionar Vehículo">
+    Elige el vehículo de tu inventario o crea un nuevo registro de vehículo si se trata de una nueva adquisición. Los detalles del vehículo se vincularán al contrato.
+  </Step>
+  
+  <Step title="Seleccionar Cliente">
+    Busca y selecciona la persona o empresa a la que le estás comprando el vehículo. Si no está en tu sistema, crea primero un nuevo registro de cliente.
+  </Step>
+  
+  <Step title="Ingresar Detalles de la Transacción">
+    Completa la información del contrato:
+    - **Precio de Compra**: Monto que estás pagando por el vehículo
+    - **Fecha de Compra**: Fecha de la transacción
+    - **Método de Pago**: Cómo se liquidará la transacción
+    - **Términos y Condiciones**: Cualquier término o condición especial
+    - **Notas**: Información adicional sobre la compra
+  </Step>
+  
+  <Step title="Establecer Estado del Contrato">
+    Elige el estado actual:
+    - **Borrador**: El contrato se está preparando
+    - **Pendiente**: En espera de aprobación o finalización
+    - **Completado**: La transacción está finalizada
+    - **Cancelado**: El contrato fue cancelado
+  </Step>
+  
+  <Step title="Asignar Usuario Responsable">
+    Selecciona el usuario que está gestionando esta transacción para fines de responsabilidad y seguimiento.
+  </Step>
+  
+  <Step title="Guardar Contrato">
+    Revisa todos los detalles y guarda el contrato. El contrato ahora forma parte de tus registros de transacciones.
+  </Step>
+</Steps>
+
+### Contrato de Venta
+
+<Steps>
+  <Step title="Iniciar Nueva Venta">
+    Desde la sección de Compra y Venta, elige "Venta" para documentar la venta de un vehículo de tu inventario.
+  </Step>
+  
+  <Step title="Seleccionar Vehículo del Inventario">
+    Elige el vehículo que estás vendiendo. Solo los vehículos marcados como "Disponible" pueden seleccionarse para contratos de venta.
+  </Step>
+  
+  <Step title="Seleccionar Cliente">
+    Busca y selecciona la persona o empresa que está comprando el vehículo. Crea un nuevo registro de cliente si es necesario.
+  </Step>
+  
+  <Step title="Ingresar Detalles de la Venta">
+    Completa la información del contrato:
+    - **Precio de Venta**: Monto que el cliente está pagando
+    - **Fecha de Venta**: Fecha de la transacción
+    - **Método de Pago**: Efectivo, financiamiento, permuta, etc.
+    - **Anticipo**: Si aplica
+    - **Términos y Condiciones**: Garantía, política de devolución, etc.
+    - **Notas**: Acuerdos especiales o requisitos
+  </Step>
+  
+  <Step title="Establecer Estado del Contrato">
+    Realiza seguimiento del progreso de la venta:
+    - **Borrador**: Preparando el acuerdo de venta
+    - **Pendiente**: En espera de firmas, pago o documentación
+    - **Completado**: La venta está finalizada y el vehículo entregado
+    - **Cancelado**: La venta no se concretó
+  </Step>
+  
+  <Step title="Asignar Representante de Ventas">
+    Selecciona el usuario responsable de esta venta para el seguimiento de comisiones y gestión posterior.
+  </Step>
+  
+  <Step title="Completar Contrato">
+    Revisa toda la información y guarda. El sistema actualiza el estado del vehículo según el estado del contrato.
+  </Step>
+</Steps>
+
+## Gestión de Contratos
+
+### Ver Detalles del Contrato
+
+<Card title="Resumen del Contrato" icon="file-contract">
+  Cada contrato muestra información completa incluyendo todas las partes involucradas, detalles del vehículo, precios, términos de pago, estado y usuario asociado. Accede a la página de detalle del contrato para ver la información completa.
+</Card>
+
+### Actualizar Contratos
+
+<Steps>
+  <Step title="Buscar Contrato">
+    Utiliza las herramientas de búsqueda y filtrado para localizar el contrato que deseas actualizar.
+  </Step>
+  
+  <Step title="Editar Contrato">
+    Selecciona el contrato y elige editar. Necesitas el permiso `purchase-sale:update` para modificar contratos.
+  </Step>
+  
+  <Step title="Actualizar Información">
+    Modifica cualquier campo del contrato según sea necesario. Las actualizaciones comunes incluyen cambios de estado, actualizaciones de información de pago o agregar notas.
+  </Step>
+  
+  <Step title="Guardar Cambios">
+    Revisa tus cambios y guarda. Todas las modificaciones se registran con marca de tiempo e información del usuario.
+  </Step>
+</Steps>
+
+### Flujo de Estados del Contrato
+
+Los contratos típicamente pasan por estos estados:
+
+<Steps>
+  <Step title="Borrador">
+    Creación inicial del contrato. Se están determinando todas las partes y términos.
+  </Step>
+  
+  <Step title="Pendiente">
+    El contrato está en espera de firmas, procesamiento de pago o finalización de documentación.
+  </Step>
+  
+  <Step title="Completado">
+    La transacción está finalizada. Para ventas, el vehículo se entrega. Para compras, el vehículo se agrega al inventario.
+  </Step>
+  
+  <Step title="Cancelado (si aplica)">
+    La transacción no se completó. El estado del vehículo se restaura al estado anterior.
+  </Step>
+</Steps>
+
+## Búsqueda de Contratos
+
+SGIVU ofrece capacidades avanzadas de búsqueda y filtrado:
+
+<CardGroup cols={2}>
+  <Card title="Por Tipo de Contrato" icon="list-check">
+    Filtra para ver solo contratos de compra o de venta.
+  </Card>
+  
+  <Card title="Por Estado" icon="circle-check">
+    Visualiza contratos según su estado actual (borrador, pendiente, completado, cancelado).
+  </Card>
+  
+  <Card title="Por Cliente" icon="user">
+    Encuentra todos los contratos asociados a una persona o empresa específica.
+  </Card>
+  
+  <Card title="Por Vehículo" icon="car">
+    Visualiza el historial de transacciones de un vehículo específico.
+  </Card>
+  
+  <Card title="Por Rango de Fechas" icon="calendar">
+    Filtra contratos por fecha de creación o fecha de transacción.
+  </Card>
+  
+  <Card title="Por Usuario" icon="user-tie">
+    Visualiza contratos asignados a un representante de ventas o miembro del personal específico.
+  </Card>
+</CardGroup>
+
+## Reportes y Exportación
+
+Genera reportes completos a partir de los datos de tus contratos:
+
+### Formatos de Reporte
+
+<CardGroup cols={3}>
+  <Card title="Reportes PDF" icon="file-pdf">
+    Genera documentos PDF formateados aptos para impresión y archivado. Ideales para registros oficiales.
+  </Card>
+  
+  <Card title="Hojas de Cálculo Excel" icon="file-excel">
+    Exporta a formato XLSX para análisis de datos, tablas dinámicas e integración con otras herramientas.
+  </Card>
+  
+  <Card title="Archivos CSV" icon="file-csv">
+    Exporta a CSV para importar en otros sistemas o aplicaciones de base de datos.
+  </Card>
+</CardGroup>
+
+### Tipos de Reportes
+
+<AccordionGroup>
+  <Accordion title="Reporte Resumen de Ventas">
+    Resumen de todas las ventas dentro de un rango de fechas, incluyendo ingresos totales, número de vehículos vendidos y ventas por estado.
+  </Accordion>
+  
+  <Accordion title="Reporte de Historial de Compras">
+    Detalles de todas las adquisiciones de vehículos, incluyendo gasto total y fuentes de compra.
+  </Accordion>
+  
+  <Accordion title="Reporte de Transacciones por Cliente">
+    Historial completo de transacciones para un cliente específico, mostrando todas las compras y ventas.
+  </Accordion>
+  
+  <Accordion title="Reporte de Rendimiento por Usuario">
+    Actividad de ventas y compras por usuario, útil para el cálculo de comisiones y evaluación de desempeño.
+  </Accordion>
+  
+  <Accordion title="Reporte de Estado de Contratos">
+    Resumen de contratos por estado, ayudando a identificar transacciones pendientes que requieren atención.
+  </Accordion>
+</AccordionGroup>
+
+### Generación de Reportes
+
+<Steps>
+  <Step title="Seleccionar Tipo de Reporte">
+    Elige el tipo de reporte que deseas generar desde el menú de Reportes.
+  </Step>
+  
+  <Step title="Establecer Filtros">
+    Aplica filtros para acotar los datos (rango de fechas, tipo de contrato, estado, etc.).
+  </Step>
+  
+  <Step title="Elegir Formato">
+    Selecciona tu formato de exportación preferido: PDF, XLSX o CSV.
+  </Step>
+  
+  <Step title="Generar y Descargar">
+    El sistema procesa tu solicitud y genera el reporte. Descarga el archivo en tu dispositivo.
+  </Step>
+</Steps>
+
+## Integración con Otras Funcionalidades
+
+### Gestión de Vehículos
+
+<Card title="Actualización Automática de Estado" icon="sync">
+  Cuando creas o actualizas contratos, el sistema puede actualizar automáticamente el estado de disponibilidad del vehículo. Los contratos de venta completados marcan los vehículos como no disponibles.
+</Card>
+
+### Gestión de Clientes
+
+<Card title="Historial de Transacciones" icon="clock-rotate-left">
+  Todos los contratos están vinculados a registros de clientes, proporcionando un historial completo de transacciones visible desde el perfil del cliente.
+</Card>
+
+### Gestión de Usuarios
+
+<Card title="Atribución de Usuario" icon="user-check">
+  Cada contrato se asigna a un usuario, permitiendo el seguimiento de rendimiento y la responsabilidad.
+</Card>
+
+## Buenas Prácticas
+
+<CardGroup cols={2}>
+  <Card title="Actualizaciones Regulares de Estado" icon="arrows-rotate">
+    Mantén los estados de los contratos actualizados para conservar un inventario y reportes precisos.
+  </Card>
+  
+  <Card title="Documentación Completa" icon="clipboard-list">
+    Completa todos los campos del contrato de forma exhaustiva para tener registros completos y facilitar la generación de reportes.
+  </Card>
+  
+  <Card title="Verificar Información" icon="check-double">
+    Verifica la información del cliente, vehículo y precios antes de finalizar los contratos.
+  </Card>
+  
+  <Card title="Usar el Campo de Notas" icon="note-sticky">
+    Documenta cualquier circunstancia especial, acuerdos verbales o requisitos de seguimiento.
+  </Card>
+</CardGroup>
+
+## Solución de Problemas
+
+<AccordionGroup>
+  <Accordion title="No se puede crear el contrato">
+    Verifica que tengas el permiso `purchase-sale:create`. Asegúrate de que el vehículo y el cliente seleccionados existan en el sistema.
+  </Accordion>
+  
+  <Accordion title="Vehículo no disponible para venta">
+    Solo los vehículos con estado "Disponible" pueden usarse en contratos de venta. Actualiza el estado del vehículo en Gestión de Vehículos.
+  </Accordion>
+  
+  <Accordion title="No se puede actualizar el estado del contrato">
+    Verifica que tengas el permiso `purchase-sale:update`. Algunas transiciones de estado pueden tener reglas de validación.
+  </Accordion>
+  
+  <Accordion title="La generación de reportes falla">
+    Los reportes grandes pueden tardar en generarse. Revisa tus filtros para asegurarte de que no sean demasiado amplios. Si el problema persiste, intenta con un rango de fechas más reducido.
+  </Accordion>
+  
+  <Accordion title="Información faltante en el contrato">
+    Asegúrate de que todos los campos obligatorios se hayan completado al crear el contrato. Edita el contrato para agregar la información faltante.
+  </Accordion>
+</AccordionGroup>

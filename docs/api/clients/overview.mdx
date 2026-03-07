@@ -1,0 +1,594 @@
+---
+title: 'Gestión de Clientes'
+description: 'Gestión de registros de clientes: personas y empresas'
+---
+
+## Descripción general
+
+La API de Gestión de Clientes (`sgivu-client`) administra la información de clientes tanto para personas físicas como para empresas. Proporciona operaciones CRUD, búsqueda multicriterio y gestión de estados para los clientes involucrados en transacciones de compra y venta de vehículos.
+
+## URL base
+
+```
+https://your-domain.com/v1
+```
+
+---
+
+## Personas
+
+### Crear persona
+
+```http
+POST /v1/persons
+```
+
+Registra una nueva persona física como cliente.
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `person:create`
+
+#### Cuerpo de la solicitud
+
+<ParamField body="firstName" type="string" required>
+  Nombre
+</ParamField>
+
+<ParamField body="lastName" type="string" required>
+  Apellido
+</ParamField>
+
+<ParamField body="nationalId" type="integer" required>
+  Número de identificación nacional
+</ParamField>
+
+<ParamField body="email" type="string" required>
+  Correo electrónico
+</ParamField>
+
+<ParamField body="phoneNumber" type="integer" required>
+  Número de teléfono
+</ParamField>
+
+<ParamField body="address" type="object">
+  Información de dirección
+</ParamField>
+
+<ParamField body="address.street" type="string">
+  Dirección (calle)
+</ParamField>
+
+<ParamField body="address.city" type="string">
+  Ciudad
+</ParamField>
+
+<ParamField body="address.state" type="string">
+  Departamento/Provincia
+</ParamField>
+
+<ParamField body="address.postalCode" type="string">
+  Código postal
+</ParamField>
+
+<ParamField body="enabled" type="boolean" default="true">
+  Indica si el cliente está habilitado
+</ParamField>
+
+```json
+{
+  "firstName": "María",
+  "lastName": "García López",
+  "nationalId": 1234567890,
+  "email": "maria.garcia@example.com",
+  "phoneNumber": 3001234567,
+  "address": {
+    "street": "Calle 123 #45-67",
+    "city": "Bogotá",
+    "state": "Cundinamarca",
+    "postalCode": "110111"
+  },
+  "enabled": true
+}
+```
+
+#### Respuesta
+
+```json
+{
+  "id": 25,
+  "clientId": 50,
+  "firstName": "María",
+  "lastName": "García López",
+  "nationalId": 1234567890,
+  "email": "maria.garcia@example.com",
+  "phoneNumber": 3001234567,
+  "address": {
+    "id": 30,
+    "street": "Calle 123 #45-67",
+    "city": "Bogotá",
+    "state": "Cundinamarca",
+    "postalCode": "110111"
+  },
+  "enabled": true,
+  "createdAt": "2026-03-06T10:30:00",
+  "updatedAt": "2026-03-06T10:30:00"
+}
+```
+
+#### Códigos de estado
+
+- `201 Created` - Persona creada exitosamente
+- `400 Bad Request` - Datos de entrada inválidos
+- `401 Unauthorized` - No autenticado
+- `403 Forbidden` - Falta el permiso `person:create`
+
+#### Ejemplo
+
+```bash
+curl -X POST https://your-domain.com/v1/persons \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "firstName": "María",
+    "lastName": "García López",
+    "nationalId": 1234567890,
+    "email": "maria.garcia@example.com",
+    "phoneNumber": 3001234567,
+    "address": {
+      "street": "Calle 123 #45-67",
+      "city": "Bogotá"
+    }
+  }'
+```
+
+---
+
+### Obtener persona por ID
+
+```http
+GET /v1/persons/{id}
+```
+
+Obtiene la información detallada de una persona específica.
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `person:read`
+
+#### Parámetros de ruta
+
+<ParamField path="id" type="integer" required>
+  ID de la persona
+</ParamField>
+
+#### Respuesta
+
+```json
+{
+  "id": 25,
+  "clientId": 50,
+  "firstName": "María",
+  "lastName": "García López",
+  "nationalId": 1234567890,
+  "email": "maria.garcia@example.com",
+  "phoneNumber": 3001234567,
+  "address": {
+    "street": "Calle 123 #45-67",
+    "city": "Bogotá"
+  },
+  "enabled": true,
+  "createdAt": "2026-03-06T10:30:00"
+}
+```
+
+#### Ejemplo
+
+```bash
+curl -X GET https://your-domain.com/v1/persons/25 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+---
+
+### Listar personas (paginado)
+
+```http
+GET /v1/persons/page/{page}
+```
+
+Obtiene una lista paginada de personas.
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `person:read`
+
+#### Parámetros de ruta
+
+<ParamField path="page" type="integer" required>
+  Número de página (base 0)
+</ParamField>
+
+#### Respuesta
+
+```json
+{
+  "content": [
+    {
+      "id": 25,
+      "firstName": "María",
+      "lastName": "García López",
+      "nationalId": 1234567890,
+      "email": "maria.garcia@example.com",
+      "phoneNumber": 3001234567,
+      "enabled": true
+    }
+  ],
+  "pageable": {
+    "pageNumber": 0,
+    "pageSize": 10
+  },
+  "totalElements": 150,
+  "totalPages": 15
+}
+```
+
+#### Ejemplo
+
+```bash
+curl -X GET https://your-domain.com/v1/persons/page/0 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+---
+
+### Actualizar persona
+
+```http
+PUT /v1/persons/{id}
+```
+
+Actualiza un registro de persona existente.
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `person:update`
+
+#### Parámetros de ruta
+
+<ParamField path="id" type="integer" required>
+  ID de la persona a actualizar
+</ParamField>
+
+#### Cuerpo de la solicitud
+
+Misma estructura que Crear persona.
+
+```json
+{
+  "firstName": "María",
+  "lastName": "García López",
+  "nationalId": 1234567890,
+  "email": "maria.garcia.updated@example.com",
+  "phoneNumber": 3009876543
+}
+```
+
+#### Códigos de estado
+
+- `200 OK` - Persona actualizada exitosamente
+- `400 Bad Request` - Datos de entrada inválidos
+- `401 Unauthorized` - No autenticado
+- `403 Forbidden` - Falta el permiso `person:update`
+- `404 Not Found` - La persona no existe
+
+#### Ejemplo
+
+```bash
+curl -X PUT https://your-domain.com/v1/persons/25 \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "maria.garcia.updated@example.com",
+    "phoneNumber": 3009876543
+  }'
+```
+
+---
+
+### Eliminar persona
+
+```http
+DELETE /v1/persons/{id}
+```
+
+Elimina permanentemente una persona del sistema.
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `person:delete`
+
+#### Parámetros de ruta
+
+<ParamField path="id" type="integer" required>
+  ID de la persona a eliminar
+</ParamField>
+
+#### Códigos de estado
+
+- `204 No Content` - Persona eliminada exitosamente
+- `401 Unauthorized` - No autenticado
+- `403 Forbidden` - Falta el permiso `person:delete`
+- `404 Not Found` - La persona no existe
+
+#### Ejemplo
+
+```bash
+curl -X DELETE https://your-domain.com/v1/persons/25 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+---
+
+### Cambiar estado de persona
+
+```http
+PATCH /v1/persons/{id}/status
+```
+
+Habilita o deshabilita un cliente persona.
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `person:update`
+
+#### Parámetros de ruta
+
+<ParamField path="id" type="integer" required>
+  ID de la persona
+</ParamField>
+
+#### Cuerpo de la solicitud
+
+<ParamField body="enabled" type="boolean" required>
+  Nuevo estado (true=habilitado, false=deshabilitado)
+</ParamField>
+
+```json
+true
+```
+
+#### Respuesta
+
+```json
+{
+  "enabled": true
+}
+```
+
+#### Ejemplo
+
+```bash
+curl -X PATCH https://your-domain.com/v1/persons/25/status \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d 'true'
+```
+
+---
+
+### Obtener conteo de personas
+
+```http
+GET /v1/persons/count
+```
+
+Obtiene estadísticas: total de personas, activas e inactivas.
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `person:read`
+
+#### Respuesta
+
+```json
+{
+  "total": 150,
+  "active": 145,
+  "inactive": 5
+}
+```
+
+#### Ejemplo
+
+```bash
+curl -X GET https://your-domain.com/v1/persons/count \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+---
+
+### Buscar personas
+
+```http
+GET /v1/persons/search
+```
+
+Búsqueda multicriterio de personas.
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `person:read`
+
+#### Parámetros de consulta
+
+<ParamField query="name" type="string">
+  Filtrar por nombre o apellido (coincidencia parcial)
+</ParamField>
+
+<ParamField query="email" type="string">
+  Filtrar por correo electrónico
+</ParamField>
+
+<ParamField query="nationalId" type="integer">
+  Filtrar por número de identificación nacional
+</ParamField>
+
+<ParamField query="phoneNumber" type="integer">
+  Filtrar por número de teléfono
+</ParamField>
+
+<ParamField query="enabled" type="boolean">
+  Filtrar por estado habilitado
+</ParamField>
+
+<ParamField query="city" type="string">
+  Filtrar por ciudad
+</ParamField>
+
+#### Respuesta
+
+```json
+[
+  {
+    "id": 25,
+    "firstName": "María",
+    "lastName": "García López",
+    "nationalId": 1234567890,
+    "email": "maria.garcia@example.com",
+    "enabled": true
+  }
+]
+```
+
+#### Ejemplo
+
+```bash
+curl -X GET "https://your-domain.com/v1/persons/search?city=Bogot%C3%A1&enabled=true" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+---
+
+### Buscar personas (paginado)
+
+```http
+GET /v1/persons/search/page/{page}
+```
+
+Variante paginada de la búsqueda de personas.
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `person:read`
+
+#### Parámetros de ruta
+
+<ParamField path="page" type="integer" required>
+  Número de página (base 0)
+</ParamField>
+
+#### Parámetros de consulta
+
+<ParamField query="size" type="integer" default="10">
+  Tamaño de página
+</ParamField>
+
+Todos los parámetros de búsqueda del endpoint no paginado están disponibles.
+
+#### Ejemplo
+
+```bash
+curl -X GET "https://your-domain.com/v1/persons/search/page/0?size=20&city=Bogot%C3%A1" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+---
+
+## Empresas
+
+Los endpoints de empresas siguen el mismo patrón que los de personas, pero utilizan `/v1/companies` como ruta base.
+
+### Campos específicos de empresa
+
+<ParamField body="companyName" type="string" required>
+  Razón social de la empresa
+</ParamField>
+
+<ParamField body="taxId" type="string" required>
+  Número de identificación tributaria (NIT)
+</ParamField>
+
+<ParamField body="legalRepresentative" type="string">
+  Nombre del representante legal
+</ParamField>
+
+<ParamField body="industry" type="string">
+  Sector industrial
+</ParamField>
+
+### Ejemplo: Crear empresa
+
+```bash
+curl -X POST https://your-domain.com/v1/companies \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "companyName": "AutoFleet Colombia S.A.S.",
+    "taxId": "900123456-7",
+    "legalRepresentative": "Carlos Mendoza",
+    "email": "contacto@autofleet.com",
+    "phoneNumber": 6012345678,
+    "industry": "Transportation",
+    "address": {
+      "street": "Av. Eldorado #99-50",
+      "city": "Bogotá"
+    }
+  }'
+```
+
+<Note>
+  Todos los endpoints de empresas (`GET`, `PUT`, `DELETE`, `PATCH`, `search`) funcionan de manera idéntica a los de personas, pero operan sobre la ruta `/v1/companies`.
+</Note>
+
+---
+
+## Modelo de cliente
+
+Tanto las personas como las empresas se consideran "clientes" en SGIVU. Cada registro de persona o empresa tiene un `clientId` asociado que se utiliza en los contratos de compra/venta.
+
+### Jerarquía de clientes
+
+```
+Client (base)
+├── Person
+└── Company
+```
+
+---
+
+## Respuestas de error
+
+### 400 Bad Request
+
+```json
+{
+  "error": "validation_error",
+  "message": "Invalid input data",
+  "details": [
+    {
+      "field": "email",
+      "message": "Email address is invalid"
+    }
+  ]
+}
+```
+
+### 404 Not Found
+
+```json
+{
+  "error": "not_found",
+  "message": "Person with ID 999 not found"
+}
+```

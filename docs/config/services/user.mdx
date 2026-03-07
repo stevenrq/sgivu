@@ -1,0 +1,430 @@
+---
+title: Configuración del Servicio de Usuarios
+description: Configuración del microservicio de gestión de usuarios para la plataforma SGIVU
+---
+
+El Servicio de Usuarios (`sgivu-user`) gestiona las cuentas de usuario, perfiles y operaciones relacionadas en la plataforma SGIVU.
+
+## Descripción General del Servicio
+
+<CardGroup cols={2}>
+  <Card title="Puerto" icon="network-wired">
+    8081
+  </Card>
+  <Card title="Base de Datos" icon="database">
+    PostgreSQL
+  </Card>
+  <Card title="Migración" icon="code-branch">
+    Flyway
+  </Card>
+  <Card title="Rol" icon="user">
+    Gestión de Usuarios
+  </Card>
+</CardGroup>
+
+## Características Principales
+
+- Gestión de cuentas de usuario (operaciones CRUD)
+- Almacenamiento de datos de perfil de usuario
+- Integración con el Servicio de Autenticación
+- Migración de base de datos con Flyway
+- API RESTful con documentación OpenAPI
+- Autenticación interna entre servicios
+
+## Configuración Base
+
+### Configuración del Servidor
+
+```yaml
+server:
+  port: ${PORT:8081}
+```
+
+### Configuración de JPA
+
+```yaml
+spring:
+  jpa:
+    open-in-view: false
+```
+
+<Note>
+`open-in-view: false` asegura que todas las operaciones de base de datos ocurran dentro de los límites de una transacción, previniendo excepciones de carga diferida (lazy loading).
+</Note>
+
+### Migración con Flyway
+
+```yaml
+spring:
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: ${FLYWAY_BASELINE_ON_MIGRATE:false}
+    baseline-version: 0
+    validate-on-migrate: true
+```
+
+<Accordion title="Detalles de Configuración de Flyway">
+- **enabled: true**: Migraciones automáticas al iniciar
+- **locations**: Ubicación de los scripts de migración
+- **baseline-on-migrate**: Inicializar versionado en bases de datos existentes
+- **baseline-version: 0**: Iniciar versionado desde 0
+- **validate-on-migrate: true**: Verificar checksums de migraciones
+</Accordion>
+
+## Configuración de Base de Datos
+
+<Tabs>
+  <Tab title="Desarrollo">
+    ```yaml
+    spring:
+      datasource:
+        url: jdbc:postgresql://${DEV_USER_DB_HOST:host.docker.internal}:${DEV_USER_DB_PORT:5432}/${DEV_USER_DB_NAME}
+        username: ${DEV_USER_DB_USERNAME}
+        password: ${DEV_USER_DB_PASSWORD}
+        driver-class-name: org.postgresql.Driver
+      jpa:
+        hibernate:
+          ddl-auto: validate
+        show-sql: true
+        properties:
+          hibernate:
+            format_sql: true
+      flyway:
+        locations: classpath:db/migration, classpath:db/seed
+        baseline-on-migrate: true
+        clean-disabled: false
+    ```
+    
+    **Características de Desarrollo:**
+    - Registro de SQL habilitado con formato
+    - Datos semilla incluidos (`classpath:db/seed`)
+    - Flyway clean permitido para pruebas
+    - Baseline on migrate para bases de datos existentes
+  </Tab>
+  <Tab title="Producción">
+    ```yaml
+    spring:
+      datasource:
+        url: jdbc:postgresql://${PROD_USER_DB_HOST}:${PROD_USER_DB_PORT}/${PROD_USER_DB_NAME}
+        username: ${PROD_USER_DB_USERNAME}
+        password: ${PROD_USER_DB_PASSWORD}
+        driver-class-name: org.postgresql.Driver
+      jpa:
+        hibernate:
+          ddl-auto: validate
+      flyway:
+        clean-disabled: true
+        baseline-on-migrate: ${FLYWAY_BASELINE_ON_MIGRATE:false}
+    ```
+    
+    **Seguridad en Producción:**
+    - Sin registro de SQL por rendimiento
+    - Flyway clean deshabilitado (previene pérdida de datos)
+    - Sin datos semilla
+  </Tab>
+</Tabs>
+
+<Warning>
+Siempre use `ddl-auto: validate` en producción para evitar que Hibernate modifique el esquema. Flyway gestiona las migraciones.
+</Warning>
+
+## Integración de Servicios
+
+### Registro en Eureka
+
+```yaml
+eureka:
+  instance:
+    instance-id: ${spring.cloud.client.hostname}:${spring.application.name}:${random.value}
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://sgivu-discovery:8761/eureka}
+```
+
+<Info>
+El valor aleatorio en el ID de instancia permite ejecutar múltiples instancias para balanceo de carga.
+</Info>
+
+### Mapa de Descubrimiento de Servicios
+
+```yaml
+services:
+  map:
+    sgivu-auth:
+      name: sgivu-auth
+      url: ${SGIVU_AUTH_URL:http://sgivu-auth:9000}
+```
+
+El Servicio de Usuarios se comunica con el Servicio de Autenticación para la validación de tokens.
+
+### Autenticación Interna entre Servicios
+
+```yaml
+service:
+  internal:
+    secret-key: "${SERVICE_INTERNAL_SECRET_KEY}"
+```
+
+<Note>
+Este secreto compartido autentica las llamadas internas de API desde otros servicios (particularmente el Servicio de Autenticación).
+</Note>
+
+## Observabilidad
+
+### Endpoints de Actuator
+
+<Tabs>
+  <Tab title="Desarrollo">
+    ```yaml
+    management:
+      endpoints:
+        web:
+          exposure:
+            include: "*"
+      endpoint:
+        health:
+          show-details: always
+    ```
+    
+    Todos los endpoints expuestos para depuración.
+  </Tab>
+  <Tab title="Producción">
+    ```yaml
+    management:
+      endpoints:
+        web:
+          exposure:
+            include: health, info, prometheus
+      endpoint:
+        health:
+          show-details: never
+    ```
+    
+    Endpoints limitados por seguridad e integración con Prometheus.
+  </Tab>
+</Tabs>
+
+### Trazas Distribuidas
+
+```yaml
+management:
+  tracing:
+    sampling:
+      probability: 0.1
+  zipkin:
+    tracing:
+      endpoint: http://sgivu-zipkin:9411/api/v2/spans
+```
+
+<Info>
+Muestrea el 10% de las solicitudes para equilibrar observabilidad con impacto en rendimiento.
+</Info>
+
+### Registro de Logs
+
+```yaml
+logging:
+  level:
+    root: INFO
+```
+
+## Documentación de la API
+
+```yaml
+springdoc:
+  swagger-ui:
+    url: /docs/user/v3/api-docs
+    configUrl: /docs/user/v3/api-docs/swagger-config
+```
+
+Acceda a la documentación de la API a través del gateway:
+```
+http://localhost:8080/docs/user/v3/api-docs
+```
+
+<Tabs>
+  <Tab title="Producción">
+    ```yaml
+    openapi:
+      server:
+        url: ${OPENAPI_SERVER_URL}
+    ```
+    
+    Producción sobrescribe la URL del servidor para la documentación pública.
+  </Tab>
+</Tabs>
+
+## Gestión del Esquema de Base de Datos
+
+### Estrategia de Migración
+
+1. **Desarrollo**: Flyway aplica migraciones y datos semilla al iniciar
+2. **Producción**: Flyway aplica solo migraciones (sin datos semilla)
+
+### Ubicaciones de Migración
+
+<Tabs>
+  <Tab title="Desarrollo">
+    ```yaml
+    flyway:
+      locations: classpath:db/migration, classpath:db/seed
+    ```
+    
+    Incluye datos de prueba para desarrollo.
+  </Tab>
+  <Tab title="Producción">
+    ```yaml
+    flyway:
+      locations: classpath:db/migration
+    ```
+    
+    Solo migraciones, sin datos semilla.
+  </Tab>
+</Tabs>
+
+### Ejemplo de Estructura de Migración
+
+```
+src/main/resources/
+├── db/
+│   ├── migration/
+│   │   ├── V1__create_users_table.sql
+│   │   ├── V2__add_email_verification.sql
+│   │   └── V3__add_user_profiles.sql
+│   └── seed/
+│       └── R__seed_test_users.sql
+```
+
+<Note>
+Las migraciones repetibles (prefijo `R__`) se ejecutan en cada inicio si su checksum cambia.
+</Note>
+
+## Variables de Entorno Requeridas
+
+### Todos los Entornos
+
+| Variable | Descripción | Ejemplo |
+|----------|-------------|----------|
+| `SERVICE_INTERNAL_SECRET_KEY` | Secreto compartido para APIs internas | `your-secret-key` |
+
+### Desarrollo
+
+| Variable | Descripción | Default |
+|----------|-------------|----------|
+| `DEV_USER_DB_HOST` | Host de la base de datos | `host.docker.internal` |
+| `DEV_USER_DB_PORT` | Puerto de la base de datos | `5432` |
+| `DEV_USER_DB_NAME` | Nombre de la base de datos | Requerido |
+| `DEV_USER_DB_USERNAME` | Usuario de la base de datos | Requerido |
+| `DEV_USER_DB_PASSWORD` | Contraseña de la base de datos | Requerido |
+
+### Producción
+
+| Variable | Descripción |
+|----------|-------------|
+| `PROD_USER_DB_HOST` | Host de la base de datos |
+| `PROD_USER_DB_PORT` | Puerto de la base de datos |
+| `PROD_USER_DB_NAME` | Nombre de la base de datos |
+| `PROD_USER_DB_USERNAME` | Usuario de la base de datos |
+| `PROD_USER_DB_PASSWORD` | Contraseña de la base de datos |
+| `OPENAPI_SERVER_URL` | URL pública de documentación de la API |
+
+### Opcionales
+
+| Variable | Descripción | Default |
+|----------|-------------|----------|
+| `PORT` | Puerto del servicio | `8081` |
+| `EUREKA_URL` | URL del servidor Eureka | `http://sgivu-discovery:8761/eureka` |
+| `SGIVU_AUTH_URL` | URL del servicio de autenticación | `http://sgivu-auth:9000` |
+| `FLYWAY_BASELINE_ON_MIGRATE` | Baseline en BD existente | `false` |
+
+## Endpoints de la API
+
+Endpoints típicos del Servicio de Usuarios (accesibles a través del gateway):
+
+```
+GET    /api/users           - List users
+GET    /api/users/{id}      - Get user by ID
+POST   /api/users           - Create user
+PUT    /api/users/{id}      - Update user
+DELETE /api/users/{id}      - Delete user
+GET    /api/users/me        - Get current user profile
+PUT    /api/users/me        - Update current user profile
+```
+
+<Note>
+Todos los endpoints requieren autenticación a través del flujo OAuth2 del gateway.
+</Note>
+
+## Seguridad
+
+### OAuth2 Resource Server
+
+El servicio valida tokens JWT emitidos por el Servicio de Autenticación:
+
+```yaml
+services:
+  map:
+    sgivu-auth:
+      name: sgivu-auth
+      url: ${SGIVU_AUTH_URL:http://sgivu-auth:9000}
+```
+
+### Protección de APIs Internas
+
+Los endpoints internos utilizan la clave secreta compartida:
+
+```yaml
+service:
+  internal:
+    secret-key: "${SERVICE_INTERNAL_SECRET_KEY}"
+```
+
+## Consideraciones de Rendimiento
+
+### Pool de Conexiones a Base de Datos
+
+Spring Boot auto-configura HikariCP para el pool de conexiones:
+
+```yaml
+spring:
+  datasource:
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+```
+
+<Info>
+Ajuste el tamaño del pool según la carga esperada y los recursos de la base de datos.
+</Info>
+
+### Optimización de JPA
+
+```yaml
+spring:
+  jpa:
+    open-in-view: false
+```
+
+Deshabilitar open-in-view fuerza límites de transacción explícitos, mejorando el rendimiento.
+
+## Archivos de Configuración
+
+- `sgivu-user.yml` - Configuración base
+- `sgivu-user-dev.yml` - Sobrescrituras de desarrollo
+- `sgivu-user-prod.yml` - Sobrescrituras de producción
+
+## Servicios Relacionados
+
+<CardGroup cols={3}>
+  <Card title="Servicio de Autenticación" icon="shield-halved" href="/config/services/auth">
+    Autentica usuarios
+  </Card>
+  <Card title="Gateway" icon="door-open" href="/config/services/gateway">
+    Enruta solicitudes de la API de usuarios
+  </Card>
+  <Card title="Compra-Venta" icon="handshake" href="/config/services/purchase-sale">
+    Consulta datos de usuarios
+  </Card>
+</CardGroup>

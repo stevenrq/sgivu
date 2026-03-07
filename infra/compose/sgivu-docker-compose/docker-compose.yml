@@ -1,0 +1,193 @@
+services:
+  sgivu-mysql:
+    container_name: sgivu-mysql
+    image: mysql:8
+    command: --mysql-native-password=ON
+    ports:
+      - "3306:3306"
+    restart: always
+    env_file: .env
+    networks:
+      - sgivu-network
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./mysql-init:/docker-entrypoint-initdb.d
+
+  sgivu-postgres:
+    container_name: sgivu-postgres
+    image: postgres:16
+    ports:
+      - "5432:5432"
+    restart: always
+    env_file: .env
+    networks:
+      - sgivu-network
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  sgivu-redis:
+    container_name: sgivu-redis
+    image: redis:7
+    ports:
+      - "6379:6379"
+    command: >
+      sh -c "redis-server --requirepass \"$REDIS_PASSWORD\""
+    env_file: .env
+    restart: always
+    networks:
+      - sgivu-network
+    volumes:
+      - redis-data:/data
+
+  sgivu-config:
+    container_name: sgivu-config
+    image: stevenrq/sgivu-config:v1
+    restart: always
+    networks:
+      - sgivu-network
+    environment:
+      - SPRING_PROFILES_ACTIVE=git
+      - SPRING_CLOUD_CONFIG_SERVER_GIT_URI=https://github.com/stevenrq/sgivu-config-repo.git
+      - SPRING_CLOUD_CONFIG_SERVER_GIT_DEFAULT_LABEL=main
+      - SPRING_CLOUD_CONFIG_SERVER_NATIVE_SEARCH_LOCATIONS=file:/config-repo
+
+  sgivu-discovery:
+    container_name: sgivu-discovery
+    image: stevenrq/sgivu-discovery:v1
+    ports:
+      - "8761:8761"
+    restart: always
+    networks:
+      - sgivu-network
+    env_file: .env
+
+  sgivu-zipkin:
+    container_name: sgivu-zipkin
+    image: openzipkin/zipkin
+    ports:
+      - "9411:9411"
+    restart: always
+    networks:
+      - sgivu-network
+    env_file: .env
+    depends_on:
+      - sgivu-mysql
+
+  sgivu-auth:
+    container_name: sgivu-auth
+    image: stevenrq/sgivu-auth:v1
+    ports:
+      - "9000:9000"
+    restart: always
+    networks:
+      - sgivu-network
+    env_file: .env
+    depends_on:
+      - sgivu-postgres
+      - sgivu-config
+      - sgivu-discovery
+
+  sgivu-user:
+    container_name: sgivu-user
+    image: stevenrq/sgivu-user:v1
+    restart: always
+    networks:
+      - sgivu-network
+    env_file: .env
+    extra_hosts:
+      - "ec2-98-86-100-220.compute-1.amazonaws.com:host-gateway"
+    depends_on:
+      - sgivu-postgres
+      - sgivu-config
+      - sgivu-discovery
+      - sgivu-auth
+
+  sgivu-client:
+    container_name: sgivu-client
+    image: stevenrq/sgivu-client:v1
+    restart: always
+    networks:
+      - sgivu-network
+    env_file: .env
+    extra_hosts:
+      - "ec2-98-86-100-220.compute-1.amazonaws.com:host-gateway"
+    depends_on:
+      - sgivu-postgres
+      - sgivu-config
+      - sgivu-discovery
+      - sgivu-auth
+
+  sgivu-vehicle:
+    container_name: sgivu-vehicle
+    image: stevenrq/sgivu-vehicle:v1
+    restart: always
+    networks:
+      - sgivu-network
+    env_file: .env
+    extra_hosts:
+      - "ec2-98-86-100-220.compute-1.amazonaws.com:host-gateway"
+    depends_on:
+      - sgivu-postgres
+      - sgivu-config
+      - sgivu-discovery
+      - sgivu-auth
+
+  sgivu-purchase-sale:
+    container_name: sgivu-purchase-sale
+    image: stevenrq/sgivu-purchase-sale:v1
+    restart: always
+    networks:
+      - sgivu-network
+    env_file: .env
+    extra_hosts:
+      - "ec2-98-86-100-220.compute-1.amazonaws.com:host-gateway"
+    depends_on:
+      - sgivu-postgres
+      - sgivu-config
+      - sgivu-discovery
+      - sgivu-auth
+
+  sgivu-ml:
+    container_name: sgivu-ml
+    image: stevenrq/sgivu-ml:v1
+    restart: always
+    networks:
+      - sgivu-network
+    env_file: .env
+    extra_hosts:
+      - "ec2-98-86-100-220.compute-1.amazonaws.com:host-gateway"
+    depends_on:
+      - sgivu-postgres
+      - sgivu-auth
+      - sgivu-client
+      - sgivu-gateway
+      - sgivu-user
+      - sgivu-vehicle
+      - sgivu-purchase-sale
+
+  sgivu-gateway:
+    container_name: sgivu-gateway
+    image: stevenrq/sgivu-gateway:v1
+    ports:
+      - "8080:8080"
+    restart: always
+    networks:
+      - sgivu-network
+    env_file: .env
+    # Resolver hostname EC2 al host para acceder a Nginx (que rutea a auth:9000)
+    extra_hosts:
+      - "ec2-98-86-100-220.compute-1.amazonaws.com:host-gateway"
+    depends_on:
+      - sgivu-config
+      - sgivu-discovery
+      - sgivu-auth
+      - sgivu-redis
+
+networks:
+  sgivu-network:
+    driver: bridge
+
+volumes:
+  mysql-data:
+  postgres-data:
+  redis-data:

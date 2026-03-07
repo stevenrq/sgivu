@@ -1,0 +1,632 @@
+---
+title: 'Gestión de Usuarios'
+description: 'Operaciones CRUD y endpoints de búsqueda para la gestión de usuarios'
+---
+
+## Descripción General
+
+La API de Gestión de Usuarios (`sgivu-user`) proporciona operaciones completas para administrar usuarios, incluyendo operaciones CRUD, búsqueda multicriterio, gestión de estados y conteo de usuarios. Todos los endpoints requieren autenticación JWT con permisos específicos.
+
+## URL Base
+
+```
+https://your-domain.com/v1/users
+```
+
+---
+
+## Crear Usuario
+
+```http
+POST /v1/users
+```
+
+Registra un nuevo usuario en el sistema con validaciones de dominio.
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `user:create`
+
+### Cuerpo de la Solicitud
+
+<ParamField body="username" type="string" required>
+  Nombre de usuario único (sin caracteres especiales)
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  Contraseña (debe cumplir requisitos de seguridad)
+</ParamField>
+
+<ParamField body="person" type="object" required>
+  Objeto con información de la persona
+</ParamField>
+
+<ParamField body="person.firstName" type="string" required>
+  Nombre
+</ParamField>
+
+<ParamField body="person.lastName" type="string" required>
+  Apellido
+</ParamField>
+
+<ParamField body="person.nationalId" type="string" required>
+  Número de identificación nacional
+</ParamField>
+
+<ParamField body="person.email" type="string" required>
+  Correo electrónico
+</ParamField>
+
+<ParamField body="person.phone" type="string" required>
+  Número de teléfono
+</ParamField>
+
+<ParamField body="roles" type="array" required>
+  Arreglo de IDs de roles a asignar
+</ParamField>
+
+<ParamField body="enabled" type="boolean" default="true">
+  Indica si la cuenta del usuario está habilitada
+</ParamField>
+
+```json
+{
+  "username": "jperez",
+  "password": "SecureP@ss123",
+  "person": {
+    "firstName": "Juan",
+    "lastName": "Pérez",
+    "nationalId": "1234567890",
+    "email": "jperez@example.com",
+    "phone": "3001234567"
+  },
+  "roles": [1],
+  "enabled": true
+}
+```
+
+### Respuesta
+
+<ResponseField name="status" type="string">
+  Estado de la respuesta (success/error)
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Mensaje de la respuesta
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  Objeto del usuario creado
+</ResponseField>
+
+```json
+{
+  "status": "success",
+  "message": "Usuario creado exitosamente",
+  "data": {
+    "id": 5,
+    "username": "jperez",
+    "person": {
+      "id": 5,
+      "firstName": "Juan",
+      "lastName": "Pérez",
+      "nationalId": "1234567890",
+      "email": "jperez@example.com",
+      "phone": "3001234567"
+    },
+    "roles": [
+      {
+        "id": 1,
+        "name": "USER",
+        "description": "Standard user role"
+      }
+    ],
+    "enabled": true,
+    "createdAt": "2026-03-06T10:30:00",
+    "updatedAt": "2026-03-06T10:30:00"
+  }
+}
+```
+
+### Códigos de Estado
+
+- `201 Created` - Usuario creado exitosamente
+- `400 Bad Request` - Datos de entrada inválidos
+- `401 Unauthorized` - No autenticado
+- `403 Forbidden` - Falta el permiso `user:create`
+
+### Ejemplo
+
+```bash
+curl -X POST https://your-domain.com/v1/users \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "jperez",
+    "password": "SecureP@ss123",
+    "person": {
+      "firstName": "Juan",
+      "lastName": "Pérez",
+      "nationalId": "1234567890",
+      "email": "jperez@example.com",
+      "phone": "3001234567"
+    },
+    "roles": [1],
+    "enabled": true
+  }'
+```
+
+---
+
+## Obtener Usuario por ID
+
+```http
+GET /v1/users/{id}
+```
+
+Recupera el perfil completo de un usuario.
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `user:read`
+
+### Parámetros de Ruta
+
+<ParamField path="id" type="integer" required>
+  ID del usuario
+</ParamField>
+
+### Respuesta
+
+```json
+{
+  "id": 1,
+  "username": "steven",
+  "person": {
+    "id": 1,
+    "firstName": "Steven",
+    "lastName": "Rodriguez",
+    "nationalId": "1234567890",
+    "email": "steven@example.com",
+    "phone": "3001234567"
+  },
+  "roles": [
+    {
+      "id": 1,
+      "name": "ADMIN",
+      "description": "Administrator role with full permissions"
+    }
+  ],
+  "enabled": true,
+  "createdAt": "2026-01-01T00:00:00",
+  "updatedAt": "2026-03-01T12:00:00"
+}
+```
+
+### Códigos de Estado
+
+- `200 OK` - Usuario encontrado
+- `401 Unauthorized` - No autenticado
+- `404 Not Found` - El usuario no existe
+
+### Ejemplo
+
+```bash
+curl -X GET https://your-domain.com/v1/users/1 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+---
+
+## Listar Usuarios (Paginado)
+
+```http
+GET /v1/users/page/{page}
+```
+
+Recupera una lista paginada de usuarios (10 por página).
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `user:read`
+
+### Parámetros de Ruta
+
+<ParamField path="page" type="integer" required>
+  Número de página (base 0)
+</ParamField>
+
+### Respuesta
+
+```json
+{
+  "content": [
+    {
+      "id": 1,
+      "username": "steven",
+      "person": {
+        "firstName": "Steven",
+        "lastName": "Rodriguez",
+        "email": "steven@example.com"
+      },
+      "roles": ["ADMIN"],
+      "enabled": true
+    }
+  ],
+  "pageable": {
+    "pageNumber": 0,
+    "pageSize": 10
+  },
+  "totalElements": 25,
+  "totalPages": 3,
+  "last": false
+}
+```
+
+### Ejemplo
+
+```bash
+curl -X GET https://your-domain.com/v1/users/page/0 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+---
+
+## Actualizar Usuario
+
+```http
+PUT /v1/users/{id}
+```
+
+Actualiza el perfil de un usuario existente. Los usuarios pueden editar su propio perfil, o los administradores pueden modificar cualquier usuario con el permiso `user:update`.
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `user:update` O ID de usuario propio
+
+### Parámetros de Ruta
+
+<ParamField path="id" type="integer" required>
+  ID del usuario a actualizar
+</ParamField>
+
+### Headers de la Solicitud
+
+<ParamField header="X-User-ID" type="string" required>
+  ID del usuario autenticado (inyectado por el Gateway)
+</ParamField>
+
+### Cuerpo de la Solicitud
+
+<ParamField body="person" type="object">
+  Información de la persona a actualizar
+</ParamField>
+
+<ParamField body="roles" type="array">
+  Arreglo de IDs de roles (solo administrador)
+</ParamField>
+
+<ParamField body="enabled" type="boolean">
+  Estado de la cuenta (solo administrador)
+</ParamField>
+
+```json
+{
+  "person": {
+    "firstName": "Juan",
+    "lastName": "Pérez García",
+    "email": "juan.perez@example.com",
+    "phone": "3009876543"
+  }
+}
+```
+
+### Respuesta
+
+```json
+{
+  "status": "success",
+  "message": "Usuario actualizado exitosamente",
+  "data": {
+    "id": 5,
+    "username": "jperez",
+    "person": {
+      "firstName": "Juan",
+      "lastName": "Pérez García",
+      "email": "juan.perez@example.com"
+    },
+    "updatedAt": "2026-03-06T11:45:00"
+  }
+}
+```
+
+### Códigos de Estado
+
+- `200 OK` - Usuario actualizado exitosamente
+- `400 Bad Request` - Datos de entrada inválidos
+- `401 Unauthorized` - No autenticado
+- `403 Forbidden` - Sin permiso o no es el usuario propio
+- `404 Not Found` - El usuario no existe
+
+### Ejemplo
+
+```bash
+curl -X PUT https://your-domain.com/v1/users/5 \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "person": {
+      "email": "juan.perez@example.com"
+    }
+  }'
+```
+
+---
+
+## Eliminar Usuario
+
+```http
+DELETE /v1/users/{id}
+```
+
+Elimina permanentemente un usuario del sistema.
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `user:delete`
+
+### Parámetros de Ruta
+
+<ParamField path="id" type="integer" required>
+  ID del usuario a eliminar
+</ParamField>
+
+### Códigos de Estado
+
+- `204 No Content` - Usuario eliminado exitosamente
+- `401 Unauthorized` - No autenticado
+- `403 Forbidden` - Falta el permiso `user:delete`
+- `404 Not Found` - El usuario no existe
+
+### Ejemplo
+
+```bash
+curl -X DELETE https://your-domain.com/v1/users/5 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+---
+
+## Actualizar Estado del Usuario
+
+```http
+PATCH /v1/users/{id}/status
+```
+
+Habilita o deshabilita una cuenta de usuario para controlar el acceso.
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `user:update`
+
+### Parámetros de Ruta
+
+<ParamField path="id" type="integer" required>
+  ID del usuario
+</ParamField>
+
+### Cuerpo de la Solicitud
+
+<ParamField body="enabled" type="boolean" required>
+  Nuevo estado (true=habilitado, false=deshabilitado)
+</ParamField>
+
+```json
+true
+```
+
+### Respuesta
+
+```json
+{
+  "enabled": true
+}
+```
+
+### Ejemplo
+
+```bash
+curl -X PATCH https://your-domain.com/v1/users/5/status \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d 'false'
+```
+
+---
+
+## Obtener Conteo de Usuarios
+
+```http
+GET /v1/users/count
+```
+
+Recupera estadísticas: total de usuarios, activos e inactivos.
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `user:read`
+
+### Respuesta
+
+```json
+{
+  "total": 25,
+  "active": 22,
+  "inactive": 3
+}
+```
+
+### Ejemplo
+
+```bash
+curl -X GET https://your-domain.com/v1/users/count \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+---
+
+## Buscar Usuarios
+
+```http
+GET /v1/users/search
+```
+
+Búsqueda multicriterio con filtros opcionales (lógica AND).
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `user:read`
+
+### Parámetros de Consulta
+
+<ParamField query="name" type="string">
+  Filtrar por nombre o apellido (coincidencia parcial)
+</ParamField>
+
+<ParamField query="username" type="string">
+  Filtrar por nombre de usuario (coincidencia parcial)
+</ParamField>
+
+<ParamField query="email" type="string">
+  Filtrar por correo electrónico
+</ParamField>
+
+<ParamField query="role" type="string">
+  Filtrar por nombre de rol
+</ParamField>
+
+<ParamField query="enabled" type="boolean">
+  Filtrar por estado habilitado
+</ParamField>
+
+### Respuesta
+
+```json
+[
+  {
+    "id": 1,
+    "username": "steven",
+    "person": {
+      "firstName": "Steven",
+      "lastName": "Rodriguez"
+    },
+    "roles": ["ADMIN"],
+    "enabled": true
+  }
+]
+```
+
+### Ejemplo
+
+```bash
+curl -X GET "https://your-domain.com/v1/users/search?role=ADMIN&enabled=true" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+---
+
+## Buscar Usuarios (Paginado)
+
+```http
+GET /v1/users/search/page/{page}
+```
+
+Variante paginada de la búsqueda multicriterio.
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `user:read`
+
+### Parámetros de Ruta
+
+<ParamField path="page" type="integer" required>
+  Número de página (base 0)
+</ParamField>
+
+### Parámetros de Consulta
+
+<ParamField query="size" type="integer" default="10">
+  Tamaño de página
+</ParamField>
+
+<ParamField query="name" type="string">
+  Filtrar por nombre
+</ParamField>
+
+<ParamField query="username" type="string">
+  Filtrar por nombre de usuario
+</ParamField>
+
+<ParamField query="email" type="string">
+  Filtrar por correo electrónico
+</ParamField>
+
+<ParamField query="role" type="string">
+  Filtrar por rol
+</ParamField>
+
+<ParamField query="enabled" type="boolean">
+  Filtrar por estado
+</ParamField>
+
+### Respuesta
+
+```json
+{
+  "content": [...],
+  "pageable": {
+    "pageNumber": 0,
+    "pageSize": 10
+  },
+  "totalElements": 5,
+  "totalPages": 1
+}
+```
+
+### Ejemplo
+
+```bash
+curl -X GET "https://your-domain.com/v1/users/search/page/0?size=20&role=USER" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+---
+
+## Endpoints Internos
+
+### Obtener Usuario por Nombre de Usuario
+
+```http
+GET /v1/users/username/{username}
+```
+
+<Warning>
+  Este endpoint es exclusivamente para comunicación interna entre servicios. Requiere el header `X-Internal-Service-Key` y nunca debe exponerse públicamente.
+</Warning>
+
+Utilizado por el Servidor de Autorización para obtener el perfil del usuario (roles/permisos) al emitir tokens JWT.
+
+**Autenticación:** Header `X-Internal-Service-Key`
+
+### Parámetros de Ruta
+
+<ParamField path="username" type="string" required>
+  Nombre de usuario a consultar
+</ParamField>
+
+### Ejemplo
+
+```bash
+curl -X GET https://your-domain.com/v1/users/username/steven \
+  -H "X-Internal-Service-Key: YOUR_INTERNAL_KEY"
+```

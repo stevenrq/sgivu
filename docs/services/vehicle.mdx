@@ -1,0 +1,536 @@
+---
+title: Servicio de Vehículos
+description: Catálogo de vehículos y gestión de imágenes con integración AWS S3
+---
+
+## Descripción General
+
+`sgivu-vehicle` gestiona el catálogo de vehículos (automóviles y motocicletas) y sus imágenes asociadas. Soporta operaciones CRUD, búsqueda avanzada, gestión de estados (disponible/no disponible) y carga/gestión de imágenes mediante AWS S3 con URLs prefirmadas.
+
+## Tecnologías
+
+- **Java**: 21
+- **Spring Boot**: 4.0.1
+- **Spring Security**: Resource Server (validación JWT)
+- **Spring Data JPA**: Persistencia en PostgreSQL
+- **Flyway**: Migraciones de base de datos
+- **AWS SDK S3**: `software.amazon.awssdk.s3` para almacenamiento de imágenes
+- **Spring Cloud Config Client**: Configuración centralizada
+- **Spring Cloud Eureka Client**: Registro de servicios
+- **SpringDoc OpenAPI**: Documentación Swagger UI
+- **MapStruct**: Mapeo de DTOs
+- **Lombok**: Generación de código
+
+## Requisitos Previos
+
+- JDK 21
+- Maven 3.9+
+- Base de datos PostgreSQL
+- Bucket AWS S3 con permisos adecuados
+- Servicios `sgivu-config` y `sgivu-discovery` en ejecución
+
+## Ejecución del Servicio
+
+### Desarrollo con Docker Compose
+
+```bash
+cd infra/compose/sgivu-docker-compose
+docker compose -f docker-compose.dev.yml up -d
+```
+
+### Ejecución Local
+
+```bash
+./mvnw clean install -DskipTests
+./mvnw spring-boot:run
+```
+
+### Construcción Docker
+
+```bash
+./build-image.bash
+docker build -t sgivu-vehicle:local .
+```
+
+## Integración con AWS S3
+
+### Servicio S3
+
+**S3Service** proporciona generación de URLs prefirmadas para:
+- **Carga**: Subidas directas del cliente a S3
+- **Descarga**: Acceso temporal a imágenes
+
+**Beneficios**:
+- Reduce la carga del servidor (subida directa)
+- Acceso temporal seguro
+- Sin consumo de ancho de banda del proxy
+
+### Flujo de URLs Prefirmadas
+
+<Steps>
+  <Step title="Solicitar URL de Carga">
+    El cliente solicita una URL prefirmada al Backend:
+    ```bash
+    POST /v1/vehicles/{id}/images/presigned-upload
+    {
+      "fileName": "front-view.jpg",
+      "contentType": "image/jpeg"
+    }
+    ```
+  </Step>
+  
+  <Step title="Subir a S3">
+    El cliente sube directamente a S3 usando la URL prefirmada:
+    ```bash
+    PUT https://bucket.s3.amazonaws.com/vehicle-123/front-view.jpg
+    Content-Type: image/jpeg
+    
+    [binary image data]
+    ```
+  </Step>
+  
+  <Step title="Confirmar Carga">
+    El cliente confirma la carga al Backend:
+    ```bash
+    POST /v1/vehicles/{id}/images/confirm-upload
+    {
+      "key": "vehicle-123/front-view.jpg",
+      "fileName": "front-view.jpg"
+    }
+    ```
+    El Backend valida la clave y registra los metadatos de la imagen en la base de datos.
+  </Step>
+  
+  <Step title="Acceder a la Imagen">
+    El cliente solicita la URL de descarga cuando la necesita:
+    ```bash
+    GET /v1/vehicles/{id}/images/{imageId}/download-url
+    ```
+    Retorna una URL prefirmada de descarga válida por tiempo limitado.
+  </Step>
+</Steps>
+
+### Tipos de Imagen Permitidos
+
+Solo se aceptan estos tipos MIME:
+- `image/jpeg`
+- `image/png`
+- `image/webp`
+
+<Warning>
+Las solicitudes de carga con otros tipos de contenido serán rechazadas. Valide el tipo de contenido en el cliente antes de solicitar la URL prefirmada.
+</Warning>
+
+### Gestión de Imagen Principal
+
+- **Primera Imagen**: Se marca automáticamente como `is_primary=true`
+- **Eliminar Principal**: La siguiente imagen más antigua se promueve automáticamente a principal
+- **Establecer Principal**: Use el Endpoint dedicado para cambiar la imagen principal
+
+## Configuración CORS
+
+### CORS del Bucket
+
+**S3BucketCorsConfig** asegura que el bucket S3 permita cargas desde los orígenes configurados:
+
+```java
+@Configuration
+public class S3BucketCorsConfig {
+    @PostConstruct
+    public void configureBucketCors() {
+        // Reads from aws.s3.allowed-origins
+        // Applies CORS rules to bucket
+    }
+}
+```
+
+**Configuración**:
+```yaml
+aws:
+  s3:
+    bucket-name: sgivu-vehicles
+    allowed-origins:
+      - http://localhost:3000
+      - https://app.sgivu.com
+```
+
+<Info>
+Actualice `allowed-origins` para que coincida con los dominios de su Frontend en producción.
+</Info>
+
+## Seguridad
+
+### Autenticación
+
+**Validación de Tokens JWT**:
+- Tokens emitidos por `sgivu-auth`
+- `JwtAuthenticationConverter` mapea claims a authorities
+- El Resource Server valida la firma mediante JWKS
+
+### Autorización
+
+**Permisos Requeridos**:
+- `vehicle:create` - Crear vehículos
+- `vehicle:read` - Ver vehículos
+- `vehicle:update` - Actualizar vehículos
+- `vehicle:delete` - Eliminar vehículos
+- `vehicle:manage-images` - Subir/eliminar imágenes
+
+### Comunicación Interna entre Servicios
+
+**InternalServiceAuthenticationFilter**:
+- Permite llamadas entre servicios mediante `X-Internal-Service-Key`
+- Omite la validación JWT para Endpoints internos
+- Debe mantenerse en secreto y rotarse periódicamente
+
+### Recomendaciones de Seguridad AWS
+
+<Warning>
+**Seguridad en Producción**:
+- Mover credenciales AWS a un gestor de secretos (AWS Secrets Manager, HashiCorp Vault)
+- Usar roles IAM en lugar de access keys al ejecutar en EC2/ECS
+- Aplicar políticas de bucket con privilegios mínimos
+- Limitar el tiempo de expiración de URLs prefirmadas (actualmente 15 minutos)
+- Habilitar versionado y logging del bucket S3
+- Usar VPC Endpoints para acceso a S3
+</Warning>
+
+## Esquema de Base de Datos
+
+### Migraciones Flyway
+
+**Ubicación**: `src/main/resources/db/migration`
+
+**Tablas Creadas**:
+- `vehicles`: Catálogo principal de vehículos
+  - Campos comunes: VIN, marca, modelo, año, precio, estado
+  - Discriminador de tipo para automóviles vs motocicletas
+- `vehicle_images`: Metadatos de imágenes
+  - Clave S3, nombre de archivo, tipo de contenido
+  - Flag `is_primary`
+  - Clave foránea a vehicles
+
+**Índices**:
+- `vehicles.vin` (unique)
+- `vehicles.status`
+- `vehicles.vehicle_type`
+- `vehicle_images.vehicle_id`
+- `vehicle_images.is_primary`
+
+## Endpoints de la API
+
+### Gestión de Vehículos
+
+<ResponseField name="GET /v1/vehicles" type="protected">
+  Listar vehículos con filtrado avanzado
+  
+  **Permiso Requerido**: `vehicle:read`
+  
+  **Parámetros de Consulta**:
+  - `status`: Filtrar por estado (AVAILABLE, SOLD, RESERVED)
+  - `vehicleType`: Filtrar por tipo (CAR, MOTORCYCLE)
+  - `minPrice`, `maxPrice`: Rango de precio
+  - `brand`, `model`, `year`: Criterios de búsqueda
+  - `page`, `size`, `sort`: Paginación
+</ResponseField>
+
+<ResponseField name="GET /v1/vehicles/{id}" type="protected">
+  Obtener vehículo por ID con imágenes
+  
+  **Permiso Requerido**: `vehicle:read`
+</ResponseField>
+
+<ResponseField name="POST /v1/vehicles" type="protected">
+  Crear nuevo vehículo
+  
+  **Permiso Requerido**: `vehicle:create`
+  
+  **Validaciones**:
+  - VIN único
+  - Tipo de vehículo válido
+  - Campos requeridos según tipo
+</ResponseField>
+
+<ResponseField name="PUT /v1/vehicles/{id}" type="protected">
+  Actualizar información del vehículo
+  
+  **Permiso Requerido**: `vehicle:update`
+</ResponseField>
+
+<ResponseField name="PATCH /v1/vehicles/{id}/status" type="protected">
+  Actualizar estado del vehículo
+  
+  **Permiso Requerido**: `vehicle:update`
+  
+  **Body**: `{"status": "AVAILABLE"}`
+</ResponseField>
+
+<ResponseField name="DELETE /v1/vehicles/{id}" type="protected">
+  Eliminar vehículo (eliminación lógica)
+  
+  **Permiso Requerido**: `vehicle:delete`
+</ResponseField>
+
+### Gestión de Imágenes
+
+<ResponseField name="POST /v1/vehicles/{id}/images/presigned-upload" type="protected">
+  Solicitar URL prefirmada para carga de imagen
+  
+  **Permiso Requerido**: `vehicle:manage-images`
+  
+  **Body**:
+  ```json
+  {
+    "fileName": "front-view.jpg",
+    "contentType": "image/jpeg"
+  }
+  ```
+  
+  **Respuesta**:
+  ```json
+  {
+    "uploadUrl": "https://bucket.s3.amazonaws.com/...",
+    "key": "vehicle-123/front-view.jpg",
+    "expiresIn": 900
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="POST /v1/vehicles/{id}/images/confirm-upload" type="protected">
+  Confirmar carga de imagen y registrar metadatos
+  
+  **Permiso Requerido**: `vehicle:manage-images`
+  
+  **Body**:
+  ```json
+  {
+    "key": "vehicle-123/front-view.jpg",
+    "fileName": "front-view.jpg"
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="GET /v1/vehicles/{id}/images/{imageId}/download-url" type="protected">
+  Obtener URL prefirmada de descarga de imagen
+  
+  **Permiso Requerido**: `vehicle:read`
+  
+  **Respuesta**:
+  ```json
+  {
+    "downloadUrl": "https://bucket.s3.amazonaws.com/...",
+    "expiresIn": 900
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="PUT /v1/vehicles/{id}/images/{imageId}/set-primary" type="protected">
+  Establecer imagen como principal
+  
+  **Permiso Requerido**: `vehicle:manage-images`
+</ResponseField>
+
+<ResponseField name="DELETE /v1/vehicles/{id}/images/{imageId}" type="protected">
+  Eliminar imagen del vehículo
+  
+  **Permiso Requerido**: `vehicle:manage-images`
+  
+  **Comportamiento**: Si se elimina la imagen principal, se promueve la siguiente imagen a principal
+</ResponseField>
+
+## Ejemplos de Request/Response
+
+### Crear Automóvil
+
+```json
+POST /v1/vehicles
+Authorization: Bearer <jwt-token>
+Content-Type: application/json
+
+{
+  "vehicleType": "CAR",
+  "vin": "1HGBH41JXMN109186",
+  "brand": "Toyota",
+  "model": "Camry",
+  "year": 2023,
+  "color": "Silver",
+  "mileage": 15000,
+  "price": 28500.00,
+  "status": "AVAILABLE",
+  "doors": 4,
+  "transmission": "AUTOMATIC",
+  "fuelType": "GASOLINE"
+}
+```
+
+### Respuesta
+
+```json
+{
+  "id": 123,
+  "vehicleType": "CAR",
+  "vin": "1HGBH41JXMN109186",
+  "brand": "Toyota",
+  "model": "Camry",
+  "year": 2023,
+  "color": "Silver",
+  "mileage": 15000,
+  "price": 28500.00,
+  "status": "AVAILABLE",
+  "doors": 4,
+  "transmission": "AUTOMATIC",
+  "fuelType": "GASOLINE",
+  "images": [],
+  "createdAt": "2024-03-06T10:30:00Z",
+  "updatedAt": "2024-03-06T10:30:00Z"
+}
+```
+
+## Observabilidad
+
+### Endpoints de Actuator
+
+- `/actuator/health`: Salud del servicio y conectividad con S3
+- `/actuator/info`: Metadatos de la aplicación
+- `/actuator/metrics`: Métricas personalizadas para operaciones de imágenes
+
+### Documentación OpenAPI
+
+**Swagger UI**: `/swagger-ui/index.html`
+
+**Configuración**: `OpenApiConfig` con servidores específicos por entorno
+
+### Trazabilidad Distribuida
+
+**Integración con Zipkin**:
+- Configurado mediante `sgivu-config`
+- Traza operaciones S3
+- Correlaciona flujos de carga de imágenes
+
+## Pruebas
+
+```bash
+./mvnw test
+```
+
+**Cobertura de Pruebas**:
+- Tests unitarios para servicios
+- Tests de integración de repositorios
+- Mocking del servicio S3
+- Tests de autorización de seguridad
+- Tests de integración del flujo de imágenes
+
+## Solución de Problemas
+
+<AccordionGroup>
+  <Accordion title="Errores de autorización 401/403">
+    **Síntomas**: Las solicitudes a la API retornan no autorizado o prohibido
+    
+    **Soluciones**:
+    - Verificar que el token Bearer contenga las authorities requeridas
+    - Comprobar que el issuer del token coincida con el servidor de autenticación
+    - Asegurar que los roles del usuario incluyan permisos de vehículos
+    - Validar que el token no haya expirado
+  </Accordion>
+  
+  <Accordion title="Fallos en la carga a S3">
+    **Síntomas**: La carga con URL prefirmada retorna 403 o falla
+    
+    **Soluciones**:
+    - Verificar credenciales y permisos de AWS
+    - Comprobar que la política del bucket S3 permita PutObject
+    - Confirmar que el nombre del bucket sea correcto
+    - Validar que el tipo de contenido esté permitido
+    - Revisar la configuración CORS del bucket
+    - Verificar que la URL prefirmada no haya expirado
+  </Accordion>
+  
+  <Accordion title="La imagen no se sube correctamente">
+    **Síntomas**: La carga a S3 tiene éxito pero la imagen no aparece
+    
+    **Soluciones**:
+    - Asegurar que se llame al Endpoint confirm-upload
+    - Verificar que la clave S3 coincida entre la carga y la confirmación
+    - Comprobar el registro de imagen en la base de datos
+    - Revisar los logs del Backend en busca de errores de validación
+    - Confirmar que el ID del vehículo exista
+  </Accordion>
+  
+  <Accordion title="Errores CORS durante la carga">
+    **Síntomas**: El navegador bloquea la carga a S3 con error CORS
+    
+    **Soluciones**:
+    - Verificar que `aws.s3.allowed-origins` incluya el dominio del Frontend
+    - Comprobar que la configuración CORS del bucket S3 se haya aplicado
+    - Asegurar que `S3BucketCorsConfig` se ejecutó al iniciar
+    - Agregar reglas CORS explícitas en la consola de AWS si es necesario
+    - Verificar que el header Content-Type coincida con los tipos permitidos
+  </Accordion>
+  
+  <Accordion title="La imagen principal no se establece correctamente">
+    **Síntomas**: Se muestra una imagen incorrecta como principal o no hay imagen principal
+    
+    **Soluciones**:
+    - Verificar la consistencia del flag `is_primary` en la base de datos
+    - Comprobar que solo una imagen por vehículo tenga `is_primary=true`
+    - Revisar la lógica de eliminación para la promoción de imagen principal
+    - Usar el Endpoint set-primary para establecer la principal explícitamente
+  </Accordion>
+  
+  <Accordion title="Error de VIN duplicado">
+    **Síntomas**: La creación del vehículo falla con violación de restricción
+    
+    **Soluciones**:
+    - Verificar la unicidad del VIN antes de la creación
+    - Manejar la excepción de clave duplicada correctamente
+    - Permitir la actualización del VIN solo en escenarios específicos
+    - Considerar eliminación lógica para vehículos eliminados
+  </Accordion>
+</AccordionGroup>
+
+## Variables de Entorno
+
+| Variable | Descripción | Ejemplo |
+|----------|-------------|----------|
+| `DB_HOST` | Host de PostgreSQL | `sgivu-postgres-vehicle` |
+| `DB_PORT` | Puerto de PostgreSQL | `5432` |
+| `DB_NAME` | Nombre de la base de datos | `sgivu_vehicle` |
+| `DB_USERNAME` | Usuario de la base de datos | `sgivu_user` |
+| `DB_PASSWORD` | Contraseña de la base de datos | `secure_password` |
+| `AWS_ACCESS_KEY_ID` | Clave de acceso AWS | `AKIAIOSFODNN7EXAMPLE` |
+| `AWS_SECRET_ACCESS_KEY` | Clave secreta AWS | `wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY` |
+| `AWS_REGION` | Región de S3 | `us-east-1` |
+| `aws.s3.bucket-name` | Nombre del bucket S3 | `sgivu-vehicles` |
+| `aws.s3.allowed-origins` | Orígenes CORS permitidos | `http://localhost:3000` |
+| `SERVICE_INTERNAL_SECRET_KEY` | Clave interna de servicio | `secret-key-value` |
+
+## Mejores Prácticas
+
+<CardGroup cols={2}>
+  <Card title="URLs Prefirmadas" icon="link">
+    Use URLs prefirmadas para cargas directas del cliente a S3 y reducir la carga del servidor
+  </Card>
+  <Card title="Validación de Imágenes" icon="shield-check">
+    Valide los tipos y tamaños de imagen antes de generar URLs prefirmadas
+  </Card>
+  <Card title="Roles IAM" icon="aws">
+    Use roles IAM en lugar de access keys en entornos de producción
+  </Card>
+  <Card title="Expiración de URLs" icon="clock">
+    Mantenga la expiración de URLs prefirmadas corta (15 minutos) por seguridad
+  </Card>
+</CardGroup>
+
+## Servicios Relacionados
+
+<CardGroup cols={2}>
+  <Card title="Compra-Venta" icon="file-contract" href="/services/purchase-sale">
+    Referencia vehículos en contratos de compra/venta
+  </Card>
+  <Card title="Servicio de Clientes" icon="address-book" href="/services/client">
+    Los clientes compran vehículos
+  </Card>
+  <Card title="Gateway" icon="shield" href="/services/gateway">
+    Enruta las solicitudes de gestión de vehículos
+  </Card>
+</CardGroup>

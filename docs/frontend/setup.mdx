@@ -1,0 +1,368 @@
+---
+title: Configuración del Frontend
+description: Configuración y flujo de trabajo de desarrollo para el Frontend Angular de SGIVU
+---
+
+# Configuración del Frontend
+
+Esta guía cubre la configuración del Frontend de SGIVU para desarrollo local, la compilación para producción y la resolución de problemas comunes.
+
+## Requisitos Previos
+
+Antes de comenzar, asegúrate de tener instalado lo siguiente:
+
+### Software Requerido
+- **Node.js** - Compatible con Angular 21 (Node.js 18.19+ o 20.11+ recomendado)
+- **npm 8+** - Gestor de paquetes (incluido con Node.js)
+- **Git** - Control de versiones
+
+### Servicios Backend
+
+El Frontend requiere que los siguientes servicios Backend estén en ejecución:
+
+- `sgivu-config` - Servidor de configuración
+- `sgivu-discovery` - Descubrimiento de servicios (Eureka)
+- `sgivu-gateway` - Gateway API y BFF
+- `sgivu-auth` - Servidor de autenticación
+
+<Note>
+  Puedes iniciar todos los servicios Backend usando Docker Compose:
+  ```bash
+  cd infra/compose
+  docker-compose -f sgivu-docker-compose.yml up -d
+  ```
+</Note>
+
+## Instalación
+
+### 1. Clonar el Repositorio
+
+```bash
+git clone <repository-url>
+cd apps/frontend/sgivu-frontend
+```
+
+### 2. Instalar Dependencias
+
+```bash
+npm install
+```
+
+Esto instalará todas las dependencias listadas en `package.json` incluyendo:
+- Framework y CLI de Angular
+- Bootstrap y librerías de UI
+- Chart.js para visualizaciones
+- Herramientas de desarrollo (ESLint, Prettier, Karma)
+
+### 3. Configurar el Entorno
+
+La configuración por defecto para desarrollo se encuentra en `src/environments/environment.development.ts`:
+
+```typescript
+export const environment = {
+  production: false,
+  apiUrl: 'http://localhost:8080',
+  issuer: 'http://sgivu-auth:9000',
+  clientId: 'angular-local'
+};
+```
+
+<Warning>
+  Si no puedes resolver el hostname `sgivu-auth` (por ejemplo, en Windows sin entrada en el archivo hosts), cambia temporalmente el issuer a:
+  ```typescript
+  issuer: 'http://localhost:9000'
+  ```
+</Warning>
+
+### 4. Actualizar Archivo Hosts (Opcional)
+
+Para una mejor integración con Docker, agrega lo siguiente a tu `/etc/hosts` (Linux/Mac) o `C:\Windows\System32\drivers\etc\hosts` (Windows):
+
+```
+127.0.0.1 sgivu-auth
+127.0.0.1 sgivu-gateway
+```
+
+## Servidor de Desarrollo
+
+### Iniciar el Servidor de Desarrollo
+
+```bash
+npm start
+# o
+npm run start
+```
+
+Esto inicia el servidor de desarrollo de Angular en:
+- **URL**: http://localhost:4200
+- **Hot Reload**: Habilitado por defecto
+- **Source Maps**: Habilitados para depuración
+
+La aplicación se recargará automáticamente cuando realices cambios en los archivos fuente.
+
+### Características de Desarrollo
+
+- **Live Reload** - Recarga automática del navegador al cambiar archivos
+- **Source Maps** - Depuración de TypeScript en las DevTools del navegador
+- **Error Overlay** - Errores de compilación mostrados en el navegador
+- **Hot Module Replacement** - Compilaciones incrementales rápidas
+
+## Compilación para Producción
+
+### Compilación Estándar
+
+```bash
+npm run build
+```
+
+Genera la salida en el directorio `dist/sgivu-frontend/`.
+
+### Compilación Optimizada para Producción
+
+```bash
+npm run build -- --configuration production
+```
+
+**Las optimizaciones de producción incluyen:**
+- Minificación y ofuscación de código
+- Tree shaking (elimina código no utilizado)
+- Compilación Ahead-of-Time (AOT)
+- Optimización y división de bundles
+- Optimización de CSS
+- Generación de source maps (opcional)
+
+### Modo Watch (Desarrollo)
+
+```bash
+npm run watch
+```
+
+Compila y observa cambios sin iniciar un servidor de desarrollo.
+
+## Pruebas
+
+### Tests Unitarios
+
+Ejecuta los tests unitarios con Karma y Jasmine:
+
+```bash
+npm test
+# o
+npm run test
+```
+
+Esto lanza Karma en modo watch y ejecuta los tests en Chrome.
+
+**Configuración de Tests:**
+- Framework: Jasmine
+- Runner: Karma
+- Navegador: Chrome (vía Puppeteer)
+- Cobertura: Habilitada con `karma-coverage`
+
+### Linting
+
+Verifica la calidad del código con ESLint:
+
+```bash
+npm run lint
+```
+
+Esto ejecuta ESLint con reglas específicas de Angular.
+
+### Formateo de Código
+
+Formatea el código con Prettier:
+
+```bash
+npx prettier --write "src/**/*.{ts,html,scss,css,json}"
+```
+
+<Info>
+  Considera agregar Prettier como un script npm en `package.json` para un acceso más fácil.
+</Info>
+
+## Flujo de Trabajo de Desarrollo
+
+### Flujo de Trabajo Recomendado
+
+1. **Iniciar Servicios Backend**
+   ```bash
+   cd infra/compose
+   docker-compose -f sgivu-docker-compose.yml up -d
+   ```
+
+2. **Iniciar el Servidor de Desarrollo del Frontend**
+   ```bash
+   cd apps/frontend/sgivu-frontend
+   npm start
+   ```
+
+3. **Abrir el Navegador**
+   - Navega a http://localhost:4200
+   - Las credenciales de inicio de sesión dependen de tu configuración de `sgivu-auth`
+
+4. **Realizar Cambios**
+   - Edita archivos en `src/app/`
+   - El navegador se recarga automáticamente
+   - Revisa la consola en busca de errores
+
+5. **Ejecutar Tests**
+   ```bash
+   npm test
+   ```
+
+6. **Ejecutar Lint Antes de Hacer Commit**
+   ```bash
+   npm run lint
+   ```
+
+### Recomendaciones de IDE
+
+**Visual Studio Code** con extensiones:
+- Angular Language Service
+- ESLint
+- Prettier - Code formatter
+- Angular Snippets
+- Auto Rename Tag
+- Path Intellisense
+
+**WebStorm/IntelliJ IDEA**:
+- Soporte integrado de Angular
+- Soporte integrado de TypeScript
+- Integración con ESLint
+- Integración con Prettier
+
+## Solución de Problemas
+
+### Errores 401/403 en Llamadas a la API
+
+**Problema**: Las solicitudes XHR devuelven 401 Unauthorized o 403 Forbidden.
+
+**Soluciones**:
+1. Verifica que `apiUrl` en `environment.development.ts` apunte a `sgivu-gateway`
+2. Comprueba que `sgivu-gateway` esté en ejecución: `docker ps | grep sgivu-gateway`
+3. Verifica que la sesión esté establecida: abre la pestaña Network en DevTools y revisa la respuesta de `/auth/session`
+4. Limpia las cookies y el localStorage del navegador
+5. Intenta cerrar sesión e iniciar sesión nuevamente
+
+### Discrepancia de Issuer/Redirect
+
+**Problema**: La redirección OAuth2 falla con un error de discrepancia de issuer.
+
+**Soluciones**:
+1. Verifica que `issuer` coincida con `ISSUER_URL` en la configuración de `sgivu-auth`
+2. Revisa `application.yml` en `sgivu-auth` para la URL correcta del issuer
+3. Asegúrate de que la configuración de Nginx coincida con la URL del issuer
+4. Verifica que no haya barras diagonales finales en las URLs del issuer
+
+### Rutas No Encontradas Después del Despliegue
+
+**Problema**: La navegación directa a rutas devuelve 404 en hosting estático.
+
+**Soluciones**:
+1. Configura el servidor para servir `index.html` en todas las rutas
+2. Verifica el `base href` en `dist/sgivu-frontend/index.html`
+3. Para **Nginx**, agrega una regla de reescritura:
+   ```nginx
+   location / {
+       try_files $uri $uri/ /index.html;
+   }
+   ```
+4. Para **S3**, configura el documento de error como `index.html`
+
+### Errores de Módulo No Encontrado
+
+**Problema**: Errores de importación o módulo no encontrado durante la compilación.
+
+**Soluciones**:
+1. Elimina `node_modules` y reinstala:
+   ```bash
+   rm -rf node_modules package-lock.json
+   npm install
+   ```
+2. Limpia la caché de Angular:
+   ```bash
+   rm -rf .angular/cache
+   ```
+3. Verifica las rutas de TypeScript en `tsconfig.json`
+
+### Puerto Ya en Uso
+
+**Problema**: El puerto 4200 ya está ocupado.
+
+**Soluciones**:
+1. Usa un puerto diferente:
+   ```bash
+   ng serve --port 4201
+   ```
+2. Finaliza el proceso que usa el puerto 4200:
+   ```bash
+   # Linux/Mac
+   lsof -ti:4200 | xargs kill -9
+   
+   # Windows
+   netstat -ano | findstr :4200
+   taskkill /PID <PID> /F
+   ```
+
+### Errores de CORS
+
+**Problema**: La política de CORS bloquea las solicitudes a la API.
+
+**Soluciones**:
+1. Verifica que la configuración de CORS de `sgivu-gateway` permita `http://localhost:4200`
+2. Revisa `application.yml` del Gateway para los orígenes permitidos de CORS
+3. Asegúrate de que las cookies se incluyan en las solicitudes (gestionado por el interceptor)
+4. Verifica `withCredentials: true` en las solicitudes HTTP
+
+### No Se Puede Resolver el Hostname
+
+**Problema**: El navegador no puede resolver `sgivu-auth` u otros hostnames de servicios.
+
+**Soluciones**:
+1. Agrega el hostname a `/etc/hosts` (ver sección de Configuración)
+2. Cambia el issuer para usar `localhost` en desarrollo
+3. Verifica la configuración de red de Docker si usas Docker
+
+## Configuración de Entornos
+
+### Entorno de Desarrollo
+
+Edita `src/environments/environment.development.ts`:
+
+```typescript
+export const environment = {
+  production: false,
+  apiUrl: 'http://localhost:8080',        // Gateway URL
+  issuer: 'http://sgivu-auth:9000',       // Auth server
+  clientId: 'angular-local'               // OAuth2 client ID
+};
+```
+
+### Entorno de Producción
+
+Edita `src/environments/environment.ts`:
+
+```typescript
+export const environment = {
+  production: true,
+  apiUrl: 'https://api.sgivu.com',        // Production gateway
+  issuer: 'https://auth.sgivu.com',       // Production auth
+  clientId: 'sgivu-frontend-prod'         // Production client
+};
+```
+
+<Warning>
+  Nunca hagas commit de credenciales o secretos en los archivos `environment.ts`. Usa configuraciones específicas por entorno y mantén seguros los valores de producción.
+</Warning>
+
+## Próximos Pasos
+
+<CardGroup cols={2}>
+  <Card title="Arquitectura" icon="sitemap" href="/frontend/architecture">
+    Conoce la arquitectura y los patrones del Frontend
+  </Card>
+  <Card title="Características" icon="puzzle-piece" href="/frontend/features">
+    Explora los módulos de características y componentes
+  </Card>
+</CardGroup>

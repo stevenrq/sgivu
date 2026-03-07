@@ -1,0 +1,461 @@
+---
+title: Instalación
+description: Guía detallada de instalación para la plataforma de gestión de inventario vehicular SGIVU
+---
+
+Esta guía cubre el proceso completo de instalación de SGIVU, incluyendo requisitos previos, configuración del entorno y configuración del sistema.
+
+## Requisitos del Sistema
+
+### Requisitos de Hardware
+
+- **CPU**: 4+ núcleos recomendados
+- **RAM**: Mínimo 8GB, 16GB recomendados
+- **Almacenamiento**: 20GB+ de espacio libre en disco
+- **Red**: Conexión a internet estable para descargar imágenes Docker
+
+### Requisitos de Software
+
+- **Sistema Operativo**: Linux, macOS o Windows con WSL2
+- **Docker**: Versión 20.10 o superior
+- **Docker Compose**: Versión 2.0 o superior
+- **Git**: Versión 2.30 o superior
+
+## Métodos de Instalación
+
+<CodeGroup>
+
+```bash Docker Compose (Recommended)
+# Clone the repository
+git clone https://github.com/your-org/sgivu.git
+cd sgivu/infra/compose/sgivu-docker-compose
+
+# Create environment file
+cp .env.dev.example .env.dev
+
+# Start the stack
+chmod +x run.bash
+./run.bash --dev
+```
+
+```bash Manual Setup
+# Clone the repository
+git clone https://github.com/your-org/sgivu.git
+cd sgivu
+
+# Install each service separately
+# Follow individual service READMEs in:
+# - apps/backend/sgivu-auth/README.md
+# - apps/backend/sgivu-gateway/README.md
+# - apps/backend/sgivu-user/README.md
+# ... etc
+```
+
+</CodeGroup>
+
+## Instalación Paso a Paso
+
+<Steps>
+
+<Step title="Instalar Docker y Docker Compose">
+
+### Linux
+
+```bash
+# Install Docker
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+
+# Add your user to the docker group
+sudo usermod -aG docker $USER
+
+# Install Docker Compose
+sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
+
+# Verify installation
+docker --version
+docker compose version
+```
+
+### macOS
+
+```bash
+# Install Docker Desktop for Mac
+brew install --cask docker
+
+# Start Docker Desktop and verify
+docker --version
+docker compose version
+```
+
+### Windows (WSL2)
+
+1. Instalar WSL2: https://docs.microsoft.com/en-us/windows/wsl/install
+2. Instalar Docker Desktop para Windows
+3. Habilitar la integración con WSL2 en la configuración de Docker Desktop
+4. Verificar la instalación en la terminal de WSL2:
+
+```bash
+docker --version
+docker compose version
+```
+
+</Step>
+
+<Step title="Clonar el repositorio de SGIVU">
+
+```bash
+git clone https://github.com/your-org/sgivu.git
+cd sgivu
+```
+
+Verificar la estructura del repositorio:
+
+```bash
+ls -la
+# You should see:
+# - apps/          (backend, frontend, ML services)
+# - infra/         (Docker Compose, Nginx configs)
+# - docs/          (documentation)
+# - scripts/       (utility scripts)
+```
+
+</Step>
+
+<Step title="Preparar el Repositorio de Configuración">
+
+SGIVU utiliza configuración centralizada almacenada en un repositorio Git separado. Para desarrollo, se puede usar el perfil nativo para cargar las configuraciones desde el sistema de archivos local.
+
+```bash
+# Clone the config repository (if using Git profile)
+git clone https://github.com/stevenrq/sgivu-config-repo.git
+
+# Or create a local config directory structure
+mkdir -p sgivu-config-repo
+cd sgivu-config-repo
+# Add your configuration YAML files here
+```
+
+La configuración de Docker Compose para desarrollo usa el perfil `native` y monta el directorio de configuración automáticamente.
+
+</Step>
+
+<Step title="Configurar Variables de Entorno">
+
+Navegar al directorio de Docker Compose:
+
+```bash
+cd infra/compose/sgivu-docker-compose
+```
+
+Para **desarrollo**:
+
+```bash
+cp .env.dev.example .env.dev
+```
+
+Para **producción**:
+
+```bash
+cp .env.example .env
+```
+
+Editar el archivo de entorno con el editor de preferencia:
+
+```bash
+nano .env.dev
+# or
+vim .env.dev
+```
+
+Variables clave a configurar (ver [Configuración](/getting-started/configuration) para más detalles):
+
+- `SERVICE_INTERNAL_SECRET_KEY` - Secreto para comunicación entre servicios
+- `REDIS_PASSWORD` - Contraseña de autenticación de Redis
+- `POSTGRES_PASSWORD` - Contraseña de PostgreSQL
+- `MYSQL_ROOT_PASSWORD` - Contraseña root de MySQL
+- `JWT_KEYSTORE_PASSWORD` - Contraseña del keystore JWT
+- `SGIVU_GATEWAY_SECRET` - Secreto del cliente OAuth2
+
+</Step>
+
+<Step title="Generar Keystore JWT (Solo Producción)">
+
+Para despliegues en producción, generar un keystore JWT personalizado:
+
+```bash
+keytool -genkeypair -alias sgivu-jwt \
+  -keyalg RSA -keysize 2048 \
+  -storetype JKS -keystore keystore.jks \
+  -validity 3650 \
+  -storepass YOUR_KEYSTORE_PASSWORD \
+  -keypass YOUR_KEY_PASSWORD \
+  -dname "CN=SGIVU Auth, OU=Security, O=SGIVU, L=City, ST=State, C=US"
+```
+
+Colocar el keystore en el directorio de recursos del servicio de autenticación:
+
+```bash
+cp keystore.jks apps/backend/sgivu-auth/src/main/resources/
+```
+
+Actualizar las variables de entorno:
+- `JWT_KEYSTORE_LOCATION=classpath:keystore.jks`
+- `JWT_KEYSTORE_PASSWORD=YOUR_KEYSTORE_PASSWORD`
+- `JWT_KEY_ALIAS=sgivu-jwt`
+- `JWT_KEY_PASSWORD=YOUR_KEY_PASSWORD`
+
+</Step>
+
+<Step title="Configurar AWS S3 (Solo Producción)">
+
+Para el almacenamiento de imágenes de vehículos, configurar AWS S3:
+
+1. Crear un bucket S3:
+
+```bash
+aws s3 mb s3://sgivu-vehicle-images --region us-east-1
+```
+
+2. Crear un usuario IAM con acceso a S3 y generar claves de acceso
+
+3. Actualizar las variables de entorno:
+
+```bash
+AWS_ACCESS_KEY=your-access-key
+AWS_SECRET_KEY=your-secret-key
+AWS_REGION=us-east-1
+AWS_VEHICLES_BUCKET=sgivu-vehicle-images
+AWS_S3_ALLOWED_ORIGINS=http://your-frontend-domain.com
+```
+
+4. Configurar la política CORS del bucket para permitir el acceso desde el Frontend
+
+</Step>
+
+<Step title="Inicializar Bases de Datos (Opcional)">
+
+La configuración de Docker Compose inicializa las bases de datos automáticamente. Para configuración manual:
+
+```bash
+# PostgreSQL databases
+psql -h localhost -U postgres -c "CREATE DATABASE sgivu_auth_db;"
+psql -h localhost -U postgres -c "CREATE DATABASE sgivu_user_db;"
+psql -h localhost -U postgres -c "CREATE DATABASE sgivu_client_db;"
+psql -h localhost -U postgres -c "CREATE DATABASE sgivu_vehicle_db;"
+psql -h localhost -U postgres -c "CREATE DATABASE sgivu_purchase_sale_db;"
+psql -h localhost -U postgres -c "CREATE DATABASE sgivu_ml_db;"
+
+# MySQL database (for Zipkin)
+mysql -h localhost -u root -p -e "CREATE DATABASE sgivu_zipkin_db;"
+mysql -h localhost -u root -p -e "CREATE USER 'zipkin'@'%' IDENTIFIED BY 'your-password';"
+mysql -h localhost -u root -p -e "GRANT ALL PRIVILEGES ON sgivu_zipkin_db.* TO 'zipkin'@'%';"
+```
+
+Las migraciones de Flyway se ejecutan automáticamente cuando los servicios inician.
+
+</Step>
+
+<Step title="Iniciar la Plataforma">
+
+Lanzar el stack completo:
+
+```bash
+chmod +x run.bash
+
+# For development
+./run.bash --dev
+
+# For production
+./run.bash --prod
+```
+
+Alternativamente, usar Docker Compose directamente:
+
+```bash
+# Development
+docker compose -f docker-compose.dev.yml --env-file .env.dev up -d --build
+
+# Production
+docker compose up -d --build
+```
+
+</Step>
+
+<Step title="Verificar la Instalación">
+
+Comprobar que todos los servicios están en ejecución:
+
+```bash
+docker compose -f docker-compose.dev.yml ps
+```
+
+Verificar el registro de servicios de Eureka:
+
+```bash
+curl http://localhost:8761
+```
+
+Comprobar el Config Server:
+
+```bash
+curl http://localhost:8888/actuator/health
+```
+
+Probar el Gateway:
+
+```bash
+curl http://localhost:8080/actuator/health
+```
+
+Ver los logs:
+
+```bash
+# All services
+docker compose -f docker-compose.dev.yml logs -f
+
+# Specific service
+docker compose -f docker-compose.dev.yml logs -f sgivu-gateway
+```
+
+</Step>
+
+</Steps>
+
+## Configuración Post-Instalación
+
+### Configurar Nginx (Producción)
+
+Para despliegues en producción, configurar Nginx como punto de entrada público:
+
+```nginx
+# /etc/nginx/sites-available/sgivu
+server {
+    listen 80;
+    server_name your-domain.com;
+
+    # Auth Server endpoints
+    location ~ ^/(login|oauth2|.well-known) {
+        proxy_pass http://localhost:9000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    # Gateway endpoints
+    location ~ ^/(v1|docs|auth/session) {
+        proxy_pass http://localhost:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    # Frontend (SPA)
+    location / {
+        # Proxy to S3 or serve from local
+        root /var/www/sgivu-frontend/dist;
+        try_files $uri $uri/ /index.html;
+    }
+}
+```
+
+Habilitar y reiniciar Nginx:
+
+```bash
+sudo ln -s /etc/nginx/sites-available/sgivu /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl restart nginx
+```
+
+### Configurar Monitoreo
+
+Acceder a Zipkin para trazabilidad distribuida:
+
+```bash
+open http://localhost:9411
+```
+
+Habilitar endpoints de Actuator para monitoreo:
+
+```bash
+curl http://localhost:8080/actuator
+curl http://localhost:9000/actuator/health
+```
+
+## Solución de Problemas
+
+### Problemas con Docker
+
+**Problema**: El daemon de Docker no está en ejecución
+```bash
+sudo systemctl start docker
+```
+
+**Problema**: Permiso denegado
+```bash
+sudo usermod -aG docker $USER
+newgrp docker
+```
+
+### Conflictos de Puertos
+
+**Problema**: Puertos en uso
+```bash
+# Find process using port
+lsof -i :8080
+
+# Kill the process or change port mapping in docker-compose
+```
+
+### Problemas de Inicio de Servicios
+
+**Problema**: Config Server no accesible
+```bash
+# Check Config Server logs
+docker compose -f docker-compose.dev.yml logs sgivu-config
+
+# Verify SPRING_CLOUD_CONFIG_URI is correct
+```
+
+**Problema**: Los servicios no se registran en Eureka
+```bash
+# Check Eureka is running
+curl http://localhost:8761
+
+# Verify EUREKA_URL in .env.dev
+```
+
+**Problema**: Fallos de autenticación
+```bash
+# Verify JWT keystore configuration
+# Check ISSUER_URL matches SGIVU_AUTH_URL
+# Ensure SGIVU_GATEWAY_SECRET is consistent
+```
+
+### Problemas de Base de Datos
+
+**Problema**: Fallos de conexión a la base de datos
+```bash
+# Check PostgreSQL is running
+docker compose -f docker-compose.dev.yml ps sgivu-postgres
+
+# Verify credentials in .env.dev
+# Check database logs
+docker compose -f docker-compose.dev.yml logs sgivu-postgres
+```
+
+## Próximos Pasos
+
+<CardGroup cols={2}>
+  <Card title="Configuración" icon="gear" href="/getting-started/configuration">
+    Conocer todas las opciones de configuración
+  </Card>
+  <Card title="Despliegue con Docker" icon="docker" href="/getting-started/docker-deployment">
+    Comprender la arquitectura Docker
+  </Card>
+  <Card title="Referencia de API" icon="code" href="/api/auth/oauth2">
+    Explorar la documentación de la API
+  </Card>
+  <Card title="Arquitectura" icon="sitemap" href="/architecture">
+    Comprender la arquitectura del sistema
+  </Card>
+</CardGroup>

@@ -1,0 +1,712 @@
+---
+title: Arquitectura
+description: Inmersión profunda en la arquitectura de microservicios de SGIVU, patrones de comunicación e implementación técnica
+---
+
+# Arquitectura del Sistema
+
+SGIVU está construido sobre una arquitectura moderna de microservicios nativa en la nube que aprovecha Spring Cloud, descubrimiento de servicios, configuración centralizada y OAuth 2.1/OIDC para la seguridad. La plataforma está diseñada para escalabilidad horizontal, resiliencia y observabilidad.
+
+## Descripción General de la Arquitectura
+
+<Note>
+El siguiente diagrama ilustra la arquitectura completa del sistema. Puedes encontrar diagramas detallados en el repositorio fuente en `docs/diagrams/img/`.
+</Note>
+
+```mermaid
+graph TB
+    subgraph "Public Internet"
+        User[End User Browser]
+        S3[S3 Static Assets]
+    end
+    
+    subgraph "Load Balancer Layer"
+        Nginx[Nginx Reverse Proxy]
+    end
+    
+    subgraph "Edge Layer"
+        Gateway[API Gateway<br/>sgivu-gateway<br/>:8080]
+        Auth[Auth Server<br/>sgivu-auth<br/>:9000]
+    end
+    
+    subgraph "Platform Layer"
+        Config[Config Server<br/>sgivu-config<br/>:8888]
+        Discovery[Service Discovery<br/>sgivu-discovery<br/>:8761]
+    end
+    
+    subgraph "Business Services"
+        UserSvc[User Service<br/>sgivu-user]
+        VehicleSvc[Vehicle Service<br/>sgivu-vehicle]
+        ClientSvc[Client Service<br/>sgivu-client]
+        PurchaseSvc[Purchase/Sale Service<br/>sgivu-purchase-sale]
+    end
+    
+    subgraph "ML Services"
+        MLSvc[ML Service<br/>sgivu-ml<br/>:8000]
+    end
+    
+    subgraph "Data Layer"
+        Postgres[(PostgreSQL)]
+        Redis[(Redis)]
+        S3Storage[AWS S3 Storage]
+    end
+    
+    User --> Nginx
+    User --> S3
+    Nginx --> Gateway
+    Nginx --> Auth
+    Gateway --> Auth
+    Gateway --> Redis
+    Gateway --> UserSvc
+    Gateway --> VehicleSvc
+    Gateway --> ClientSvc
+    Gateway --> PurchaseSvc
+    Gateway --> MLSvc
+    
+    UserSvc --> Config
+    VehicleSvc --> Config
+    ClientSvc --> Config
+    PurchaseSvc --> Config
+    Auth --> Config
+    Gateway --> Config
+    
+    UserSvc --> Discovery
+    VehicleSvc --> Discovery
+    ClientSvc --> Discovery
+    PurchaseSvc --> Discovery
+    Gateway --> Discovery
+    
+    UserSvc --> Postgres
+    VehicleSvc --> Postgres
+    ClientSvc --> Postgres
+    PurchaseSvc --> Postgres
+    Auth --> Postgres
+    MLSvc --> Postgres
+    
+    VehicleSvc --> S3Storage
+```
+
+## Capas Arquitectónicas
+
+### 1. Capa Pública
+
+**Nginx como Proxy Inverso**
+
+Nginx sirve como punto de entrada público único, enrutando el tráfico según patrones de URL:
+
+- **Servidor de Autorización** (puerto 9000): `/login`, `/oauth2/*`, `/.well-known/*` — Flujos OIDC
+- **API Gateway** (puerto 8080): `/v1/*`, `/docs/*`, `/auth/session` — APIs de negocio y BFF
+- **Frontend**: S3 como catch-all para la SPA Angular
+
+<Info>
+Esta separación permite escalar de forma independiente los servicios de Auth y Gateway, y simplifica las reglas de firewall (solo los puertos 80/443 expuestos).
+</Info>
+
+### 2. Capa de Borde
+
+#### API Gateway (sgivu-gateway)
+
+**Puerto**: 8080 | **Tecnología**: Spring Cloud Gateway (WebFlux)
+
+El gateway implementa el patrón **BFF (Backend for Frontend)** y cumple múltiples roles:
+
+<CardGroup cols={2}>
+  <Card title="Proxy de Autenticación" icon="shield">
+    - Cliente OAuth2 para flujo PKCE
+    - Gestión de sesiones vía Redis
+    - Relay de tokens a servicios backend
+    - Endpoint `/auth/session` para la UI
+  </Card>
+  <Card title="API Gateway" icon="door-open">
+    - Proxy de rutas a microservicios
+    - Circuit breakers (Resilience4j)
+    - Filtros globales (trazado, ID de usuario)
+    - Manejo de fallbacks
+  </Card>
+</CardGroup>
+
+**Componentes Clave:**
+
+- **Almacenamiento de Sesiones en Redis**: Permite escalado horizontal sin pérdida de sesiones
+- **Filtro de Relay de Tokens**: Reenvía automáticamente los tokens OAuth2 a los servicios downstream
+- **Circuit Breaker**: Previene fallos en cascada con rutas de fallback
+- **Filtros Globales**:
+  - `ZipkinTracingGlobalFilter`: Agrega encabezados `X-Trace-Id` para trazado distribuido
+  - `AddUserIdHeaderGlobalFilter`: Inyecta `X-User-ID` desde los claims del JWT
+
+**Ejemplo de Configuración de Rutas:**
+
+```yaml
+spring:
+  cloud:
+    gateway:
+      routes:
+        - id: vehicle-service
+          uri: lb://sgivu-vehicle
+          predicates:
+            - Path=/v1/vehicles/**
+          filters:
+            - TokenRelay=
+            - CircuitBreaker=name:vehicleCircuitBreaker,fallbackuri:forward:/fallback/vehicle
+```
+
+#### Servidor de Autorización (sgivu-auth)
+
+**Puerto**: 9000 | **Tecnología**: Spring Authorization Server
+
+Implementa OAuth 2.1 / OpenID Connect con emisión de tokens JWT:
+
+- **Tipos de Token**: Tokens de acceso (JWT), Tokens de actualización
+- **Flujos**: Authorization Code con PKCE
+- **Firma de Tokens**: Keystore JKS con RS256
+- **Almacenamiento**: PostgreSQL para clientes, autorizaciones, consentimientos y sesiones
+- **Validación de Usuarios**: Delega a `sgivu-user` vía API interna
+
+**Características de Seguridad:**
+
+<Steps>
+  <Step title="Registro de Clientes">
+    Clientes por defecto registrados al iniciar:
+    - `sgivu-gateway` (aplicación principal)
+    - `postman-client` (pruebas)
+    - `oauth2-debugger-client` (depuración)
+  </Step>
+  <Step title="Claims del JWT">
+    Los tokens incluyen claims personalizados:
+    - `sub`: ID del usuario
+    - `username`: Nombre de inicio de sesión
+    - `rolesAndPermissions`: Array de permisos
+    - `isAdmin`: Indicador booleano
+  </Step>
+  <Step title="Validación de Tokens">
+    Endpoint JWKS en `/oauth2/jwks` para distribución de clave pública
+  </Step>
+</Steps>
+
+<Warning>
+El archivo de keystore (`keystore.jks`) debe proporcionarse vía gestor de secretos en producción. Los secretos de cliente por defecto son solo para desarrollo.
+</Warning>
+
+### 3. Capa de Plataforma
+
+#### Servidor de Configuración (sgivu-config)
+
+**Puerto**: 8888 | **Tecnología**: Spring Cloud Config Server
+
+Gestión de configuración centralizada que soporta dos modos:
+
+**Modo Git (Producción)**
+```yaml
+spring:
+  cloud:
+    config:
+      server:
+        git:
+          uri: https://github.com/stevenrq/sgivu-config-repo.git
+          default-label: main
+```
+
+**Modo Nativo (Desarrollo)**
+```yaml
+spring:
+  profiles:
+    active: native
+  cloud:
+    config:
+      server:
+        native:
+          search-locations: file:/config-repo
+```
+
+**Estructura del Repositorio de Configuración:**
+```
+sgivu-config-repo/
+├── application.yml              # Global defaults
+├── sgivu-gateway.yml
+├── sgivu-gateway-dev.yml
+├── sgivu-gateway-prod.yml
+├── sgivu-auth.yml
+├── sgivu-user.yml
+├── sgivu-vehicle.yml
+├── sgivu-client.yml
+└── sgivu-purchase-sale.yml
+```
+
+#### Descubrimiento de Servicios (sgivu-discovery)
+
+**Puerto**: 8761 | **Tecnología**: Netflix Eureka Server
+
+Proporciona registro y descubrimiento de servicios:
+
+- **Verificaciones de Salud**: Heartbeats periódicos desde los servicios registrados
+- **Balanceo de Carga**: Balanceo de carga del lado del cliente vía `LoadBalancerClient`
+- **Resolución de Servicios**: Servicios referenciados por URIs `lb://nombre-servicio`
+- **Dashboard**: Interfaz web en `http://localhost:8761` para monitoreo
+
+**Ejemplo de Configuración del Cliente:**
+```yaml
+eureka:
+  client:
+    service-url:
+      defaultZone: http://sgivu-discovery:8761/eureka/
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${random.value}
+```
+
+### 4. Capa de Servicios de Negocio
+
+#### Servicio de Usuarios (sgivu-user)
+
+**Tecnología**: Spring Boot 4.0.1, Spring Data JPA, PostgreSQL
+
+**Responsabilidades:**
+- CRUD de usuarios con validación de fortaleza de contraseña
+- Gestión de roles y permisos
+- Gestión de entidades de persona
+- API interna para el Servidor de Autorización (`/internal/users/username/{username}`)
+
+**Esquema de Base de Datos:**
+- `users` — Credenciales y estado de usuarios
+- `persons` — Información personal
+- `roles` — Definiciones de roles
+- `permissions` — Permisos granulares
+- `users_roles`, `roles_permissions` — Relaciones muchos a muchos
+
+**Modelo de Permisos:**
+```
+user:create, user:read, user:update, user:delete
+person:create, person:read, person:update, person:delete
+role:create, role:read, role:update, role:delete
+permission:read
+```
+
+#### Servicio de Vehículos (sgivu-vehicle)
+
+**Tecnología**: Spring Boot 4.0.1, AWS SDK S3
+
+**Responsabilidades:**
+- Gestión del catálogo de vehículos (automóviles, motocicletas)
+- Búsqueda avanzada con múltiples criterios
+- Gestión de estados (disponible/no disponible)
+- Gestión de imágenes vía AWS S3 con URLs prefirmadas
+
+**Flujo de Integración con S3:**
+
+<Steps>
+  <Step title="Solicitar URL de Carga">
+    El cliente solicita una URL prefirmada al backend
+    ```bash
+    POST /v1/vehicles/{id}/images/upload-url
+    ```
+  </Step>
+  <Step title="Carga Directa a S3">
+    El cliente sube la imagen directamente a S3 usando la URL prefirmada
+  </Step>
+  <Step title="Confirmar Carga">
+    El cliente notifica al backend para registrar los metadatos de la imagen
+    ```bash
+    POST /v1/vehicles/{id}/images/confirm-upload
+    ```
+  </Step>
+</Steps>
+
+**Características de Gestión de Imágenes:**
+- Formatos soportados: JPEG, PNG, WebP
+- Designación de imagen principal
+- Configuración automática de CORS para orígenes permitidos
+- Seguimiento de metadatos en PostgreSQL
+
+#### Servicio de Clientes (sgivu-client)
+
+**Tecnología**: Spring Boot 4.0.1, Spring Data JPA
+
+**Responsabilidades:**
+- Gestión de clientes (personas y empresas)
+- Gestión de direcciones con datos geográficos
+- Búsqueda avanzada y filtrado
+- Contadores y estadísticas de clientes
+
+**Modelo de Entidades:**
+```
+clients (abstract)
+├── persons (individual clients)
+└── companies (corporate clients)
+    └── addresses
+```
+
+#### Servicio de Compraventa (sgivu-purchase-sale)
+
+**Tecnología**: Spring Boot 4.0.1, OpenPDF, Apache POI
+
+**Responsabilidades:**
+- Gestión del ciclo de vida de contratos
+- Transacciones de compra y venta
+- Seguimiento del estado de contratos
+- Generación de informes (PDF, Excel, CSV)
+- Integración con los servicios de Usuario, Cliente y Vehículo
+
+**Flujo de Contratos:**
+1. Creación del contrato con referencias a cliente, usuario y vehículo
+2. Transiciones de estado (borrador → activo → completado/cancelado)
+3. Generación de documentos
+4. Informes y analíticas
+
+### 5. Capa de Aprendizaje Automático
+
+#### Servicio ML (sgivu-ml)
+
+**Puerto**: 8000 | **Tecnología**: FastAPI, scikit-learn, Python 3.12
+
+**Responsabilidades:**
+- Pronóstico y predicción de demanda
+- Entrenamiento y reentrenamiento de modelos
+- Ingeniería de características
+- Versionado y persistencia de modelos
+
+**Endpoints de la API:**
+
+| Endpoint | Método | Descripción |
+|----------|--------|-------------|
+| `/v1/ml/predict` | POST | Solicitar predicción con características |
+| `/v1/ml/predict-with-history` | POST | Predicción con datos históricos para visualización |
+| `/v1/ml/retrain` | POST | Ejecutar reentrenamiento del modelo |
+| `/v1/ml/models/latest` | GET | Obtener metadatos del último modelo |
+| `/health` | GET | Verificación de salud |
+
+**Persistencia de Modelos:**
+- Artefactos almacenados vía `joblib`
+- Almacenamiento opcional en PostgreSQL para versiones de modelos
+- Snapshots de características de entrenamiento
+- Registro de predicciones para monitoreo
+
+**Seguridad:**
+- Validación de JWT vía descubrimiento OIDC
+- Soporte de clave interna entre servicios (`X-Internal-Service-Key`)
+- Propagación de tokens desde el Gateway
+
+### 6. Capa de Datos
+
+#### Bases de Datos PostgreSQL
+
+Cada servicio tiene su propia base de datos siguiendo el patrón de **base de datos por servicio**:
+
+```
+sgivu_auth_db       — OAuth2 clients, authorizations, sessions
+sgivu_user_db       — Users, roles, permissions, persons
+sgivu_vehicle_db    — Vehicles, images metadata
+sgivu_client_db     — Clients (persons/companies), addresses
+sgivu_purchase_sale_db — Purchase/sale contracts
+sgivu_ml_db         — ML models, features, predictions
+```
+
+**Gestión de Migraciones:**
+- Flyway para migraciones de esquema versionadas
+- Migraciones en `src/main/resources/db/migration/V{version}__{description}.sql`
+- Datos semilla en `R__seed_data.sql` (repetible)
+
+#### Redis
+
+**Propósito**: Persistencia de sesiones HTTP para `sgivu-gateway`
+
+**Configuración:**
+```yaml
+spring:
+  session:
+    store-type: redis
+    redis:
+      namespace: spring:session:sgivu-gateway
+  data:
+    redis:
+      host: ${REDIS_HOST:sgivu-redis}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD}
+```
+
+**Cookie de Sesión:**
+- Nombre: `SESSION`
+- Atributos: `HttpOnly`, `SameSite=Lax`, `Path=/`
+- Permite escalado horizontal sin pérdida de sesiones
+
+<Info>
+Redis se usa **exclusivamente** para almacenamiento de sesiones, no para caché ni rate limiting.
+</Info>
+
+#### AWS S3
+
+**Propósito**: Almacenamiento de imágenes de vehículos
+
+**Características:**
+- URLs prefirmadas para carga/descarga directa del cliente
+- Configuración de CORS para orígenes permitidos
+- Políticas de bucket para acceso mínimo
+- Validación de tipo de imagen (JPEG, PNG, WebP)
+
+## Patrones de Comunicación
+
+### Comunicación Síncrona
+
+**APIs REST con Relay de Tokens OAuth2:**
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Gateway
+    participant Auth
+    participant Service
+    
+    Client->>Gateway: Request with session cookie
+    Gateway->>Gateway: Retrieve tokens from Redis session
+    Gateway->>Service: Forward request with Bearer token
+    Service->>Auth: Validate JWT (JWKS)
+    Service->>Gateway: Response
+    Gateway->>Client: Response
+```
+
+**Servicio a Servicio (Interno):**
+
+```mermaid
+sequenceDiagram
+    participant Auth
+    participant User Service
+    
+    Auth->>User Service: GET /internal/users/username/{username}
+    Note over Auth,User Service: Header: X-Internal-Service-Key
+    User Service->>User Service: Validate internal key
+    User Service->>Auth: User details
+```
+
+### Descubrimiento de Servicios
+
+Los servicios se comunican usando nombres lógicos resueltos vía Eureka:
+
+```java
+// Gateway route configuration
+uri: lb://sgivu-vehicle  // Resolved to http://<vehicle-instance-ip>:<port>
+```
+
+### Circuit Breaking
+
+Resilience4j proporciona patrones de circuit breaker en el Gateway:
+
+```yaml
+resilience4j:
+  circuitbreaker:
+    instances:
+      vehicleCircuitBreaker:
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        sliding-window-size: 10
+```
+
+## Observabilidad y Monitoreo
+
+### Trazado Distribuido
+
+**Integración con Zipkin:**
+
+- Propagación de Trace ID vía encabezado `X-Trace-Id`
+- Creación de spans a nivel de Gateway y servicios
+- Correlación de trazas a través de los límites de servicios
+- UI de Zipkin: `http://localhost:9411`
+
+### Verificaciones de Salud
+
+**Spring Boot Actuator:**
+
+```bash
+GET /actuator/health
+```
+
+**FastAPI (ML Service):**
+
+```bash
+GET /health
+GET /actuator/health
+```
+
+### Métricas
+
+Métricas de Micrometer expuestas para scraping de Prometheus:
+- Métricas de JVM (memoria, hilos, GC)
+- Métricas de requests HTTP (duración, códigos de estado)
+- Métricas de negocio personalizadas
+
+## Arquitectura de Despliegue
+
+### Desarrollo Local
+
+```bash
+cd infra/compose/sgivu-docker-compose
+docker compose -f docker-compose.dev.yml up -d
+```
+
+### Producción (AWS)
+
+<CardGroup cols={2}>
+  <Card title="Red" icon="network-wired">
+    - VPC con subredes privadas
+    - Application Load Balancer (público)
+    - NAT Gateway para tráfico saliente
+  </Card>
+  <Card title="Cómputo" icon="server">
+    - ECS Fargate / EKS para servicios
+    - Grupos de auto-escalado
+    - EC2 para Nginx (opcional)
+  </Card>
+  <Card title="Datos" icon="database">
+    - RDS PostgreSQL (Multi-AZ)
+    - ElastiCache Redis (modo clúster)
+    - S3 para assets estáticos e imágenes
+  </Card>
+  <Card title="Seguridad" icon="lock">
+    - Security groups (mínimo privilegio)
+    - Secrets Manager para credenciales
+    - WAF en ALB
+  </Card>
+</CardGroup>
+
+**Topología de Red:**
+
+```
+Internet
+   |
+  ALB (public subnets)
+   |
+   +-- Nginx (EC2)
+   |
+   +-- API Gateway (private subnets)
+   +-- Auth Server (private subnets)
+   |
+   +-- Business Services (private subnets)
+   |
+   +-- RDS (private subnets)
+   +-- ElastiCache (private subnets)
+```
+
+## Pipeline de Construcción
+
+<Note>
+Diagrama detallado del pipeline de construcción disponible en `docs/diagrams/img/02-build-pipeline.png`
+</Note>
+
+**Proceso de Construcción:**
+
+<Steps>
+  <Step title="Construcción Maven (Servicios Java)">
+    ```bash
+    ./mvnw clean package
+    ```
+  </Step>
+  <Step title="Construcción de Imagen Docker">
+    ```bash
+    ./build-image.bash
+    docker build -t stevenrq/{service}:v1 .
+    ```
+  </Step>
+  <Step title="Publicar en Registro">
+    ```bash
+    # Orchestrated build and push
+    cd infra/compose/sgivu-docker-compose
+    ./build-and-push-images.bash
+    ```
+  </Step>
+  <Step title="Desplegar">
+    Actualizar las definiciones de servicios en ECS/EKS con las nuevas etiquetas de imagen
+  </Step>
+</Steps>
+
+## Consideraciones de Seguridad
+
+### Flujo de Autenticación (Patrón BFF)
+
+<Note>
+Diagrama detallado del flujo BFF y refresh token: `docs/diagrams/img/03-bff-refresh-token-flow.png`
+</Note>
+
+**Authorization Code con PKCE:**
+
+1. El usuario inicia sesión desde la app Angular
+2. El Gateway redirige al Servidor de Autorización con el challenge PKCE
+3. El usuario se autentica
+4. El Servidor de Autorización emite tokens (acceso + refresh)
+5. El Gateway almacena los tokens en la sesión respaldada por Redis
+6. El Gateway emite una cookie de sesión al cliente
+7. El cliente incluye la cookie en las solicitudes subsiguientes
+8. El Gateway recupera los tokens de la sesión y los retransmite a los servicios
+
+**Renovación de Tokens:**
+
+El Gateway renueva automáticamente los tokens de acceso usando el refresh token cuando expiran.
+
+### Autenticación entre Servicios
+
+**Clave Interna de Servicio:**
+
+```bash
+X-Internal-Service-Key: {shared-secret}
+```
+
+<Warning>
+Nunca expongas la clave interna de servicio públicamente. Almácenala en variables de entorno o en un gestor de secretos.
+</Warning>
+
+### Protección de Datos
+
+- **Cifrado en tránsito**: HTTPS/TLS para toda la comunicación externa
+- **Cifrado en reposo**: Cifrado de RDS, cifrado del lado del servidor en S3
+- **Gestión de secretos**: AWS Secrets Manager o HashiCorp Vault
+- **Credenciales de base de datos**: Nunca en código ni en repositorios Git
+
+## Solución de Problemas
+
+### Problemas Comunes
+
+| Problema | Diagnóstico | Solución |
+|----------|-------------|----------|
+| Errores 401/403 | Fallo en validación de token | Verificar URL del issuer, endpoint JWKS, claims del token |
+| Servicio no registrado en Eureka | Config Server inalcanzable | Verificar `eureka.client.service-url.defaultZone` |
+| Pérdida de sesión tras reinicio | Redis no configurado | Verificar conexión a Redis y configuración de sesión |
+| Circuit breaker abierto | Servicio downstream fallando | Verificar salud del servicio, logs y rutas de fallback |
+| Configuración no carga | Config Server no disponible | Asegurar que `SPRING_CLOUD_CONFIG_URI` sea correcto |
+
+### Comandos de Verificación de Salud
+
+```bash
+# Gateway
+curl http://localhost:8080/actuator/health
+
+# Auth Server
+curl http://localhost:9000/actuator/health
+
+# User Service
+curl http://localhost:8081/actuator/health
+
+# Eureka Dashboard
+open http://localhost:8761
+
+# Config Server
+curl http://localhost:8888/actuator/health
+curl http://localhost:8888/sgivu-gateway/dev
+```
+
+## Validación de Versiones
+
+Asegura la consistencia entre las versiones de los servicios:
+
+```bash
+./scripts/check-readme-boot-version.sh
+```
+
+Esto valida que todos los archivos README referencien la versión correcta de Spring Boot.
+
+## Siguientes Pasos
+
+<CardGroup cols={2}>
+  <Card title="Funcionalidades" icon="stars" href="/features">
+    Explora la documentación detallada de funcionalidades
+  </Card>
+  <Card title="Referencia API" icon="code" href="/api/auth/oauth2">
+    Navega los endpoints y esquemas de las APIs
+  </Card>
+</CardGroup>

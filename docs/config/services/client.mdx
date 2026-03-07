@@ -1,0 +1,441 @@
+---
+title: Configuración del Servicio de Clientes
+description: Configuración del microservicio de gestión de clientes para la plataforma SGIVU
+---
+
+El Servicio de Clientes (`sgivu-client`) gestiona las cuentas, perfiles y operaciones de negocio relacionadas con los clientes en la plataforma SGIVU.
+
+## Descripción General del Servicio
+
+<CardGroup cols={2}>
+  <Card title="Puerto" icon="network-wired">
+    8082
+  </Card>
+  <Card title="Base de Datos" icon="database">
+    PostgreSQL
+  </Card>
+  <Card title="Migración" icon="code-branch">
+    Flyway
+  </Card>
+  <Card title="Rol" icon="users">
+    Gestión de Clientes
+  </Card>
+</CardGroup>
+
+## Características Principales
+
+- Gestión de cuentas de clientes
+- Perfiles e información de contacto de clientes
+- Integración con el Servicio de Compra-Venta
+- Migración de base de datos con Flyway
+- API RESTful con documentación OpenAPI
+- Autenticación interna entre servicios
+
+## Configuración Base
+
+### Configuración del Servidor
+
+```yaml
+server:
+  port: ${PORT:8082}
+```
+
+### Configuración de JPA
+
+```yaml
+spring:
+  jpa:
+    open-in-view: false
+```
+
+<Info>
+Deshabilitar open-in-view previene excepciones de carga diferida al forzar los límites de las transacciones.
+</Info>
+
+### Migración con Flyway
+
+```yaml
+spring:
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: ${FLYWAY_BASELINE_ON_MIGRATE:false}
+    baseline-version: 0
+    validate-on-migrate: true
+```
+
+<Accordion title="Configuración de Flyway">
+- **enabled: true**: Ejecuta las migraciones automáticamente al iniciar
+- **locations**: Ubicación donde se almacenan los scripts de migración
+- **baseline-on-migrate**: Gestiona bases de datos existentes sin historial de versiones
+- **baseline-version: 0**: Versión inicial para el baseline
+- **validate-on-migrate: true**: Garantiza la integridad de las migraciones
+</Accordion>
+
+## Configuración de Base de Datos
+
+<Tabs>
+  <Tab title="Desarrollo">
+    ```yaml
+    spring:
+      datasource:
+        url: jdbc:postgresql://${DEV_CLIENT_DB_HOST:host.docker.internal}:${DEV_CLIENT_DB_PORT:5432}/${DEV_CLIENT_DB_NAME}
+        username: ${DEV_CLIENT_DB_USERNAME}
+        password: ${DEV_CLIENT_DB_PASSWORD}
+        driver-class-name: org.postgresql.Driver
+      jpa:
+        hibernate:
+          ddl-auto: validate
+        show-sql: true
+        properties:
+          hibernate:
+            format_sql: true
+      flyway:
+        locations: classpath:db/migration
+        baseline-on-migrate: true
+        clean-disabled: true
+    ```
+    
+    **Características de Desarrollo:**
+    - Registro de SQL con formato para depuración
+    - Baseline on migrate para bases de datos existentes
+    - Clean deshabilitado (cambiado de false) por seguridad
+  </Tab>
+  <Tab title="Producción">
+    ```yaml
+    spring:
+      datasource:
+        url: jdbc:postgresql://${PROD_CLIENT_DB_HOST}:${PROD_CLIENT_DB_PORT}/${PROD_CLIENT_DB_NAME}
+        username: ${PROD_CLIENT_DB_USERNAME}
+        password: ${PROD_CLIENT_DB_PASSWORD}
+        driver-class-name: org.postgresql.Driver
+      jpa:
+        hibernate:
+          ddl-auto: validate
+      flyway:
+        clean-disabled: true
+        baseline-on-migrate: ${FLYWAY_BASELINE_ON_MIGRATE:false}
+    ```
+    
+    **Seguridad en Producción:**
+    - Sin registro de SQL para mejorar el rendimiento
+    - Clean deshabilitado para prevenir pérdida accidental de datos
+    - Migración baseline controlada
+  </Tab>
+</Tabs>
+
+<Warning>
+Tenga en cuenta que incluso en desarrollo, `clean-disabled: true` previene la eliminación accidental de la base de datos. Tenga precaución al modificar esta configuración.
+</Warning>
+
+## Integración de Servicios
+
+### Registro en Eureka
+
+```yaml
+eureka:
+  instance:
+    instance-id: ${spring.cloud.client.hostname}:${spring.application.name}:${random.value}
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://sgivu-discovery:8761/eureka}
+```
+
+<Note>
+El ID de instancia aleatorio permite ejecutar múltiples instancias para escalado horizontal.
+</Note>
+
+### Mapa de Descubrimiento de Servicios
+
+```yaml
+services:
+  map:
+    sgivu-auth:
+      name: sgivu-auth
+      url: ${SGIVU_AUTH_URL:http://sgivu-auth:9000}
+```
+
+El Servicio de Clientes se comunica con el Servicio de Autenticación para la validación de tokens.
+
+### Autenticación Interna entre Servicios
+
+```yaml
+service:
+  internal:
+    secret-key: "${SERVICE_INTERNAL_SECRET_KEY}"
+```
+
+<Info>
+Este secreto compartido autentica las solicitudes provenientes de otros microservicios, en particular del Servicio de Compra-Venta.
+</Info>
+
+## Observabilidad
+
+### Endpoints de Actuator
+
+<Tabs>
+  <Tab title="Desarrollo">
+    ```yaml
+    management:
+      endpoints:
+        web:
+          exposure:
+            include: "*"
+      endpoint:
+        health:
+          show-details: always
+    ```
+    
+    Todos los endpoints de Actuator expuestos para depuración completa.
+  </Tab>
+  <Tab title="Producción">
+    ```yaml
+    management:
+      endpoints:
+        web:
+          exposure:
+            include: health, info, prometheus
+      endpoint:
+        health:
+          show-details: never
+    ```
+    
+    Endpoints limitados con integración de Prometheus para monitoreo.
+  </Tab>
+</Tabs>
+
+### Trazabilidad Distribuida
+
+```yaml
+management:
+  tracing:
+    sampling:
+      probability: 0.1
+  zipkin:
+    tracing:
+      endpoint: http://sgivu-zipkin:9411/api/v2/spans
+```
+
+<Accordion title="Configuración de Trazabilidad">
+- **probability: 0.1**: Muestrea el 10% de las solicitudes
+- Reduce la sobrecarga manteniendo la visibilidad
+- Todos los servicios usan la misma tasa de muestreo
+- Las trazas abarcan los límites entre servicios
+</Accordion>
+
+### Logging
+
+```yaml
+logging:
+  level:
+    root: INFO
+```
+
+## Documentación de la API
+
+```yaml
+springdoc:
+  swagger-ui:
+    url: /docs/client/v3/api-docs
+    configUrl: /docs/client/v3/api-docs/swagger-config
+```
+
+Documentación de la API accesible a través del gateway:
+```
+http://localhost:8080/docs/client/v3/api-docs
+```
+
+<Tabs>
+  <Tab title="Producción">
+    ```yaml
+    openapi:
+      server:
+        url: ${OPENAPI_SERVER_URL}
+    ```
+    
+    Producción utiliza una URL personalizada para la documentación pública de la API.
+  </Tab>
+</Tabs>
+
+## Esquema de Base de Datos
+
+### Archivos de Migración
+
+```
+src/main/resources/db/migration/
+├── V1__create_clients_table.sql
+├── V2__add_contact_information.sql
+└── V3__add_client_preferences.sql
+```
+
+<Note>
+Todas las migraciones se ejecutan automáticamente al iniciar. Use `validate-on-migrate: true` para garantizar la integridad del esquema.
+</Note>
+
+### Validación del Esquema
+
+```yaml
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+```
+
+<Warning>
+Siempre use `validate` en producción. Nunca use `create`, `create-drop` ni `update`.
+</Warning>
+
+## Variables de Entorno Requeridas
+
+### Todos los Entornos
+
+| Variable | Descripción | Ejemplo |
+|----------|-------------|----------|
+| `SERVICE_INTERNAL_SECRET_KEY` | Secreto compartido para APIs internas | `your-secret-key` |
+
+### Desarrollo
+
+| Variable | Descripción | Predeterminado |
+|----------|-------------|----------|
+| `DEV_CLIENT_DB_HOST` | Host de la base de datos | `host.docker.internal` |
+| `DEV_CLIENT_DB_PORT` | Puerto de la base de datos | `5432` |
+| `DEV_CLIENT_DB_NAME` | Nombre de la base de datos | Requerido |
+| `DEV_CLIENT_DB_USERNAME` | Usuario de la base de datos | Requerido |
+| `DEV_CLIENT_DB_PASSWORD` | Contraseña de la base de datos | Requerido |
+
+### Producción
+
+| Variable | Descripción |
+|----------|-------------|
+| `PROD_CLIENT_DB_HOST` | Host de la base de datos |
+| `PROD_CLIENT_DB_PORT` | Puerto de la base de datos |
+| `PROD_CLIENT_DB_NAME` | Nombre de la base de datos |
+| `PROD_CLIENT_DB_USERNAME` | Usuario de la base de datos |
+| `PROD_CLIENT_DB_PASSWORD` | Contraseña de la base de datos |
+| `OPENAPI_SERVER_URL` | URL pública de documentación de la API |
+
+### Opcionales
+
+| Variable | Descripción | Predeterminado |
+|----------|-------------|----------|
+| `PORT` | Puerto del servicio | `8082` |
+| `EUREKA_URL` | URL del servidor Eureka | `http://sgivu-discovery:8761/eureka` |
+| `SGIVU_AUTH_URL` | URL del servicio de autenticación | `http://sgivu-auth:9000` |
+| `FLYWAY_BASELINE_ON_MIGRATE` | Baseline en BD existente | `false` |
+
+## Endpoints de la API
+
+Endpoints típicos del Servicio de Clientes (accesibles a través del gateway):
+
+```
+GET    /api/clients           - List clients
+GET    /api/clients/{id}      - Get client by ID
+POST   /api/clients           - Create client
+PUT    /api/clients/{id}      - Update client
+DELETE /api/clients/{id}      - Delete client
+GET    /api/clients/search    - Search clients
+```
+
+<Info>
+Todos los endpoints requieren autenticación a través del flujo OAuth2 del gateway.
+</Info>
+
+## Modelo de Datos del Cliente
+
+La entidad típica de un cliente incluye:
+
+- Información básica (nombre, identificación, CUIT/CUIL)
+- Datos de contacto (teléfono, correo electrónico, dirección)
+- Preferencias y configuraciones del cliente
+- Marcas de tiempo de creación/actualización
+- Estado de la cuenta
+
+## Integración con Otros Servicios
+
+### Servicio de Compra-Venta
+
+El Servicio de Compra-Venta consulta los datos de clientes:
+
+```yaml
+# In sgivu-purchase-sale.yml
+services:
+  map:
+    sgivu-client:
+      name: sgivu-client
+      url: ${SGIVU_CLIENT_URL:http://sgivu-client:8082}
+```
+
+### Servicio de Autenticación
+
+Valida los tokens JWT para la autorización de la API:
+
+```yaml
+services:
+  map:
+    sgivu-auth:
+      name: sgivu-auth
+      url: ${SGIVU_AUTH_URL:http://sgivu-auth:9000}
+```
+
+## Seguridad
+
+### OAuth2 Resource Server
+
+El servicio valida los tokens de acceso JWT emitidos por el Servicio de Autenticación.
+
+### Protección de APIs Internas
+
+Los endpoints internos requieren el secreto compartido:
+
+```yaml
+service:
+  internal:
+    secret-key: "${SERVICE_INTERNAL_SECRET_KEY}"
+```
+
+<Warning>
+Mantenga la clave secreta interna segura y rótela periódicamente.
+</Warning>
+
+## Ajuste de Rendimiento
+
+### Pool de Conexiones
+
+Configuración predeterminada de HikariCP:
+
+```yaml
+spring:
+  datasource:
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+```
+
+### Optimización de Consultas
+
+- Usar `@EntityGraph` para evitar consultas N+1
+- Indexar columnas consultadas frecuentemente
+- Usar DTOs de proyección para operaciones de lectura
+
+## Archivos de Configuración
+
+- `sgivu-client.yml` - Configuración base
+- `sgivu-client-dev.yml` - Sobrescrituras de desarrollo
+- `sgivu-client-prod.yml` - Sobrescrituras de producción
+
+## Servicios Relacionados
+
+<CardGroup cols={3}>
+  <Card title="Servicio de Autenticación" icon="shield-halved" href="/config/services/auth">
+    Validación de tokens
+  </Card>
+  <Card title="Compra-Venta" icon="handshake" href="/config/services/purchase-sale">
+    Consumidor de datos de clientes
+  </Card>
+  <Card title="Gateway" icon="door-open" href="/config/services/gateway">
+    Enrutamiento de API
+  </Card>
+</CardGroup>

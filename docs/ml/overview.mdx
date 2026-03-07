@@ -1,0 +1,340 @@
+---
+title: Visión General del Servicio ML
+description: Microservicio de Machine Learning para pronóstico de demanda vehicular en SGIVU
+---
+
+## Introducción
+
+El microservicio **sgivu-ml** proporciona capacidades de Machine Learning para la plataforma SGIVU, enfocándose en el pronóstico de demanda para segmentos del inventario vehicular. Expone APIs REST para predicciones, consultas de metadatos de modelos y operaciones de reentrenamiento.
+
+## Arquitectura
+
+El servicio ML sigue un patrón de arquitectura limpia con una clara separación de responsabilidades:
+
+- **Capa API** (`app/api/`): Routers de FastAPI y esquemas de request/response
+- **Capa de Aplicación** (`app/application/services/`): Orquestación de lógica de negocio
+- **Capa de Dominio** (`app/domain/`): Entidades centrales, puertos y excepciones
+- **Capa de Infraestructura** (`app/infrastructure/`): Implementaciones ML, base de datos, seguridad
+
+### Componentes Clave
+
+<CardGroup cols={2}>
+  <Card title="Servicio de Predicción" icon="brain">
+    Orquesta el pronóstico de demanda, gestiona la carga de modelos y administra el historial de características
+  </Card>
+  <Card title="Servicio de Entrenamiento" icon="graduation-cap">
+    Coordina el pipeline de entrenamiento de modelos desde la ingeniería de características hasta la persistencia del modelo
+  </Card>
+  <Card title="Ingeniería de Características" icon="gear">
+    Transforma transacciones brutas en características listas para ML con componentes de series temporales
+  </Card>
+  <Card title="Registro de Modelos" icon="database">
+    Gestiona el versionamiento de modelos, persistencia y almacenamiento de metadatos
+  </Card>
+</CardGroup>
+
+## Stack Tecnológico
+
+### Framework Principal
+- **Python 3.12**: Entorno de ejecución
+- **FastAPI**: Framework web moderno con documentación OpenAPI automática
+- **Uvicorn**: Servidor ASGI para despliegue en producción
+- **Pydantic v2**: Validación de datos y gestión de configuración
+
+### Machine Learning
+- **scikit-learn**: Algoritmos ML principales y pipelines de preprocesamiento
+- **XGBoost**: Gradient boosting para predicciones mejoradas
+- **pandas**: Manipulación de datos y procesamiento de series temporales
+- **numpy**: Cómputo numérico
+- **joblib**: Serialización de modelos
+
+### Datos y Seguridad
+- **SQLAlchemy 2.0**: ORM asíncrono para PostgreSQL
+- **asyncpg**: Driver asíncrono para PostgreSQL
+- **Authlib / PyJWT**: Validación de tokens JWT
+- **PostgreSQL**: Artefactos de modelos, características y logs de predicciones
+
+## Cómo Funciona
+
+### Flujo de Predicción
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API
+    participant PredictionService
+    participant ModelRegistry
+    participant FeatureRepo
+    
+    Client->>API: POST /v1/ml/predict
+    API->>PredictionService: predict(filters, horizon)
+    PredictionService->>ModelRegistry: load_latest()
+    ModelRegistry-->>PredictionService: model + metadata
+    PredictionService->>FeatureRepo: load_segment_history()
+    FeatureRepo-->>PredictionService: historical features
+    PredictionService->>PredictionService: forecast(horizon)
+    PredictionService-->>API: PredictionResult
+    API-->>Client: JSON response
+```
+
+### Flujo de Entrenamiento
+
+```mermaid
+sequenceDiagram
+    participant API
+    participant TrainingService
+    participant FeatureEngineering
+    participant ModelTrainer
+    participant ModelRegistry
+    
+    API->>TrainingService: train(raw_df)
+    TrainingService->>FeatureEngineering: build_feature_table()
+    FeatureEngineering-->>TrainingService: feature dataset
+    TrainingService->>ModelTrainer: train_and_evaluate()
+    ModelTrainer->>ModelTrainer: Compare LinearRegression, RandomForest, XGBoost
+    ModelTrainer-->>TrainingService: best pipeline + metrics
+    TrainingService->>ModelRegistry: save(pipeline, metadata)
+    ModelRegistry-->>TrainingService: ModelMetadata
+```
+
+## Funcionalidades
+
+### Pronóstico de Demanda
+- Predicciones multi-horizonte (1-24 meses)
+- Intervalos de confianza basados en la desviación estándar de residuos
+- Pronóstico a nivel de segmento (vehicle_type, brand, model, line)
+- Visualización de ventas históricas
+
+### Gestión de Modelos
+- Versionamiento automático de modelos con marcas de tiempo
+- Seguimiento de métricas de rendimiento (RMSE, MAE, MAPE, R²)
+- Comparación de modelos entre múltiples algoritmos
+- Persistencia de artefactos en PostgreSQL o sistema de archivos
+
+### Ingeniería de Características
+- Características de series temporales: lags (1, 3, 6 meses), medias móviles
+- Métricas de negocio: margen, rotación de inventario, días en inventario
+- Codificación temporal: representación cíclica del mes (sin/cos)
+- Normalización de categorías y canonicalización de marca/modelo
+
+### Seguridad
+- Validación de tokens JWT vía descubrimiento OIDC
+- Autenticación interna entre servicios con `X-Internal-Service-Key`
+- Control de acceso a endpoints basado en permisos
+- Autorización configurable por operación
+
+## Despliegue
+
+### Variables de Entorno
+
+Variables de configuración principales (consultar el código fuente para la lista completa):
+
+```bash
+# Application
+APP_NAME=sgivu-ml
+APP_VERSION=v1
+
+# Database
+DATABASE_URL=postgresql+asyncpg://user:pass@host/db
+DATABASE_AUTO_CREATE=true
+
+# Security
+SGIVU_AUTH_DISCOVERY_URL=https://auth.example.com/.well-known/openid-configuration
+INTERNAL_SERVICE_KEY=your-secret-key
+
+# ML Settings
+MODEL_DIR=./models
+TARGET_COLUMN=sales_count
+MIN_HISTORY_MONTHS=6
+```
+
+### Ejecutar el Servicio
+
+<CodeGroup>
+```bash Development
+# Install dependencies
+pip install -r requirements.txt
+
+# Run with auto-reload
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+```bash Docker
+# Build image
+./build-image.bash
+
+# Run container
+docker run --env-file .env -p 8000:8000 stevenrq/sgivu-ml:v1
+```
+
+```bash Production
+# Via gateway routing
+# /v1/ml/** → http://sgivu-ml:8000
+```
+</CodeGroup>
+
+## Documentación de la API
+
+La documentación interactiva de la API está disponible en:
+- **Swagger UI**: `http://localhost:8000/docs`
+- **ReDoc**: `http://localhost:8000/redoc`
+
+Consulta la [API de Predicción](/ml/prediction-api) para documentación detallada de los endpoints.
+
+## Pipeline de Datos
+
+### Requisitos de Datos de Entrada
+
+El servicio espera datos de transacciones con:
+- **Atributos del vehículo**: `vehicle_type`, `brand`, `model`, `line`
+- **Información del contrato**: `contract_type` (SALE/PURCHASE)
+- **Precios**: `sale_price`, `purchase_price`
+- **Marcas de tiempo**: `created_at`, `updated_at`
+- **ID del vehículo**: Para el seguimiento del ciclo de vida del inventario
+
+### Generación de Características
+
+A partir de las transacciones brutas, el sistema genera:
+
+1. **Agregaciones mensuales** por segmento
+2. **Métricas de negocio**: precios promedio, márgenes, rotación de inventario
+3. **Lags de series temporales**: ventas históricas de 1, 3 y 6 meses
+4. **Estadísticas móviles**: medias móviles de 3 y 6 meses
+5. **Características temporales**: mes, año, codificación cíclica
+
+Consulta el código fuente en `app/infrastructure/ml/feature_engineering.py:46-141` para detalles de implementación.
+
+## Entrenamiento de Modelos
+
+### Modelos Candidatos
+
+El entrenador evalúa tres algoritmos:
+
+<CodeGroup>
+```python Linear Regression
+LinearRegression()
+# Fast baseline model
+```
+
+```python Random Forest
+RandomForestRegressor(
+    n_estimators=300,
+    max_depth=15,
+    random_state=7
+)
+```
+
+```python XGBoost
+XGBRegressor(
+    n_estimators=500,
+    max_depth=6,
+    learning_rate=0.05,
+    subsample=0.9,
+    colsample_bytree=0.9,
+    objective="reg:squarederror",
+    random_state=7
+)
+```
+</CodeGroup>
+
+### Selección de Modelo
+
+El mejor modelo se selecciona en base al **RMSE** (Root Mean Squared Error) sobre el conjunto de prueba. Todas las métricas (RMSE, MAE, MAPE, R²) se registran para comparación.
+
+### División Train/Test
+
+- **División basada en tiempo**: 80% entrenamiento, 20% prueba
+- Respeta el orden temporal (sin fuga de datos)
+- Mínimo 6 meses de historial requerido (configurable)
+
+## Esquema de Base de Datos
+
+El servicio puede persistir datos en PostgreSQL:
+
+### Tablas
+
+| Tabla | Propósito |
+|-------|-----------|
+| `ml_model_artifacts` | Pipelines de modelos serializados y metadatos |
+| `ml_training_features` | Snapshots de características para reproducibilidad |
+| `ml_predictions` | Logs de requests/responses de predicciones |
+
+<Note>
+La persistencia en base de datos es opcional. El servicio puede operar en modo solo archivos usando `MODEL_DIR` para el almacenamiento de artefactos.
+</Note>
+
+## Observabilidad
+
+### Health Checks
+
+```bash
+curl http://localhost:8000/health
+# {"status": "ok", "version": "v1"}
+```
+
+### Logs
+
+El servicio utiliza el módulo estándar de logging de Python con mensajes estructurados:
+- Eventos de entrenamiento de modelos con versión y métricas
+- Requests de predicción y advertencias
+- Errores de carga y validación de datos
+
+### Métricas
+
+Las métricas de rendimiento del modelo se almacenan con cada versión:
+- **RMSE**: Error cuadrático medio (Root Mean Squared Error)
+- **MAE**: Error absoluto medio (Mean Absolute Error)
+- **MAPE**: Error porcentual absoluto medio (Mean Absolute Percentage Error)
+- **R²**: Coeficiente de determinación
+- **residual_std**: Desviación estándar de residuos (para intervalos de confianza)
+
+## Solución de Problemas
+
+<AccordionGroup>
+  <Accordion title="Error de modelo no disponible">
+    **Causa**: No existen artefactos de modelo entrenado en `MODEL_DIR` ni en la base de datos.
+    
+    **Solución**: Ejecuta el pipeline de entrenamiento o activa el reentrenamiento vía `/v1/ml/retrain`.
+  </Accordion>
+  
+  <Accordion title="Errores de conexión a la base de datos">
+    **Causa**: `DATABASE_URL` inválida o PostgreSQL no es alcanzable.
+    
+    **Solución**: Verifica las variables de entorno y la conectividad de red. Comprueba que PostgreSQL esté en ejecución y aceptando conexiones.
+  </Accordion>
+  
+  <Accordion title="401/403 en endpoints de predicción">
+    **Causa**: Token JWT inválido o falta el header `X-Internal-Service-Key`.
+    
+    **Solución**: Asegúrate de que los tokens sean emitidos por el issuer correcto e incluyan los scopes requeridos. Para llamadas internas, proporciona la clave de servicio compartida.
+  </Accordion>
+  
+  <Accordion title="Error de segmento no encontrado">
+    **Causa**: No existen datos históricos para la combinación de vehicle_type/brand/model/line solicitada.
+    
+    **Solución**: Verifica que el segmento exista en los datos de entrenamiento. Revisa posibles errores tipográficos en los atributos del vehículo. Reentrena con datos que incluyan este segmento.
+  </Accordion>
+  
+  <Accordion title="Predicciones inconsistentes">
+    **Causa**: Las características de entrada están fuera de distribución o hay problemas de calidad de datos.
+    
+    **Solución**: Revisa las reglas de preprocesamiento y normalización. Reentrena el modelo con datos recientes. Verifica anomalías en los patrones de ventas.
+  </Accordion>
+</AccordionGroup>
+
+## Próximos Pasos
+
+<CardGroup cols={2}>
+  <Card title="API de Predicción" icon="code" href="/ml/prediction-api">
+    Explora los endpoints de la API y los esquemas de request/response
+  </Card>
+  <Card title="Proceso de Entrenamiento" icon="flask" href="/ml/training">
+    Aprende sobre el entrenamiento de modelos y la ingeniería de características
+  </Card>
+  <Card title="Gestión de Modelos" icon="layer-group" href="/ml/model-management">
+    Comprende el versionamiento y el ciclo de vida de los modelos
+  </Card>
+  <Card title="Integración con el Gateway" icon="gateway" href="/services/gateway">
+    Conoce cómo el gateway enruta las solicitudes al servicio ML
+  </Card>
+</CardGroup>

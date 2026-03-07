@@ -1,0 +1,550 @@
+---
+title: Estructura YAML
+description: Buenas prácticas para organizar y estructurar archivos de configuración en el Repositorio de Configuración de SGIVU
+---
+
+## Descripción General
+
+Los archivos de configuración YAML bien estructurados son cruciales para la mantenibilidad y la reducción de errores. El repositorio de configuración de SGIVU sigue las convenciones de Spring Cloud Config para organizar la configuración a través de archivos base y sobrescrituras específicas por entorno.
+
+## Convención de Nombres de Archivos
+
+Spring Cloud Config utiliza un patrón de nombres específico para resolver la configuración:
+
+<CardGroup cols={2}>
+  <Card title="Configuración Base" icon="file">
+    `{application}.yml` - Configuración compartida entre todos los entornos
+    
+    Ejemplo: `sgivu-auth.yml`
+  </Card>
+  <Card title="Específica por Profile" icon="layer-group">
+    `{application}-{profile}.yml` - Sobrescrituras específicas por entorno
+    
+    Ejemplo: `sgivu-auth-dev.yml`, `sgivu-auth-prod.yml`
+  </Card>
+</CardGroup>
+
+### Ejemplo del Repositorio
+
+```text
+sgivu-config-repo/
+├── sgivu-auth.yml           # Config base del servicio auth
+├── sgivu-auth-dev.yml       # Sobrescrituras de desarrollo
+├── sgivu-auth-prod.yml      # Sobrescrituras de producción
+├── sgivu-gateway.yml        # Config base del gateway
+├── sgivu-gateway-dev.yml    # Sobrescrituras de desarrollo
+└── sgivu-gateway-prod.yml   # Sobrescrituras de producción
+```
+
+## Configuración Base vs Sobrescrituras por Profile
+
+### Qué Incluir en los Archivos Base
+
+Los archivos de configuración base (`{application}.yml`) deben contener:
+
+- **Configuraciones comunes** que aplican a todos los entornos
+- **Valores por defecto razonables** para desarrollo
+- **Definiciones de estructura** que muestren todas las claves de configuración disponibles
+- **Documentación** mediante comentarios
+
+#### Ejemplo: sgivu-auth.yml (Configuración Base)
+
+```yaml
+spring:
+  jpa:
+    open-in-view: false
+  session:
+    store-type: jdbc
+    jdbc:
+      initialize-schema: never
+      table-name: SPRING_SESSION
+      cleanup-cron: 0 */15 * * * *
+      flush-mode: on_save
+      save-mode: on_get_attribute
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: ${FLYWAY_BASELINE_ON_MIGRATE:false}
+    baseline-version: 0
+    validate-on-migrate: true
+
+eureka:
+  instance:
+    instance-id: ${spring.cloud.client.hostname}:${spring.application.name}:${random.value}
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://sgivu-discovery:8761/eureka}
+
+server:
+  port: ${PORT:9000}
+  forward-headers-strategy: framework
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+  endpoint:
+    health:
+      show-details: never
+  tracing:
+    sampling:
+      probability: 0.1
+
+logging:
+  level:
+    root: INFO
+```
+
+<Info>
+  Los archivos base establecen el "contrato": muestran qué opciones de configuración están disponibles y proveen valores por defecto razonables.
+</Info>
+
+### Qué Incluir en los Archivos por Profile
+
+Los archivos específicos por profile deben sobrescribir **únicamente** los valores que difieren de la base:
+
+- **URLs específicas del entorno** (hosts de base de datos, endpoints de servicios)
+- **Credenciales** y placeholders de secretos
+- **Niveles de logging** (detallado en dev, mínimo en prod)
+- **Configuraciones de seguridad** (relajadas en dev, estrictas en prod)
+- **Ajustes de rendimiento** (pools de conexiones, timeouts)
+
+#### Ejemplo: sgivu-auth-dev.yml (Sobrescrituras de Desarrollo)
+
+```yaml
+spring:
+  datasource:
+    url: jdbc:postgresql://${DEV_AUTH_DB_HOST:host.docker.internal}:${DEV_AUTH_DB_PORT:5432}/${DEV_AUTH_DB_NAME}
+    username: ${DEV_AUTH_DB_USERNAME}
+    password: ${DEV_AUTH_DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+  flyway:
+    baseline-on-migrate: true
+    clean-disabled: false
+  session:
+    timeout: 2h
+
+angular-client:
+  url: ${DEV_ANGULAR_APP_URL}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    health:
+      show-details: always
+```
+
+#### Ejemplo: sgivu-auth-prod.yml (Sobrescrituras de Producción)
+
+```yaml
+spring:
+  datasource:
+    url: jdbc:postgresql://${PROD_AUTH_DB_HOST:host.docker.internal}:${PROD_AUTH_DB_PORT:5432}/${PROD_AUTH_DB_NAME}
+    username: ${PROD_AUTH_DB_USERNAME}
+    password: ${PROD_AUTH_DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    clean-disabled: true
+    baseline-on-migrate: ${FLYWAY_BASELINE_ON_MIGRATE:false}
+  session:
+    timeout: 2h
+
+angular-client:
+  url: ${PROD_ANGULAR_APP_URL}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus
+
+openapi:
+  server:
+    url: ${OPENAPI_SERVER_URL}
+```
+
+<Tip>
+  Los archivos por profile deben ser concisos. Si un valor es el mismo en todos los entornos, pertenece al archivo base.
+</Tip>
+
+## Mantener la Configuración DRY
+
+### No Te Repitas
+
+Evita duplicar configuración entre archivos por profile:
+
+<Warning>
+  **Anti-patrón: Duplicar la configuración de Eureka en cada profile**
+  
+  ```yaml
+  # ❌ sgivu-auth-dev.yml
+  eureka:
+    instance:
+      instance-id: ${spring.cloud.client.hostname}:${spring.application.name}:${random.value}
+    client:
+      service-url:
+        defaultZone: ${EUREKA_URL:http://sgivu-discovery:8761/eureka}
+  
+  # ❌ sgivu-auth-prod.yml
+  eureka:
+    instance:
+      instance-id: ${spring.cloud.client.hostname}:${spring.application.name}:${random.value}
+    client:
+      service-url:
+        defaultZone: ${EUREKA_URL:http://sgivu-discovery:8761/eureka}
+  ```
+</Warning>
+
+**Mejor enfoque: Definir una sola vez en el archivo base**
+
+```yaml
+# ✅ sgivu-auth.yml (base)
+eureka:
+  instance:
+    instance-id: ${spring.cloud.client.hostname}:${spring.application.name}:${random.value}
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://sgivu-discovery:8761/eureka}
+```
+
+### Cuándo Sobrescribir vs Extender
+
+Spring Cloud Config **fusiona** las configuraciones, por lo que se puede:
+
+- **Sobrescribir** valores específicos manteniendo los demás del archivo base
+- **Agregar** nuevas claves que no existen en la base
+- **No es posible** fusionar listas parcialmente (las listas se reemplazan por completo)
+
+## Indentación y Formato
+
+### Reglas Estándar de YAML
+
+<Steps>
+  <Step title="Usar Espacios, No Tabulaciones">
+    YAML requiere espacios para la indentación. Usar **2 espacios** por nivel.
+    
+    ```yaml
+    spring:
+      datasource:  # 2 spaces
+        url: jdbc:postgresql://localhost:5432/db  # 4 spaces
+    ```
+  </Step>
+  
+  <Step title="Indentación Consistente">
+    Mantener el mismo nivel de indentación en todo el archivo
+    
+    ```yaml
+    # ✅ Good
+    spring:
+      jpa:
+        open-in-view: false
+      session:
+        store-type: jdbc
+    
+    # ❌ Bad - inconsistent indentation
+    spring:
+      jpa:
+         open-in-view: false
+      session:
+       store-type: jdbc
+    ```
+  </Step>
+  
+  <Step title="Entrecomillar Valores de Texto Cuando Sea Necesario">
+    Usar comillas para cadenas de texto con caracteres especiales o que puedan ser ambiguas
+    
+    ```yaml
+    service:
+      internal:
+        secret-key: "${SERVICE_INTERNAL_SECRET_KEY}"  # Quoted to preserve spaces
+    ```
+  </Step>
+</Steps>
+
+### Formato de Listas
+
+Para listas, usar la notación con guion de forma consistente:
+
+```yaml
+spring:
+  security:
+    oauth2:
+      client:
+        registration:
+          sgivu-gateway:
+            scope:
+              - openid
+              - profile
+              - email
+              - phone
+              - address
+              - offline_access
+              - api
+              - read
+              - write
+```
+
+## Comentarios y Documentación
+
+### Cuándo Agregar Comentarios
+
+Agregar comentarios para:
+
+- **Decisiones de configuración no obvias**
+- **Configuraciones críticas de seguridad**
+- **Parámetros de ajuste de rendimiento**
+- **Comportamiento específico del entorno**
+
+#### Ejemplo: Configuración de Logging Documentada
+
+De `sgivu-gateway-dev.yml`:
+
+```yaml
+# Niveles de log para depuración del flujo de autenticación/autorización en desarrollo.
+# - security: trazabilidad de cadenas de filtros, authorization decisions, login/logout
+# - gateway.security / gateway.controller: logs detallados de token relay, sesión, revocación
+# - oauth2.client: interacciones con el auth server (token requests, refreshes)
+# - session: operaciones de Redis session (creación, acceso, expiración)
+logging:
+  level:
+    com.sgivu.gateway.security: DEBUG
+    com.sgivu.gateway.controller: DEBUG
+    com.sgivu.gateway.config: DEBUG
+    org.springframework.security.oauth2.client: DEBUG
+    org.springframework.security.web.server.authentication: DEBUG
+    org.springframework.session.web.server: DEBUG
+```
+
+<Tip>
+  Los buenos comentarios explican el **por qué** de una configuración, no solo el **qué**. La estructura YAML ya muestra el "qué".
+</Tip>
+
+## Uso de yamllint
+
+El README del repositorio recomienda validar los archivos YAML con `yamllint` antes de hacer merge:
+
+### Instalación
+
+```bash
+# Using pip
+pip install yamllint
+
+# Using apt (Ubuntu/Debian)
+sudo apt-get install yamllint
+
+# Using brew (macOS)
+brew install yamllint
+```
+
+### Uso Básico
+
+```bash
+# Lint a single file
+yamllint sgivu-auth.yml
+
+# Lint all YAML files
+yamllint *.yml
+
+# Lint with specific rules
+yamllint -d "{extends: default, rules: {line-length: {max: 120}}}" *.yml
+```
+
+### Problemas Comunes que yamllint Detecta
+
+<CardGroup cols={2}>
+  <Card title="Errores de Indentación" icon="indent">
+    Espaciado inconsistente o uso de tabulaciones
+  </Card>
+  <Card title="Espacios en Blanco al Final" icon="space-bar">
+    Espacios al final de las líneas
+  </Card>
+  <Card title="Longitud de Línea" icon="ruler-horizontal">
+    Líneas que exceden el ancho recomendado
+  </Card>
+  <Card title="Errores de Sintaxis" icon="triangle-exclamation">
+    Estructura YAML inválida
+  </Card>
+</CardGroup>
+
+### Hook de Pre-commit
+
+Considerar agregar un hook de pre-commit para validar YAML automáticamente:
+
+```bash
+#!/bin/bash
+# .git/hooks/pre-commit
+
+echo "Running yamllint..."
+yamllint *.yml
+
+if [ $? -ne 0 ]; then
+  echo "❌ YAML validation failed. Please fix errors before committing."
+  exit 1
+fi
+
+echo "✅ YAML validation passed"
+```
+
+## Patrones de Organización de Configuración
+
+### Agrupar Configuraciones Relacionadas
+
+Organizar la configuración de forma jerárquica:
+
+```yaml
+# ✅ Good - grouped by concern
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/db
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+
+# ❌ Avoid - scattered configuration
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/db
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+```
+
+### Orden Alfabético
+
+Para las claves de nivel superior, considerar el orden alfabético para mantener la consistencia:
+
+```yaml
+eureka:
+  # ...
+
+logging:
+  # ...
+
+management:
+  # ...
+
+server:
+  # ...
+
+spring:
+  # ...
+
+springdoc:
+  # ...
+```
+
+## Ejemplos de YAML Bien Estructurado
+
+### Configuración Mínima de un Servicio
+
+El archivo `sgivu-discovery.yml` muestra una configuración limpia y mínima:
+
+```yaml
+server:
+  port: 8761
+
+eureka:
+  instance:
+    hostname: host.docker.internal
+  client:
+    registerWithEureka: false
+    fetchRegistry: false
+    serviceUrl:
+      defaultZone: http://${eureka.instance.hostname}:${server.port}/eureka/
+```
+
+<Info>
+  Los servicios simples como Eureka Discovery no necesitan configuraciones complejas. Mantener la simplicidad cuando sea posible.
+</Info>
+
+### Configuración Compleja de un Servicio
+
+El archivo `sgivu-gateway.yml` demuestra cómo organizar una configuración compleja de OAuth2 + Redis + Eureka:
+
+```yaml
+spring:
+  session:
+    store-type: redis
+    timeout: 1h
+    redis:
+      namespace: spring:session:sgivu-gateway
+  data:
+    redis:
+      host: ${REDIS_HOST:sgivu-redis}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD}
+  security:
+    oauth2:
+      client:
+        registration:
+          sgivu-gateway:
+            provider: sgivu-auth
+            client-id: sgivu-gateway
+            client-secret: ${SGIVU_GATEWAY_SECRET}
+            # ... more OAuth2 config
+
+eureka:
+  instance:
+    instance-id: ${spring.cloud.client.hostname}:${spring.application.name}:${random.value}
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://sgivu-discovery:8761/eureka}
+
+server:
+  port: ${PORT:8080}
+  forward-headers-strategy: framework
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+```
+
+<Tip>
+  Incluso las configuraciones complejas se mantienen legibles cuando están correctamente indentadas y agrupadas por área funcional.
+</Tip>
+
+## Lista de Verificación de Estructura
+
+Antes de hacer commit de archivos YAML:
+
+- [ ] El archivo base contiene las configuraciones comunes
+- [ ] Los archivos por profile solo sobrescriben los valores necesarios
+- [ ] La indentación es consistente (2 espacios por nivel)
+- [ ] No hay configuración duplicada entre archivos
+- [ ] Las configuraciones relacionadas están agrupadas
+- [ ] Los comentarios explican las decisiones no obvias
+- [ ] Todos los archivos pasan la validación de `yamllint`
+- [ ] Los valores secretos usan placeholders `${VAR_NAME}`
+- [ ] Las listas usan la notación con guion de forma consistente
+- [ ] Los valores de texto están entrecomillados cuando es necesario
+
+## Resumen de Buenas Prácticas
+
+1. **Separar responsabilidades** - Archivos base para configuración común, profiles para sobrescrituras
+2. **Mantener DRY** - No duplicar configuración entre archivos
+3. **Formato consistente** - 2 espacios, sin tabulaciones, validar con yamllint
+4. **Documentar con criterio** - Explicar el "por qué", no solo el "qué"
+5. **Agrupar lógicamente** - Organizar las configuraciones por área funcional
+6. **Mantener la simplicidad** - Solo sobrescribir lo que necesita cambiar por entorno
+7. **Validar antes de hacer commit** - Usar yamllint para detectar errores tempranamente
+8. **Usar placeholders** - Externalizar todos los valores específicos del entorno

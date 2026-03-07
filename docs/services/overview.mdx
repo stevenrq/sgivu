@@ -1,0 +1,201 @@
+---
+title: Visión General de los Servicios
+description: Visión completa de la arquitectura de microservicios de SGIVU
+---
+
+SGIVU está construido sobre una arquitectura de microservicios con Spring Cloud y sigue los estándares OAuth2/OpenID Connect para la seguridad. La plataforma se compone de servicios de infraestructura y servicios de dominio de negocio.
+
+## Componentes de la Arquitectura
+
+### Servicios de Infraestructura
+
+<CardGroup cols={2}>
+  <Card title="Config Server" icon="gear" href="/services/config">
+    Gestión centralizada de configuración usando Spring Cloud Config Server
+  </Card>
+  <Card title="Discovery Server" icon="compass" href="/services/discovery">
+    Registro y descubrimiento de servicios usando Netflix Eureka
+  </Card>
+  <Card title="API Gateway" icon="shield" href="/services/gateway">
+    Backend-for-Frontend y enrutamiento con Spring Cloud Gateway
+  </Card>
+  <Card title="Servidor de Autorización" icon="lock" href="/services/auth">
+    Autenticación OAuth2/OIDC usando Spring Authorization Server
+  </Card>
+</CardGroup>
+
+### Servicios de Negocio
+
+<CardGroup cols={2}>
+  <Card title="Servicio de Usuarios" icon="users" href="/services/user">
+    Gestión de usuarios, roles y permisos
+  </Card>
+  <Card title="Servicio de Clientes" icon="address-book" href="/services/client">
+    Gestión de clientes (personas y empresas)
+  </Card>
+  <Card title="Servicio de Vehículos" icon="car" href="/services/vehicle">
+    Catálogo de vehículos y gestión de imágenes con S3
+  </Card>
+  <Card title="Servicio de Compraventa" icon="file-contract" href="/services/purchase-sale">
+    Gestión de contratos y generación de reportes
+  </Card>
+</CardGroup>
+
+## Stack Tecnológico
+
+### Tecnologías Principales
+
+- **Java**: 21
+- **Spring Boot**: 3.5.8 (gateway, config, discovery) / 4.0.1 (servicios de negocio, auth)
+- **Spring Cloud**: 2025.x
+- **Base de datos**: PostgreSQL con migraciones Flyway
+- **Seguridad**: Spring Security con OAuth2/JWT
+
+### Dependencias Clave
+
+| Servicio | Puerto | Base de datos | Dependencias Especiales |
+|---------|------|----------|---------------------|
+| sgivu-config | 8888 | - | Spring Cloud Config Server |
+| sgivu-discovery | 8761 | - | Netflix Eureka Server |
+| sgivu-gateway | 8080 | Redis (sesiones) | Spring Cloud Gateway, Resilience4j |
+| sgivu-auth | 9000 | PostgreSQL | Spring Authorization Server, Spring Session JDBC |
+| sgivu-user | - | PostgreSQL | MapStruct, SpringDoc OpenAPI |
+| sgivu-client | 8082 | PostgreSQL | MapStruct, SpringDoc OpenAPI |
+| sgivu-vehicle | - | PostgreSQL | AWS SDK S3, MapStruct |
+| sgivu-purchase-sale | - | PostgreSQL | OpenPDF, Apache POI |
+
+## Comunicación entre Servicios
+
+### Flujo de Solicitudes
+
+1. **Solicitud del cliente** → API Gateway (puerto 8080)
+2. **Gateway** → Valida el JWT o inicia el flujo OAuth2 con el Auth Server
+3. **Gateway** → Enruta al servicio de negocio mediante descubrimiento Eureka
+4. **Servicio de negocio** → Valida el JWT y procesa la solicitud
+
+### Flujo de Autenticación
+
+1. El usuario se autentica vía `/oauth2/authorize` (flujo PKCE)
+2. El Auth Server valida las credenciales contra el servicio de usuarios
+3. El Auth Server emite un JWT firmado con el keystore
+4. El Gateway valida el JWT y agrega el header `X-User-ID`
+5. Los servicios de negocio validan el JWT usando el endpoint JWKS
+
+### Comunicación Interna
+
+- Los servicios usan el header `X-Internal-Service-Key` para autenticación entre servicios
+- El Gateway aplica `tokenRelay()` para reenviar tokens de usuario a los servicios downstream
+- Todos los servicios se registran en Eureka para el descubrimiento de servicios
+
+## Observabilidad
+
+### Trazabilidad
+
+- **Zipkin**: Endpoint de trazabilidad distribuida en `http://sgivu-zipkin:9411/api/v2/spans`
+- **Headers de traza**: `X-Trace-Id` agregado por el filtro global del Gateway
+- **Micrometer**: Integrado en todos los servicios para métricas
+
+### Monitoreo de Salud
+
+- Todos los servicios exponen endpoints `/actuator/health`
+- Endpoints adicionales de Actuator configurables por entorno
+
+### Documentación de la API
+
+- Los servicios de negocio exponen Swagger UI en `/swagger-ui/index.html`
+- El Gateway hace proxy de la documentación vía `/docs/<service>/...`
+
+## Configuración de Desarrollo
+
+### Requisitos Previos
+
+- JDK 21
+- Maven 3.9+
+- Docker & docker-compose
+- PostgreSQL
+- Redis (para sesiones del Gateway)
+
+### Inicio Rápido
+
+Desde `infra/compose/sgivu-docker-compose`:
+
+```bash
+docker compose -f docker-compose.dev.yml up -d
+```
+
+Esto inicia todos los servicios de infraestructura y de negocio con:
+- Config Server en modo `native`
+- Bases de datos PostgreSQL para cada servicio
+- Redis para sesiones del Gateway
+- Zipkin para trazabilidad
+
+### Compilar un Servicio Individual
+
+```bash
+cd apps/backend/<service-name>
+./mvnw clean package
+./mvnw spring-boot:run
+```
+
+## Despliegue en Producción
+
+### Configuración
+
+- El Config Server usa modo Git apuntando a `https://github.com/stevenrq/sgivu-config-repo.git`
+- Las variables de entorno sobrescriben la configuración por defecto
+- Los secretos se gestionan mediante variables de entorno (no en el repositorio de configuración)
+
+### Consideraciones de Seguridad
+
+- El keystore JWT (`keystore.jks`) debe proporcionarse mediante un gestor de secretos
+- Los secretos de clientes OAuth2 deben rotarse periódicamente
+- Las claves internas de servicios (`X-Internal-Service-Key`) deben estar protegidas
+- Las credenciales AWS para S3 deben usar roles IAM en producción
+- Las credenciales de base de datos se gestionan mediante variables de entorno
+
+### Enrutamiento Nginx
+
+En producción, Nginx enruta:
+- `/oauth2/*`, `/login`, `/.well-known/*` → sgivu-auth (puerto 9000)
+- El resto de solicitudes → sgivu-gateway (puerto 8080)
+
+## Solución de Problemas Comunes
+
+<AccordionGroup>
+  <Accordion title="Los servicios no aparecen en Eureka">
+    Verificar que `eureka.client.service-url.defaultZone` apunte a `http://sgivu-discovery:8761/eureka/`
+  </Accordion>
+  
+  <Accordion title="Errores 401/403 en llamadas a la API">
+    - Verificar que el Bearer token sea válido con el audience e issuer correctos
+    - Comprobar que el usuario tenga los permisos requeridos en los claims del JWT
+    - Asegurarse de que sgivu-auth esté operativo
+  </Accordion>
+  
+  <Accordion title="Discrepancia en el issuer del JWT">
+    Verificar que `ISSUER_URL` coincida con la URL real utilizada por los clientes (revisar la configuración de Nginx)
+  </Accordion>
+  
+  <Accordion title="La configuración no se carga">
+    - Asegurarse de que sgivu-config sea accesible
+    - Verificar que `spring.application.name` coincida con los nombres de los archivos de configuración
+    - Revisar los logs del Config Server por problemas de acceso a Git
+  </Accordion>
+</AccordionGroup>
+
+## Próximos Pasos
+
+<CardGroup cols={2}>
+  <Card title="Autenticación" icon="key" href="/services/auth">
+    Conoce la implementación de OAuth2/OIDC
+  </Card>
+  <Card title="API Gateway" icon="route" href="/services/gateway">
+    Comprende el enrutamiento y los filtros de seguridad
+  </Card>
+  <Card title="Gestión de Usuarios" icon="user-gear" href="/services/user">
+    Explora las APIs de usuarios, roles y permisos
+  </Card>
+  <Card title="Catálogo de Vehículos" icon="warehouse" href="/services/vehicle">
+    Gestiona vehículos e imágenes con S3
+  </Card>
+</CardGroup>

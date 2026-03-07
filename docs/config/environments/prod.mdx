@@ -1,0 +1,629 @@
+---
+title: 'Entorno de Producción'
+description: 'Configuraciones listas para producción y mejores prácticas de seguridad'
+icon: 'server'
+---
+
+## Propósito
+
+El entorno de **producción (prod)** está optimizado para:
+
+- Alta disponibilidad y fiabilidad
+- Seguridad y protección de datos
+- Rendimiento y eficiencia de recursos
+- Exposición mínima de endpoints
+- Auditoría y monitoreo
+
+<Warning>
+Las configuraciones de producción priorizan seguridad, estabilidad y rendimiento. Nunca utilice configuraciones de desarrollo en producción.
+</Warning>
+
+## Configuraciones Específicas de Producción
+
+### Endurecimiento de Seguridad
+
+Todos los perfiles prod minimizan la información y los endpoints expuestos:
+
+```yaml
+# Common across all *-prod.yml files
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate          # Only validate, never modify schema
+    show-sql: false               # Don't log SQL queries (performance)
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus  # Limited endpoints only
+  endpoint:
+    health:
+      show-details: never         # Hide internal health details
+```
+
+### Protección de Base de Datos
+
+La configuración de Flyway en producción previene la pérdida accidental de datos:
+
+```yaml
+spring:
+  flyway:
+    clean-disabled: true          # Prevent database wipes
+    baseline-on-migrate: ${FLYWAY_BASELINE_ON_MIGRATE:false}
+    validate-on-migrate: true     # Ensure migrations are valid
+```
+
+<Note>
+`clean-disabled: true` es una característica de seguridad crítica que previene que Flyway elimine objetos de la base de datos.
+</Note>
+
+### Configuración de Logging
+
+Producción utiliza logging a nivel INFO para un rendimiento óptimo:
+
+```yaml
+logging:
+  level:
+    root: INFO                    # Production logging level
+    com.sgivu: INFO               # Application-specific logging
+```
+
+## Configuración de Base de Datos para Prod
+
+### Variables de Entorno Requeridas
+
+A diferencia de dev, las variables de base de datos en producción **no tienen valores por defecto** para forzar una configuración explícita:
+
+```yaml
+# All *-prod.yml database configurations
+spring:
+  datasource:
+    url: jdbc:postgresql://${PROD_*_DB_HOST}:${PROD_*_DB_PORT}/${PROD_*_DB_NAME}
+    username: ${PROD_*_DB_USERNAME}
+    password: ${PROD_*_DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+```
+
+<Warning>
+La ausencia de variables de base de datos en producción causará un fallo al iniciar. Esto es intencional para prevenir configuraciones incorrectas.
+</Warning>
+
+### Base de Datos del Servicio Auth
+
+```yaml
+# sgivu-auth-prod.yml
+spring:
+  datasource:
+    url: jdbc:postgresql://${PROD_AUTH_DB_HOST:host.docker.internal}:${PROD_AUTH_DB_PORT:5432}/${PROD_AUTH_DB_NAME}
+    username: ${PROD_AUTH_DB_USERNAME}
+    password: ${PROD_AUTH_DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    clean-disabled: true
+    baseline-on-migrate: ${FLYWAY_BASELINE_ON_MIGRATE:false}
+  session:
+    timeout: 2h
+
+angular-client:
+  url: ${PROD_ANGULAR_APP_URL}
+```
+
+**Variables requeridas:**
+- `PROD_AUTH_DB_HOST` (por defecto: `host.docker.internal`)
+- `PROD_AUTH_DB_PORT` (por defecto: `5432`)
+- `PROD_AUTH_DB_NAME`
+- `PROD_AUTH_DB_USERNAME`
+- `PROD_AUTH_DB_PASSWORD`
+- `PROD_ANGULAR_APP_URL`
+
+### Base de Datos del Servicio User
+
+```yaml
+# sgivu-user-prod.yml
+spring:
+  datasource:
+    url: jdbc:postgresql://${PROD_USER_DB_HOST}:${PROD_USER_DB_PORT}/${PROD_USER_DB_NAME}
+    username: ${PROD_USER_DB_USERNAME}
+    password: ${PROD_USER_DB_PASSWORD}
+  flyway:
+    clean-disabled: true
+    baseline-on-migrate: ${FLYWAY_BASELINE_ON_MIGRATE:false}
+```
+
+<Info>
+Note que la configuración prod del servicio de usuarios **no** incluye la ubicación `classpath:db/seed`, lo que previene la carga de datos de prueba.
+</Info>
+
+### Base de Datos del Servicio Client
+
+```yaml
+# sgivu-client-prod.yml
+spring:
+  datasource:
+    url: jdbc:postgresql://${PROD_CLIENT_DB_HOST}:${PROD_CLIENT_DB_PORT}/${PROD_CLIENT_DB_NAME}
+    username: ${PROD_CLIENT_DB_USERNAME}
+    password: ${PROD_CLIENT_DB_PASSWORD}
+```
+
+### Base de Datos del Servicio Vehicle
+
+```yaml
+# sgivu-vehicle-prod.yml
+spring:
+  datasource:
+    url: jdbc:postgresql://${PROD_VEHICLE_DB_HOST}:${PROD_VEHICLE_DB_PORT}/${PROD_VEHICLE_DB_NAME}
+    username: ${PROD_VEHICLE_DB_USERNAME}
+    password: ${PROD_VEHICLE_DB_PASSWORD}
+```
+
+### Base de Datos del Servicio Purchase Sale
+
+```yaml
+# sgivu-purchase-sale-prod.yml
+spring:
+  datasource:
+    url: jdbc:postgresql://${PROD_PURCHASE_SALE_DB_HOST}:${PROD_PURCHASE_SALE_DB_PORT}/${PROD_PURCHASE_SALE_DB_NAME}
+    username: ${PROD_PURCHASE_SALE_DB_USERNAME}
+    password: ${PROD_PURCHASE_SALE_DB_PASSWORD}
+```
+
+## URLs de Servicios en el Entorno Prod
+
+### URL del Cliente Angular
+
+Los servicios de producción utilizan la URL de la aplicación Angular de producción:
+
+```yaml
+angular-client:
+  url: ${PROD_ANGULAR_APP_URL}
+```
+
+**Valor de ejemplo:**
+```bash
+PROD_ANGULAR_APP_URL=https://app.sgivu.com
+```
+
+### URL del Servidor OpenAPI
+
+Los servicios de producción especifican la URL del servidor de documentación OpenAPI:
+
+```yaml
+openapi:
+  server:
+    url: ${OPENAPI_SERVER_URL}
+```
+
+**Valor de ejemplo:**
+```bash
+OPENAPI_SERVER_URL=https://api.sgivu.com
+```
+
+<Note>
+Esto configura la función "Try it out" en Swagger UI para utilizar la URL base de la API de producción.
+</Note>
+
+## Consideraciones de Seguridad para Prod
+
+### 1. Gestión de Secretos
+
+<Warning>
+**Nunca versione secretos de producción en el repositorio de configuración.** Utilice gestión externa de secretos.
+</Warning>
+
+**Enfoques recomendados:**
+
+<Tabs>
+  <Tab title="Kubernetes Secrets">
+    ```yaml
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: sgivu-auth-secrets
+    type: Opaque
+    data:
+      PROD_AUTH_DB_PASSWORD: <base64-encoded>
+      SGIVU_GATEWAY_SECRET: <base64-encoded>
+      SERVICE_INTERNAL_SECRET_KEY: <base64-encoded>
+    ```
+    
+    Referencia en el despliegue:
+    ```yaml
+    envFrom:
+    - secretRef:
+        name: sgivu-auth-secrets
+    ```
+  </Tab>
+  
+  <Tab title="HashiCorp Vault">
+    ```bash
+    # Store secrets in Vault
+    vault kv put secret/sgivu/auth \
+      PROD_AUTH_DB_PASSWORD="secure-password" \
+      SGIVU_GATEWAY_SECRET="gateway-secret"
+    
+    # Retrieve in application
+    spring:
+      cloud:
+        vault:
+          token: ${VAULT_TOKEN}
+          scheme: https
+          host: vault.example.com
+    ```
+  </Tab>
+  
+  <Tab title="AWS Secrets Manager">
+    ```bash
+    # Store secrets
+    aws secretsmanager create-secret \
+      --name sgivu/auth/db-password \
+      --secret-string "secure-password"
+    
+    # Retrieve using Spring Cloud AWS
+    spring:
+      cloud:
+        aws:
+          secretsmanager:
+            enabled: true
+            region: us-east-1
+    ```
+  </Tab>
+</Tabs>
+
+### 2. Seguridad de Conexión a Base de Datos
+
+**Utilice SSL para las conexiones a base de datos:**
+
+```yaml
+spring:
+  datasource:
+    url: jdbc:postgresql://${PROD_AUTH_DB_HOST}:${PROD_AUTH_DB_PORT}/${PROD_AUTH_DB_NAME}?ssl=true&sslmode=require
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+```
+
+**Seguridad de red:**
+- La base de datos solo debe ser accesible desde la red de la aplicación
+- Utilice aislamiento por VPC/subred
+- Habilite reglas de firewall en la base de datos
+- Utilice contraseñas fuertes (mínimo 32 caracteres, aleatorias)
+
+### 3. Seguridad de Sesiones Redis
+
+El gateway utiliza Redis para la gestión de sesiones. Asegúrelo adecuadamente:
+
+```yaml
+# sgivu-gateway.yml (base configuration)
+spring:
+  data:
+    redis:
+      host: ${REDIS_HOST:sgivu-redis}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD}
+      ssl: true                    # Enable for production
+      timeout: 2000ms
+```
+
+**Lista de verificación de Redis en producción:**
+- Habilitar autenticación por contraseña
+- Utilizar conexiones SSL/TLS
+- Deshabilitar comandos peligrosos (FLUSHALL, CONFIG)
+- Configurar límites de memoria y políticas de evicción
+- Habilitar persistencia para recuperación de sesiones
+
+### 4. Seguridad del Keystore JWT
+
+El servicio auth utiliza un keystore para la firma de JWT:
+
+```yaml
+sgivu:
+  jwt:
+    keystore:
+      location: ${JWT_KEYSTORE_LOCATION}  # file:/path/to/keystore.jks
+      password: ${JWT_KEYSTORE_PASSWORD}
+    key:
+      alias: ${JWT_KEY_ALIAS}
+      password: ${JWT_KEY_PASSWORD}
+```
+
+**Mejores prácticas del keystore:**
+- Generar el keystore con claves fuertes (RSA 4096 bits como mínimo)
+- Almacenar el archivo del keystore fuera del JAR de la aplicación
+- Utilizar contraseñas únicas y fuertes
+- Rotar las claves periódicamente (cada 6-12 meses)
+- Respaldar el keystore de forma segura
+
+<Warning>
+Perder el keystore significa que todos los tokens emitidos se vuelven inválidos. Mantenga siempre respaldos seguros.
+</Warning>
+
+### 5. Autenticación entre Servicios
+
+La comunicación interna entre servicios utiliza secretos compartidos:
+
+```yaml
+service:
+  internal:
+    secret-key: ${SERVICE_INTERNAL_SECRET_KEY}
+
+gateway-client:
+  secret: ${SGIVU_GATEWAY_SECRET}
+```
+
+**Requisitos:**
+- Utilizar secretos criptográficamente aleatorios (mínimo 64 caracteres)
+- Rotar secretos periódicamente
+- Nunca registrar valores de secretos en logs
+- Utilizar secretos diferentes por entorno
+
+### 6. Seguridad de AWS S3
+
+El servicio de vehículos utiliza S3 para el almacenamiento de imágenes:
+
+```yaml
+aws:
+  s3:
+    vehicles-bucket: ${AWS_VEHICLES_BUCKET}
+    allowed-origins: ${AWS_S3_ALLOWED_ORIGINS}  # Production URLs only
+  access:
+    key: ${AWS_ACCESS_KEY}
+  secret:
+    key: ${AWS_SECRET_KEY}
+  region: ${AWS_REGION}
+```
+
+**Lista de verificación de seguridad S3:**
+- Utilizar roles IAM en lugar de claves de acceso cuando sea posible
+- Habilitar versionado de buckets
+- Habilitar registro de acceso
+- Configurar CORS para permitir solo orígenes de producción
+- Utilizar políticas de bucket para restringir el acceso
+- Habilitar cifrado en reposo
+
+## Monitoreo y Observabilidad
+
+### Métricas de Prometheus
+
+Producción expone métricas de Prometheus para monitoreo:
+
+```yaml
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+```
+
+### Health Checks
+
+```yaml
+management:
+  endpoint:
+    health:
+      show-details: never        # Don't expose internal details
+      probes:
+        enabled: true            # Enable Kubernetes probes
+```
+
+**Seguridad de los endpoints de salud:**
+- No exponer información detallada de salud públicamente
+- Utilizar `show-details: never` en producción
+- Configurar probes de liveness/readiness en Kubernetes
+- Monitorear endpoints de salud con herramientas externas
+
+### Trazabilidad Distribuida
+
+Todos los servicios envían trazas a Zipkin:
+
+```yaml
+management:
+  tracing:
+    sampling:
+      probability: 0.1           # Sample 10% of requests
+  zipkin:
+    tracing:
+      endpoint: http://sgivu-zipkin:9411/api/v2/spans
+```
+
+<Info>
+La tasa de muestreo está configurada en 0.1 (10%) para equilibrar observabilidad con rendimiento. Ajuste según el volumen de tráfico.
+</Info>
+
+## Lista de Verificación para Despliegue en Producción
+
+<Steps>
+  <Step title="Revisar todas las variables de entorno">
+    Asegúrese de que todas las variables requeridas estén configuradas con valores de producción:
+    ```bash
+    # Check required variables
+    env | grep PROD_
+    env | grep AWS_
+    env | grep JWT_
+    env | grep SERVICE_INTERNAL_SECRET_KEY
+    ```
+  </Step>
+  
+  <Step title="Verificar conectividad a la base de datos">
+    Pruebe las conexiones a base de datos antes del despliegue:
+    ```bash
+    psql -h $PROD_AUTH_DB_HOST -p $PROD_AUTH_DB_PORT -U $PROD_AUTH_DB_USERNAME -d $PROD_AUTH_DB_NAME
+    ```
+  </Step>
+  
+  <Step title="Ejecutar migraciones Flyway">
+    Aplique las migraciones de base de datos de forma controlada:
+    ```bash
+    # Run migrations manually first
+    ./mvnw flyway:migrate -Dflyway.url=jdbc:postgresql://... -Dflyway.user=... -Dflyway.password=...
+    ```
+  </Step>
+  
+  <Step title="Configurar secretos de forma segura">
+    Utilice Kubernetes Secrets, Vault o la gestión de secretos del proveedor cloud:
+    ```bash
+    kubectl create secret generic sgivu-auth-secrets \
+      --from-literal=PROD_AUTH_DB_PASSWORD="..." \
+      --from-literal=SERVICE_INTERNAL_SECRET_KEY="..."
+    ```
+  </Step>
+  
+  <Step title="Habilitar monitoreo">
+    Configure Prometheus, Grafana y alertas:
+    ```yaml
+    # Prometheus scrape config
+    scrape_configs:
+    - job_name: 'sgivu-services'
+      kubernetes_sd_configs:
+      - role: pod
+      relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: true
+    ```
+  </Step>
+  
+  <Step title="Probar endpoints de salud">
+    Verifique que todos los servicios estén saludables:
+    ```bash
+    curl https://api.sgivu.com/auth/actuator/health
+    curl https://api.sgivu.com/user/actuator/health
+    curl https://api.sgivu.com/vehicle/actuator/health
+    ```
+  </Step>
+  
+  <Step title="Verificar flujos OAuth">
+    Pruebe la autenticación de extremo a extremo:
+    ```bash
+    # Test login flow
+    curl -X POST https://api.sgivu.com/auth/oauth2/token \
+      -d grant_type=authorization_code \
+      -d code=...
+    ```
+  </Step>
+  
+  <Step title="Monitorear logs y métricas">
+    Observe los logs en busca de errores después del despliegue:
+    ```bash
+    kubectl logs -f deployment/sgivu-auth -n production
+    kubectl logs -f deployment/sgivu-gateway -n production
+    ```
+  </Step>
+</Steps>
+
+## Resumen de Variables de Entorno en Prod
+
+<AccordionGroup>
+  <Accordion title="Servicio Auth" icon="key">
+    **Base de datos:**
+    - `PROD_AUTH_DB_HOST` (por defecto: `host.docker.internal`)
+    - `PROD_AUTH_DB_PORT` (por defecto: `5432`)
+    - `PROD_AUTH_DB_NAME` (requerido)
+    - `PROD_AUTH_DB_USERNAME` (requerido)
+    - `PROD_AUTH_DB_PASSWORD` (requerido)
+    
+    **Aplicación:**
+    - `PROD_ANGULAR_APP_URL` (requerido)
+    - `OPENAPI_SERVER_URL` (requerido)
+    
+    **Comunes:** Ver sección de variables compartidas
+  </Accordion>
+  
+  <Accordion title="Servicio User" icon="user">
+    - `PROD_USER_DB_HOST` (requerido)
+    - `PROD_USER_DB_PORT` (requerido)
+    - `PROD_USER_DB_NAME` (requerido)
+    - `PROD_USER_DB_USERNAME` (requerido)
+    - `PROD_USER_DB_PASSWORD` (requerido)
+    - `OPENAPI_SERVER_URL` (requerido)
+  </Accordion>
+  
+  <Accordion title="Servicio Client" icon="building">
+    - `PROD_CLIENT_DB_HOST` (requerido)
+    - `PROD_CLIENT_DB_PORT` (requerido)
+    - `PROD_CLIENT_DB_NAME` (requerido)
+    - `PROD_CLIENT_DB_USERNAME` (requerido)
+    - `PROD_CLIENT_DB_PASSWORD` (requerido)
+    - `OPENAPI_SERVER_URL` (requerido)
+  </Accordion>
+  
+  <Accordion title="Servicio Vehicle" icon="car">
+    - `PROD_VEHICLE_DB_HOST` (requerido)
+    - `PROD_VEHICLE_DB_PORT` (requerido)
+    - `PROD_VEHICLE_DB_NAME` (requerido)
+    - `PROD_VEHICLE_DB_USERNAME` (requerido)
+    - `PROD_VEHICLE_DB_PASSWORD` (requerido)
+    - `OPENAPI_SERVER_URL` (requerido)
+  </Accordion>
+  
+  <Accordion title="Servicio Purchase Sale" icon="cart-shopping">
+    - `PROD_PURCHASE_SALE_DB_HOST` (requerido)
+    - `PROD_PURCHASE_SALE_DB_PORT` (requerido)
+    - `PROD_PURCHASE_SALE_DB_NAME` (requerido)
+    - `PROD_PURCHASE_SALE_DB_USERNAME` (requerido)
+    - `PROD_PURCHASE_SALE_DB_PASSWORD` (requerido)
+    - `OPENAPI_SERVER_URL` (requerido)
+  </Accordion>
+  
+  <Accordion title="Servicio Gateway" icon="gateway">
+    - `PROD_ANGULAR_APP_URL` (requerido)
+    - `OPENAPI_SERVER_URL` (requerido)
+  </Accordion>
+</AccordionGroup>
+
+## Recuperación ante Desastres
+
+### Respaldos de Base de Datos
+
+<CardGroup cols={2}>
+  <Card title="Respaldos Automatizados" icon="clock">
+    Configure respaldos automatizados de PostgreSQL:
+    ```bash
+    # Daily backups with 30-day retention
+    0 2 * * * pg_dump -h $DB_HOST -U $DB_USER $DB_NAME | gzip > backup-$(date +%Y%m%d).sql.gz
+    ```
+  </Card>
+  
+  <Card title="Recuperación a un Punto en el Tiempo" icon="rotate-left">
+    Habilite el archivado WAL para PostgreSQL:
+    ```
+    wal_level = replica
+    archive_mode = on
+    archive_command = 'cp %p /archive/%f'
+    ```
+  </Card>
+</CardGroup>
+
+### Recuperación de Servicios
+
+**Rollback en Kubernetes:**
+```bash
+# Rollback to previous deployment
+kubectl rollout undo deployment/sgivu-auth -n production
+
+# View rollout history
+kubectl rollout history deployment/sgivu-auth -n production
+```
+
+## Ver También
+
+<CardGroup cols={3}>
+  <Card title="Descripción General" icon="layer-group" href="/config/environments/overview">
+    Mecanismo de perfiles y combinación de configuraciones
+  </Card>
+  
+  <Card title="Entorno de Desarrollo" icon="flask" href="/config/environments/dev">
+    Configuraciones del entorno de desarrollo
+  </Card>
+  
+  <Card title="Referencia de Variables" icon="gear" href="/config/environments/variables">
+    Lista completa de variables de entorno
+  </Card>
+</CardGroup>

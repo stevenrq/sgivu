@@ -1,0 +1,295 @@
+---
+title: Predicción de Demanda
+description: Pronóstico de demanda de vehículos impulsado por IA para optimizar el inventario
+---
+
+## Descripción General
+
+La Predicción de Demanda utiliza Machine Learning para analizar los datos históricos de ventas y pronosticar la demanda futura de vehículos por segmento. Esta potente funcionalidad le permite tomar decisiones basadas en datos sobre gestión de inventario, precios y estrategias de compra.
+
+## Cómo Funciona
+
+El sistema de predicción de demanda de SGIVU analiza:
+
+- Contratos de venta históricos y tendencias
+- Características del vehículo (tipo, marca, modelo, año, rango de precios)
+- Patrones estacionales y condiciones del mercado
+- Preferencias del cliente y patrones de compra
+
+El modelo de Machine Learning procesa estos datos para predecir la demanda esperada de diferentes segmentos de vehículos, ayudándole a optimizar la composición de su inventario.
+
+## Obtener Predicciones
+
+### Solicitar una Predicción
+
+<Steps>
+  <Step title="Navegar a Predicción de Demanda">
+    Acceda a la sección de Predicción de Demanda desde su panel de control o el menú de analíticas.
+  </Step>
+  
+  <Step title="Seleccionar Segmento de Vehículo">
+    Elija las características del vehículo para el cual desea predecir la demanda:
+    - Tipo de vehículo (auto o motocicleta)
+    - Marca y modelo
+    - Rango de año
+    - Rango de precio
+    - Otras características relevantes
+  </Step>
+  
+  <Step title="Definir Período de Tiempo">
+    Especifique el período de tiempo para su predicción (próximo mes, próximo trimestre, próximo año).
+  </Step>
+  
+  <Step title="Generar Predicción">
+    Haga clic para generar la predicción. El sistema envía sus parámetros al servicio de ML y devuelve la demanda pronosticada.
+  </Step>
+  
+  <Step title="Revisar Resultados">
+    Analice los resultados de la predicción, incluyendo:
+    - Volumen de demanda esperado
+    - Nivel de confianza
+    - Tendencias históricas
+    - Recomendaciones
+  </Step>
+</Steps>
+
+### Interpretación de los Resultados
+
+<Card title="Estimación de Demanda" icon="chart-line">
+  El sistema proporciona una estimación del número de unidades que se espera vender en el segmento y período especificados. Esto se basa en patrones históricos y tendencias actuales.
+</Card>
+
+<Card title="Nivel de Confianza" icon="gauge-high">
+  Cada predicción incluye una puntuación de confianza que indica qué tan fiable es el pronóstico en función de la calidad de los datos y la consistencia histórica.
+</Card>
+
+<Card title="Contexto Histórico" icon="clock-rotate-left">
+  Visualice los datos de ventas históricos para el mismo segmento para comprender las tendencias y validar las predicciones contra el rendimiento pasado.
+</Card>
+
+## Predicción con Tendencias Históricas
+
+Para un análisis más detallado, utilice la funcionalidad "Predicción con Historial":
+
+<Steps>
+  <Step title="Solicitar Predicción Detallada">
+    Seleccione la opción "Predicción con Historial" al generar pronósticos.
+  </Step>
+  
+  <Step title="Ver Datos Históricos">
+    El sistema recupera los datos de ventas históricos para el segmento seleccionado, mostrando el rendimiento pasado a lo largo del tiempo.
+  </Step>
+  
+  <Step title="Comparar Tendencias">
+    Visualice la tendencia histórica junto con la predicción futura para identificar patrones y validar el pronóstico.
+  </Step>
+  
+  <Step title="Identificar Oportunidades">
+    Utilice la vista combinada para detectar oportunidades de mercado, patrones estacionales y niveles óptimos de inventario.
+  </Step>
+</Steps>
+
+## Casos de Uso
+
+### Optimización de Inventario
+
+<CardGroup cols={2}>
+  <Card title="Planificación de Stock" icon="boxes-stacked">
+    Prediga qué segmentos de vehículos tendrán alta demanda para guiar sus decisiones de compra.
+  </Card>
+  
+  <Card title="Evitar Sobrestock" icon="warehouse">
+    Identifique segmentos de baja rotación para evitar inmovilizar capital en inventario de baja demanda.
+  </Card>
+  
+  <Card title="Preparación Estacional" icon="calendar">
+    Anticipe los cambios de demanda estacionales y ajuste el inventario en consecuencia.
+  </Card>
+  
+  <Card title="Asignación de Presupuesto" icon="dollar-sign">
+    Asigne el presupuesto de compras a segmentos de alta demanda para un mejor retorno de inversión.
+  </Card>
+</CardGroup>
+
+### Estrategia de Precios
+
+<Card title="Precios Dinámicos" icon="tags">
+  Utilice las predicciones de demanda para informar las decisiones de precios. Una demanda alta prevista puede justificar precios premium, mientras que los segmentos de baja demanda pueden requerir precios competitivos.
+</Card>
+
+### Planificación de Ventas
+
+<Card title="Objetivos de Ventas" icon="bullseye">
+  Establezca objetivos de ventas realistas basados en la demanda prevista para diferentes segmentos de vehículos.
+</Card>
+
+<Card title="Enfoque de Marketing" icon="bullhorn">
+  Dirija los esfuerzos de marketing hacia los segmentos de alta demanda predichos por el sistema.
+</Card>
+
+## Entrenamiento del Modelo
+
+El sistema de predicción mejora continuamente mediante el reentrenamiento del modelo:
+
+### Entrenamiento Automático
+
+<Card title="Aprendizaje Continuo" icon="brain">
+  El modelo de ML se reentrena periódicamente con sus datos de ventas más recientes, asegurando que las predicciones se mantengan precisas a medida que su negocio evoluciona.
+</Card>
+
+### Reentrenamiento Manual
+
+<Steps>
+  <Step title="Solicitar Reentrenamiento">
+    Acceda a la sección de gestión de modelos y solicite un reentrenamiento manual si tiene datos nuevos significativos o cambios en el mercado.
+  </Step>
+  
+  <Step title="Especificar Rango de Datos">
+    Opcionalmente, especifique un rango de fechas para los datos de entrenamiento. Por defecto, el sistema utiliza todos los datos históricos disponibles.
+  </Step>
+  
+  <Step title="Proceso de Entrenamiento">
+    El sistema reentrena el modelo utilizando los datos de contratos más recientes. Este proceso puede tardar varios minutos dependiendo del volumen de datos.
+  </Step>
+  
+  <Step title="Validación del Modelo">
+    El nuevo modelo se valida contra datos de prueba para garantizar una precisión mejorada antes de ser desplegado.
+  </Step>
+  
+  <Step title="Despliegue">
+    Una vez validado, el nuevo modelo se activa automáticamente y se utiliza para todas las predicciones futuras.
+  </Step>
+</Steps>
+
+## Información del Modelo
+
+### Ver Detalles del Modelo
+
+<Card title="Metadatos del Modelo" icon="info-circle">
+  Acceda a información sobre el modelo de predicción actual, incluyendo:
+  - Fecha de entrenamiento y versión
+  - Volumen de datos utilizado para el entrenamiento
+  - Métricas de rendimiento del modelo
+  - Importancia de características
+</Card>
+
+## Mejores Prácticas
+
+<AccordionGroup>
+  <Accordion title="Revisiones periódicas de predicciones">
+    Genere predicciones regularmente (mensual o trimestralmente) para anticiparse a las tendencias del mercado y ajustar el inventario de forma proactiva.
+  </Accordion>
+  
+  <Accordion title="Comparar con resultados reales">
+    Realice un seguimiento de la precisión de las predicciones comparando los pronósticos con las ventas reales. Esto le ayuda a comprender la fiabilidad del modelo y refinar sus estrategias.
+  </Accordion>
+  
+  <Accordion title="Usar múltiples segmentos">
+    Genere predicciones para varios segmentos de vehículos para obtener una visión integral de todas las necesidades de inventario.
+  </Accordion>
+  
+  <Accordion title="Considerar factores externos">
+    Recuerde que las predicciones se basan en datos históricos. Considere factores externos como cambios económicos, nuevas regulaciones o disrupciones del mercado.
+  </Accordion>
+  
+  <Accordion title="Combinar con investigación de mercado">
+    Utilice las predicciones de demanda junto con investigación de mercado tradicional e información del sector para tomar las decisiones más informadas.
+  </Accordion>
+</AccordionGroup>
+
+## Requisitos de Datos
+
+### Datos Mínimos
+
+<Card title="Datos Históricos de Ventas" icon="database">
+  El sistema de predicción requiere suficientes contratos de venta históricos para generar pronósticos precisos. Más datos generalmente conducen a predicciones más fiables.
+</Card>
+
+### Calidad de Datos
+
+<CardGroup cols={2}>
+  <Card title="Contratos Completos" icon="check-circle">
+    Asegúrese de que los contratos tengan información completa del vehículo y la venta para obtener mejores predicciones.
+  </Card>
+  
+  <Card title="Fechas Precisas" icon="calendar-check">
+    Las fechas de transacción correctas son cruciales para identificar tendencias y patrones.
+  </Card>
+  
+  <Card title="Categorías Consistentes" icon="layer-group">
+    Utilice una categorización de vehículos consistente (tipo, marca, modelo) para un análisis de segmentos significativo.
+  </Card>
+  
+  <Card title="Actualizaciones Regulares" icon="rotate">
+    Mantenga los datos de contratos actualizados ingresando regularmente las nuevas transacciones.
+  </Card>
+</CardGroup>
+
+## Integración con Otras Funcionalidades
+
+### Contratos de Compra y Venta
+
+<Card title="Fuente de Datos de Entrenamiento" icon="arrows-left-right">
+  El sistema de predicción utiliza su historial de contratos como datos de entrenamiento. Registros de contratos más completos conducen a mejores predicciones.
+</Card>
+
+### Gestión de Vehículos
+
+<Card title="Planificación de Inventario" icon="clipboard-list">
+  Utilice las predicciones para informar las decisiones de compra de vehículos y la composición del inventario en la Gestión de Vehículos.
+</Card>
+
+## Detalles Técnicos
+
+<AccordionGroup>
+  <Accordion title="Tecnología de Machine Learning">
+    SGIVU utiliza algoritmos avanzados de Machine Learning incluyendo scikit-learn y opcionalmente XGBoost para el pronóstico de demanda. Los modelos se entrenan con sus datos específicos para predicciones personalizadas.
+  </Accordion>
+  
+  <Accordion title="Ingeniería de Características">
+    El sistema extrae automáticamente características relevantes de sus datos de contratos, incluyendo patrones temporales, características de vehículos y tendencias de transacciones.
+  </Accordion>
+  
+  <Accordion title="Versionado de Modelos">
+    Cada modelo entrenado se versiona y almacena, permitiéndole rastrear las mejoras del modelo a lo largo del tiempo y revertir cambios si es necesario.
+  </Accordion>
+  
+  <Accordion title="API de Predicción">
+    El servicio de predicción expone APIs REST que pueden integrarse con otros sistemas o aplicaciones personalizadas.
+  </Accordion>
+</AccordionGroup>
+
+## Solución de Problemas
+
+<AccordionGroup>
+  <Accordion title="No hay predicciones disponibles">
+    Esto generalmente significa que aún no se ha entrenado ningún modelo. Asegúrese de tener suficientes datos históricos de ventas y ejecute un entrenamiento del modelo.
+  </Accordion>
+  
+  <Accordion title="Predicciones con baja confianza">
+    La baja confianza puede indicar datos históricos insuficientes para el segmento específico. Intente con definiciones de segmento más amplias o acumule más historial de ventas.
+  </Accordion>
+  
+  <Accordion title="Las predicciones parecen imprecisas">
+    Compare las predicciones con los resultados reales. Si son consistentemente imprecisas, reentrene el modelo con datos más recientes o revise la calidad de sus datos de contratos.
+  </Accordion>
+  
+  <Accordion title="El entrenamiento del modelo falla">
+    Verifique que tenga datos históricos suficientes y válidos. Revise los logs del sistema o contacte a su administrador si los errores de entrenamiento persisten.
+  </Accordion>
+  
+  <Accordion title="La solicitud de predicción expira">
+    Las predicciones muy complejas pueden tardar en procesarse. Simplifique los criterios de segmento o intente nuevamente en horas de menor actividad.
+  </Accordion>
+</AccordionGroup>
+
+## Mejoras Futuras
+
+El sistema de predicción de demanda evoluciona continuamente. Las mejoras futuras pueden incluir:
+
+- Integración con datos de mercado externos
+- Análisis de precios de la competencia
+- Incorporación de indicadores económicos
+- Pronóstico de demanda multi-ubicación
+- Recomendaciones automatizadas de inventario
+- Actualizaciones de predicción en tiempo real

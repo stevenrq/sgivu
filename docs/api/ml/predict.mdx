@@ -1,0 +1,531 @@
+---
+title: 'Predicción de Demanda'
+description: 'Genera pronósticos de demanda para segmentos de vehículos'
+---
+
+## Descripción General
+
+La API de Predicción ML proporciona pronósticos de demanda basados en Machine Learning para segmentos de vehículos. Predice la demanda mensual de ventas según las características del vehículo (marca, modelo, línea) utilizando modelos de series temporales entrenados con datos históricos de transacciones.
+
+## URL Base
+
+```
+https://your-domain.com/v1/ml
+```
+
+---
+
+## Predecir Demanda
+
+```http
+POST /v1/ml/predict
+```
+
+Genera un pronóstico de demanda para un segmento de vehículo específico.
+
+**Autenticación:** Requerida (JWT o clave de servicio interno)
+
+**Autorización:** Permisos configurables (por defecto: requiere token válido)
+
+### Cuerpo de la Solicitud
+
+<ParamField body="vehicle_type" type="string" required>
+  Tipo de vehículo: `CAR` o `MOTORCYCLE`
+</ParamField>
+
+<ParamField body="brand" type="string" required>
+  Marca/fabricante del vehículo (ej., "Toyota", "Yamaha")
+</ParamField>
+
+<ParamField body="model" type="string" required>
+  Año del modelo (ej., "2022", "2023")
+</ParamField>
+
+<ParamField body="line" type="string" required>
+  Línea/variante del vehículo (ej., "Corolla", "MT-09")
+</ParamField>
+
+<ParamField body="horizon_months" type="integer" default="6">
+  Horizonte de pronóstico en meses (1-24)
+</ParamField>
+
+<ParamField body="confidence" type="number" default="0.95">
+  Nivel de confianza para los intervalos de predicción (0.5-0.99)
+</ParamField>
+
+```json
+{
+  "vehicle_type": "CAR",
+  "brand": "Toyota",
+  "model": "2022",
+  "line": "Corolla",
+  "horizon_months": 6,
+  "confidence": 0.95
+}
+```
+
+### Respuesta
+
+<ResponseField name="predictions" type="array">
+  Arreglo de predicciones mensuales
+</ResponseField>
+
+<ResponseField name="predictions[].month" type="string">
+  Mes en formato YYYY-MM
+</ResponseField>
+
+<ResponseField name="predictions[].demand" type="number">
+  Demanda predicha (estimación puntual)
+</ResponseField>
+
+<ResponseField name="predictions[].lower_ci" type="number">
+  Límite inferior del intervalo de confianza
+</ResponseField>
+
+<ResponseField name="predictions[].upper_ci" type="number">
+  Límite superior del intervalo de confianza
+</ResponseField>
+
+<ResponseField name="model_version" type="string">
+  Identificador de versión del modelo utilizado
+</ResponseField>
+
+<ResponseField name="metrics" type="object" nullable>
+  Métricas de rendimiento del modelo (MAE, RMSE, etc.)
+</ResponseField>
+
+```json
+{
+  "predictions": [
+    {
+      "month": "2026-04",
+      "demand": 8.5,
+      "lower_ci": 5.2,
+      "upper_ci": 11.8
+    },
+    {
+      "month": "2026-05",
+      "demand": 9.2,
+      "lower_ci": 5.8,
+      "upper_ci": 12.6
+    },
+    {
+      "month": "2026-06",
+      "demand": 10.1,
+      "lower_ci": 6.5,
+      "upper_ci": 13.7
+    },
+    {
+      "month": "2026-07",
+      "demand": 9.8,
+      "lower_ci": 6.2,
+      "upper_ci": 13.4
+    },
+    {
+      "month": "2026-08",
+      "demand": 10.5,
+      "lower_ci": 6.8,
+      "upper_ci": 14.2
+    },
+    {
+      "month": "2026-09",
+      "demand": 11.2,
+      "lower_ci": 7.4,
+      "upper_ci": 15.0
+    }
+  ],
+  "model_version": "v1.2.3-20260301",
+  "metrics": {
+    "mae": 1.45,
+    "rmse": 2.12,
+    "mape": 0.15
+  }
+}
+```
+
+### Códigos de Estado
+
+- `200 OK` - Predicción generada exitosamente
+- `400 Bad Request` - Parámetros de entrada inválidos
+- `401 Unauthorized` - Autenticación faltante o inválida
+- `403 Forbidden` - Permisos insuficientes
+- `404 Not Found` - Modelo no disponible o segmento no encontrado
+- `500 Internal Server Error` - Falló la predicción del modelo
+
+### Ejemplo
+
+```bash
+curl -X POST https://your-domain.com/v1/ml/predict \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "vehicle_type": "CAR",
+    "brand": "Toyota",
+    "model": "2022",
+    "line": "Corolla",
+    "horizon_months": 6,
+    "confidence": 0.95
+  }'
+```
+
+---
+
+## Predecir con Datos Históricos
+
+```http
+POST /v1/ml/predict-with-history
+```
+
+Genera un pronóstico de demanda junto con datos históricos de ventas para visualización y comparación.
+
+**Autenticación:** Requerida (JWT o clave de servicio interno)
+
+**Autorización:** Permisos configurables (por defecto: requiere token válido)
+
+### Cuerpo de la Solicitud
+
+Igual que el endpoint `/predict`.
+
+```json
+{
+  "vehicle_type": "CAR",
+  "brand": "Toyota",
+  "model": "2022",
+  "line": "Corolla",
+  "horizon_months": 6,
+  "confidence": 0.95
+}
+```
+
+### Respuesta
+
+<ResponseField name="predictions" type="array">
+  Arreglo de predicciones mensuales futuras
+</ResponseField>
+
+<ResponseField name="history" type="array">
+  Arreglo de puntos de datos de ventas históricas
+</ResponseField>
+
+<ResponseField name="history[].month" type="string">
+  Mes en formato YYYY-MM
+</ResponseField>
+
+<ResponseField name="history[].sales_count" type="number">
+  Cantidad real de ventas para ese mes
+</ResponseField>
+
+<ResponseField name="segment" type="object">
+  Detalles del segmento de vehículo
+</ResponseField>
+
+<ResponseField name="segment.vehicle_type" type="string">
+  Tipo de vehículo
+</ResponseField>
+
+<ResponseField name="segment.brand" type="string">
+  Nombre de la marca
+</ResponseField>
+
+<ResponseField name="segment.model" type="string">
+  Año del modelo
+</ResponseField>
+
+<ResponseField name="segment.line" type="string">
+  Línea del vehículo
+</ResponseField>
+
+<ResponseField name="model_version" type="string">
+  Identificador de versión del modelo
+</ResponseField>
+
+<ResponseField name="trained_at" type="string" nullable>
+  Marca temporal de entrenamiento del modelo (ISO 8601)
+</ResponseField>
+
+<ResponseField name="metrics" type="object" nullable>
+  Métricas de rendimiento del modelo
+</ResponseField>
+
+```json
+{
+  "predictions": [
+    {
+      "month": "2026-04",
+      "demand": 8.5,
+      "lower_ci": 5.2,
+      "upper_ci": 11.8
+    },
+    {
+      "month": "2026-05",
+      "demand": 9.2,
+      "lower_ci": 5.8,
+      "upper_ci": 12.6
+    }
+  ],
+  "history": [
+    {
+      "month": "2025-01",
+      "sales_count": 7.0
+    },
+    {
+      "month": "2025-02",
+      "sales_count": 9.0
+    },
+    {
+      "month": "2025-03",
+      "sales_count": 8.0
+    },
+    {
+      "month": "2025-04",
+      "sales_count": 10.0
+    },
+    {
+      "month": "2025-05",
+      "sales_count": 11.0
+    },
+    {
+      "month": "2025-06",
+      "sales_count": 9.0
+    },
+    {
+      "month": "2025-07",
+      "sales_count": 12.0
+    },
+    {
+      "month": "2025-08",
+      "sales_count": 10.0
+    },
+    {
+      "month": "2025-09",
+      "sales_count": 11.0
+    },
+    {
+      "month": "2025-10",
+      "sales_count": 13.0
+    },
+    {
+      "month": "2025-11",
+      "sales_count": 9.0
+    },
+    {
+      "month": "2025-12",
+      "sales_count": 8.0
+    },
+    {
+      "month": "2026-01",
+      "sales_count": 10.0
+    },
+    {
+      "month": "2026-02",
+      "sales_count": 11.0
+    },
+    {
+      "month": "2026-03",
+      "sales_count": 9.0
+    }
+  ],
+  "segment": {
+    "vehicle_type": "CAR",
+    "brand": "Toyota",
+    "model": "2022",
+    "line": "Corolla"
+  },
+  "model_version": "v1.2.3-20260301",
+  "trained_at": "2026-03-01T08:00:00Z",
+  "metrics": {
+    "mae": 1.45,
+    "rmse": 2.12,
+    "mape": 0.15
+  }
+}
+```
+
+### Caso de Uso
+
+Este endpoint es ideal para:
+- Graficar ventas históricas vs. predichas
+- Analizar tendencias y estacionalidad
+- Validar predicciones contra el historial reciente
+- Dashboards e informes
+
+### Códigos de Estado
+
+Igual que el endpoint `/predict`.
+
+### Ejemplo
+
+```bash
+curl -X POST https://your-domain.com/v1/ml/predict-with-history \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "vehicle_type": "CAR",
+    "brand": "Toyota",
+    "model": "2022",
+    "line": "Corolla",
+    "horizon_months": 6
+  }'
+```
+
+---
+
+## Interpretación de Predicciones
+
+### Estimación Puntual
+
+El campo `demand` representa la mejor estimación del modelo sobre las ventas mensuales.
+
+### Intervalos de Confianza
+
+Los campos `lower_ci` y `upper_ci` proporcionan intervalos de predicción:
+
+- Con `confidence=0.95` (por defecto), existe un 95% de probabilidad de que la demanda real se encuentre dentro de `[lower_ci, upper_ci]`
+- Intervalos más amplios indican mayor incertidumbre
+- Los intervalos típicamente se amplían para horizontes de pronóstico más largos
+
+### Ejemplo de Interpretación
+
+```json
+{
+  "month": "2026-04",
+  "demand": 8.5,
+  "lower_ci": 5.2,
+  "upper_ci": 11.8
+}
+```
+
+**Interpretación:** El modelo predice que se venderán 8-9 unidades en abril de 2026, con un 95% de confianza de que las ventas reales estarán entre 5 y 12 unidades.
+
+---
+
+## Reglas de Validación
+
+### Tipo de Vehículo
+
+Debe ser exactamente `CAR` o `MOTORCYCLE` (sensible a mayúsculas/minúsculas).
+
+### Campo Line
+
+El campo `line` es **obligatorio** y no debe estar vacío después de eliminar espacios en blanco.
+
+### Meses de Horizonte
+
+- **Mínimo:** 1 mes
+- **Máximo:** 24 meses
+- **Por defecto:** 6 meses
+
+### Nivel de Confianza
+
+- **Mínimo:** 0.5 (50%)
+- **Máximo:** 0.99 (99%)
+- **Por defecto:** 0.95 (95%)
+
+---
+
+## Métricas del Modelo
+
+Cuando están disponibles, la respuesta incluye métricas de rendimiento del modelo:
+
+<ResponseField name="mae" type="number">
+  Mean Absolute Error - Magnitud promedio del error de predicción
+</ResponseField>
+
+<ResponseField name="rmse" type="number">
+  Root Mean Square Error - Desviación estándar de los errores de predicción
+</ResponseField>
+
+<ResponseField name="mape" type="number">
+  Mean Absolute Percentage Error - Error promedio como porcentaje
+</ResponseField>
+
+**Valores más bajos indican mayor precisión del modelo.**
+
+---
+
+## Opciones de Autenticación
+
+### JWT Bearer Token
+
+Autenticación estándar para aplicaciones orientadas al usuario:
+
+```bash
+curl -H "Authorization: Bearer YOUR_JWT_TOKEN" ...
+```
+
+### Clave de Servicio Interno
+
+Para comunicación entre servicios:
+
+```bash
+curl -H "X-Internal-Service-Key: YOUR_INTERNAL_KEY" ...
+```
+
+<Warning>
+  Nunca exponga la clave de servicio interno en aplicaciones del lado del cliente o repositorios públicos.
+</Warning>
+
+---
+
+## Respuestas de Error
+
+### 400 Bad Request - Tipo de Vehículo Inválido
+
+```json
+{
+  "detail": [
+    {
+      "loc": ["body", "vehicle_type"],
+      "msg": "vehicle_type must be CAR or MOTORCYCLE",
+      "type": "value_error"
+    }
+  ]
+}
+```
+
+### 400 Bad Request - Horizonte Inválido
+
+```json
+{
+  "detail": [
+    {
+      "loc": ["body", "horizon_months"],
+      "msg": "ensure this value is less than or equal to 24",
+      "type": "value_error.number.not_le"
+    }
+  ]
+}
+```
+
+### 404 Not Found - Modelo No Disponible
+
+```json
+{
+  "detail": "No trained model available. Please train a model first."
+}
+```
+
+### 404 Not Found - Segmento No Encontrado
+
+```json
+{
+  "detail": "No historical data found for the specified vehicle segment"
+}
+```
+
+### 500 Internal Server Error
+
+```json
+{
+  "detail": "Model prediction failed: insufficient training data"
+}
+```
+
+---
+
+## Notas de Rendimiento
+
+- Las predicciones se generan típicamente en < 500ms
+- Las consultas de datos históricos pueden tardar más para segmentos con historial extenso
+- Considere cachear predicciones para segmentos consultados frecuentemente
+- Las predicciones son deterministas para la misma versión del modelo y los mismos datos de entrada

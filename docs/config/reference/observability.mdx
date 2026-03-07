@@ -1,0 +1,634 @@
+---
+title: Configuración de Observabilidad
+description: Monitoreo, health checks, tracing distribuido y configuración de logging en SGIVU
+---
+
+SGIVU implementa observabilidad integral mediante Spring Boot Actuator, tracing distribuido con Zipkin y logging estructurado.
+
+## Endpoints de Actuator
+
+Spring Boot Actuator proporciona endpoints de monitoreo y gestión listos para producción.
+
+### Exposición de Endpoints
+
+<ParamField path="management.endpoints.web.exposure.include" type="string" required>
+  Lista separada por comas de endpoints de Actuator a exponer vía HTTP. Diferentes perfiles exponen diferentes endpoints.
+</ParamField>
+
+#### Perfil por Defecto (Todos los Servicios)
+
+```yaml
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+```
+
+<Info>
+  Por defecto, los servicios solo exponen los endpoints `health` e `info` para minimizar la superficie de ataque.
+</Info>
+
+#### Perfil de Desarrollo
+
+```yaml
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    health:
+      show-details: always
+```
+
+<Warning>
+  Los perfiles de desarrollo exponen todos los endpoints de Actuator para depuración. Nunca use `"*"` en producción.
+</Warning>
+
+#### Perfil de Producción
+
+```yaml
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus
+```
+
+<Note>
+  Producción agrega el endpoint `prometheus` para el scraping de métricas por sistemas de monitoreo.
+</Note>
+
+### Endpoints Expuestos
+
+<CardGroup cols={2}>
+  <Card title="Health" icon="heart-pulse">
+    `GET /actuator/health`
+    
+    Estado de salud del servicio y verificaciones de disponibilidad
+  </Card>
+  <Card title="Info" icon="circle-info">
+    `GET /actuator/info`
+    
+    Metadatos de la aplicación e información de compilación
+  </Card>
+  <Card title="Prometheus" icon="chart-line">
+    `GET /actuator/prometheus`
+    
+    Métricas en formato Prometheus (solo producción)
+  </Card>
+  <Card title="Todos los Endpoints" icon="asterisk">
+    `GET /actuator`
+    
+    Lista todos los endpoints disponibles (solo desarrollo)
+  </Card>
+</CardGroup>
+
+## Configuración de Health Checks
+
+### Visibilidad de Detalles de Salud
+
+<ParamField path="management.endpoint.health.show-details" type="string" required>
+  Controla la visibilidad de los detalles del health check. Valores: `never`, `when-authorized`, `always`.
+</ParamField>
+
+#### Por Defecto y Producción
+
+```yaml
+management:
+  endpoint:
+    health:
+      show-details: never
+```
+
+<Info>
+  Los servicios ocultan los detalles de salud por defecto para prevenir filtración de información. El endpoint de health solo retorna el estado `UP` o `DOWN`.
+</Info>
+
+#### Desarrollo
+
+```yaml
+management:
+  endpoint:
+    health:
+      show-details: always
+```
+
+<Note>
+  Los perfiles de desarrollo muestran todos los detalles de salud, incluyendo conectividad a base de datos, espacio en disco y otros indicadores.
+</Note>
+
+### Ejemplos de Respuestas de Health
+
+#### Producción (show-details: never)
+
+```json
+{
+  "status": "UP"
+}
+```
+
+#### Desarrollo (show-details: always)
+
+```json
+{
+  "status": "UP",
+  "components": {
+    "db": {
+      "status": "UP",
+      "details": {
+        "database": "PostgreSQL",
+        "validationQuery": "isValid()"
+      }
+    },
+    "diskSpace": {
+      "status": "UP",
+      "details": {
+        "total": 499963174912,
+        "free": 262958080000,
+        "threshold": 10485760
+      }
+    },
+    "ping": {
+      "status": "UP"
+    }
+  }
+}
+```
+
+## Tracing Distribuido
+
+SGIVU utiliza Zipkin para tracing distribuido, permitiendo rastrear solicitudes a través de los microservicios.
+
+### Configuración de Tracing
+
+<ParamField path="management.tracing.sampling.probability" type="number" required>
+  Porcentaje de solicitudes a rastrear (0.0 a 1.0). Establecido en `0.1` (10%) por defecto para equilibrar observabilidad con rendimiento.
+</ParamField>
+
+<ParamField path="management.zipkin.tracing.endpoint" type="string" required>
+  Endpoint del servidor Zipkin para el envío de datos de trazas.
+</ParamField>
+
+```yaml
+management:
+  tracing:
+    sampling:
+      probability: 0.1
+  zipkin:
+    tracing:
+      endpoint: http://sgivu-zipkin:9411/api/v2/spans
+```
+
+### Estrategia de Muestreo
+
+<Accordion title="¿Por qué muestreo del 10%?">
+  Rastrear cada solicitud puede impactar el rendimiento y generar cantidades masivas de datos. Una tasa de muestreo del 10%:
+  
+  - Proporciona visibilidad suficiente del comportamiento del sistema
+  - Captura suficientes trazas para detectar patrones y problemas
+  - Minimiza la sobrecarga de rendimiento
+  - Reduce los requisitos de almacenamiento
+  
+  Aumente la tasa de muestreo a `1.0` (100%) en desarrollo para visibilidad completa.
+</Accordion>
+
+### Ejemplos por Servicio
+
+#### Servicio Gateway
+
+```yaml
+management:
+  tracing:
+    sampling:
+      probability: 0.1
+  zipkin:
+    tracing:
+      endpoint: http://sgivu-zipkin:9411/api/v2/spans
+```
+
+#### Servicio Auth
+
+```yaml
+management:
+  tracing:
+    sampling:
+      probability: 0.1
+  zipkin:
+    tracing:
+      endpoint: http://sgivu-zipkin:9411/api/v2/spans
+```
+
+#### Servicios de Dominio (User, Client, Vehicle, Purchase-Sale)
+
+Todos los servicios de dominio utilizan una configuración de tracing idéntica:
+
+```yaml
+management:
+  tracing:
+    sampling:
+      probability: 0.1
+  zipkin:
+    tracing:
+      endpoint: http://sgivu-zipkin:9411/api/v2/spans
+```
+
+## Configuración de Logging
+
+SGIVU utiliza SLF4J con Logback para logging estructurado.
+
+### Niveles de Log
+
+<ParamField path="logging.level.root" type="string">
+  Nivel del logger raíz. Establecido en `INFO` en todos los entornos para un logging equilibrado.
+</ParamField>
+
+<ParamField path="logging.level.{package}" type="string">
+  Niveles de log por paquete para control granular.
+</ParamField>
+
+### Configuración Estándar
+
+```yaml
+logging:
+  level:
+    root: INFO
+```
+
+### Logging Específico por Servicio
+
+#### Servicio Gateway
+
+```yaml
+logging:
+  level:
+    root: INFO
+    com.sgivu.gateway.security: INFO
+    com.sgivu.gateway.controller: INFO
+```
+
+<Info>
+  El Gateway establece explícitamente los niveles de log para los paquetes de seguridad y controladores, asegurando que los eventos de autenticación/autorización se capturen.
+</Info>
+
+#### Servicio Vehicle
+
+```yaml
+logging:
+  level:
+    root: INFO
+    software:
+      amazon:
+        awssdk: info
+```
+
+<Note>
+  El servicio Vehicle establece el logging del AWS SDK en `info` para reducir la verbosidad de las operaciones con S3.
+</Note>
+
+### Guía de Niveles de Log
+
+<CardGroup cols={2}>
+  <Card title="ERROR" icon="circle-exclamation">
+    Fallos críticos que requieren atención inmediata
+  </Card>
+  <Card title="WARN" icon="triangle-exclamation">
+    Situaciones potencialmente dañinas que no detienen la ejecución
+  </Card>
+  <Card title="INFO" icon="circle-info">
+    Eventos importantes en tiempo de ejecución e hitos
+  </Card>
+  <Card title="DEBUG" icon="bug">
+    Información de diagnóstico detallada (solo desarrollo)
+  </Card>
+</CardGroup>
+
+## Ejemplos Completos de Observabilidad
+
+### Servicio Gateway
+
+```yaml
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+  endpoint:
+    health:
+      show-details: never
+  tracing:
+    sampling:
+      probability: 0.1
+  zipkin:
+    tracing:
+      endpoint: http://sgivu-zipkin:9411/api/v2/spans
+
+logging:
+  level:
+    root: INFO
+    com.sgivu.gateway.security: INFO
+    com.sgivu.gateway.controller: INFO
+```
+
+### Servicio Auth
+
+```yaml
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+  endpoint:
+    health:
+      show-details: never
+  tracing:
+    sampling:
+      probability: 0.1
+  zipkin:
+    tracing:
+      endpoint: http://sgivu-zipkin:9411/api/v2/spans
+
+logging:
+  level:
+    root: INFO
+```
+
+### Servicio User
+
+```yaml
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+  endpoint:
+    health:
+      show-details: never
+  tracing:
+    sampling:
+      probability: 0.1
+  zipkin:
+    tracing:
+      endpoint: http://sgivu-zipkin:9411/api/v2/spans
+
+logging:
+  level:
+    root: INFO
+```
+
+### Servicio Client
+
+```yaml
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+  endpoint:
+    health:
+      show-details: never
+  tracing:
+    sampling:
+      probability: 0.1
+  zipkin:
+    tracing:
+      endpoint: http://sgivu-zipkin:9411/api/v2/spans
+
+logging:
+  level:
+    root: INFO
+```
+
+### Servicio Vehicle
+
+```yaml
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+  endpoint:
+    health:
+      show-details: never
+  tracing:
+    sampling:
+      probability: 0.1
+  zipkin:
+    tracing:
+      endpoint: http://sgivu-zipkin:9411/api/v2/spans
+
+logging:
+  level:
+    root: INFO
+    software:
+      amazon:
+        awssdk: info
+```
+
+### Servicio Purchase-Sale
+
+```yaml
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+  endpoint:
+    health:
+      show-details: never
+  tracing:
+    sampling:
+      probability: 0.1
+  zipkin:
+    tracing:
+      endpoint: http://sgivu-zipkin:9411/api/v2/spans
+
+logging:
+  level:
+    root: INFO
+```
+
+## Stack de Observabilidad
+
+<Steps>
+  <Step title="Instrumentación de Servicios">
+    Spring Boot Actuator y Micrometer instrumentan automáticamente los servicios con métricas, health checks y propagación de contexto de trazas.
+  </Step>
+  
+  <Step title="Recolección de Trazas">
+    Las solicitudes muestreadas generan spans de trazas que se envían al servidor Zipkin en `http://sgivu-zipkin:9411`.
+  </Step>
+  
+  <Step title="Exportación de Métricas">
+    Los servicios en producción exponen métricas de Prometheus en `/actuator/prometheus` para scraping.
+  </Step>
+  
+  <Step title="Monitoreo de Salud">
+    Los orquestadores y balanceadores de carga consultan `/actuator/health` para determinar la disponibilidad del servicio.
+  </Step>
+  
+  <Step title="Agregación de Logs">
+    Los logs de contenedores (stdout/stderr) son recolectados por el runtime del contenedor y pueden enviarse a sistemas centralizados de logging.
+  </Step>
+</Steps>
+
+## Mejores Prácticas de Monitoreo
+
+<Accordion title="Configurar alertas de health check">
+  Configure su orquestador (Kubernetes, Docker Swarm, ECS) para:
+  
+  1. Realizar health checks en `/actuator/health`
+  2. Establecer valores apropiados de timeout e intervalo
+  3. Reiniciar contenedores no saludables automáticamente
+  4. Alertar ante fallos repetidos de health check
+  
+  Ejemplo de liveness probe en Kubernetes:
+  ```yaml
+  livenessProbe:
+    httpGet:
+      path: /actuator/health
+      port: 8080
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  ```
+</Accordion>
+
+<Accordion title="Usar la interfaz de Zipkin para rastreo de solicitudes">
+  Acceda a la interfaz de Zipkin (normalmente en `http://localhost:9411`) para:
+  
+  1. Buscar trazas por nombre de servicio o rango de tiempo
+  2. Visualizar flujos de solicitudes entre servicios
+  3. Identificar cuellos de botella de rendimiento
+  4. Depurar fallos en transacciones distribuidas
+  5. Analizar dependencias entre servicios
+</Accordion>
+
+<Accordion title="Ajustar la tasa de muestreo según el tráfico">
+  **Entornos de bajo tráfico (< 100 req/min):**
+  ```yaml
+  management:
+    tracing:
+      sampling:
+        probability: 1.0  # Trace 100%
+  ```
+  
+  **Entornos de tráfico medio (100-1000 req/min):**
+  ```yaml
+  management:
+    tracing:
+      sampling:
+        probability: 0.1  # Trace 10%
+  ```
+  
+  **Entornos de alto tráfico (> 1000 req/min):**
+  ```yaml
+  management:
+    tracing:
+      sampling:
+        probability: 0.01  # Trace 1%
+  ```
+</Accordion>
+
+<Accordion title="Exportar métricas de Prometheus a Grafana">
+  1. Despliegue Prometheus para hacer scraping de los endpoints `/actuator/prometheus`
+  2. Configure Prometheus como fuente de datos en Grafana
+  3. Importe dashboards de Spring Boot desde Grafana.com
+  4. Cree dashboards personalizados para métricas de negocio
+  5. Configure reglas de alertas en Prometheus/Alertmanager
+</Accordion>
+
+<Accordion title="Implementar logging estructurado">
+  Use logging estructurado (formato JSON) para un mejor análisis de logs:
+  
+  ```java
+  import org.slf4j.Logger;
+  import org.slf4j.LoggerFactory;
+  
+  Logger log = LoggerFactory.getLogger(UserService.class);
+  
+  // Good: Structured with context
+  log.info("User created: userId={}, email={}", user.getId(), user.getEmail());
+  
+  // Better: With MDC for request tracing
+  MDC.put("userId", user.getId());
+  log.info("User login successful");
+  ```
+  
+  Esto permite un filtrado y análisis potente de logs en sistemas centralizados de logging.
+</Accordion>
+
+## Solución de Problemas
+
+<Accordion title="El endpoint de health check retorna 404">
+  **Causas:**
+  - Dependencia de Actuator no incluida
+  - Endpoints no expuestos en la configuración
+  - Mala configuración del context path
+  
+  **Soluciones:**
+  1. Verifique que `spring-boot-starter-actuator` esté en las dependencias
+  2. Revise la configuración de `management.endpoints.web.exposure.include`
+  3. Intente con la ruta completa: `/actuator/health` (no solo `/health`)
+</Accordion>
+
+<Accordion title="No aparecen trazas en Zipkin">
+  **Causas:**
+  - Servidor Zipkin inaccesible
+  - Probabilidad de muestreo demasiado baja
+  - Tracing de Micrometer no configurado
+  
+  **Soluciones:**
+  1. Verifique que Zipkin esté corriendo: `curl http://sgivu-zipkin:9411/health`
+  2. Aumente el muestreo a `1.0` para pruebas
+  3. Revise los logs del servicio en busca de errores de conexión con Zipkin
+  4. Verifique la dependencia `spring-cloud-starter-zipkin`
+</Accordion>
+
+<Accordion title="Demasiados endpoints de Actuator expuestos en producción">
+  **Riesgo:** Divulgación de información y potenciales vulnerabilidades de seguridad
+  
+  **Solución:** Asegúrese de que el perfil de producción use exposición restringida de endpoints:
+  ```yaml
+  management:
+    endpoints:
+      web:
+        exposure:
+          include: health, info, prometheus
+  ```
+  
+  Nunca use `include: "*"` en producción.
+</Accordion>
+
+<Accordion title="Alto uso de CPU por tracing">
+  **Causa:** Probabilidad de muestreo demasiado alta para el volumen de tráfico
+  
+  **Solución:** Reduzca la probabilidad de muestreo:
+  ```yaml
+  management:
+    tracing:
+      sampling:
+        probability: 0.01  # 1% instead of 10%
+  ```
+  
+  Monitoree el uso de CPU después del ajuste.
+</Accordion>
+
+## Configuración Relacionada
+
+<CardGroup cols={2}>
+  <Card title="Configuración de Spring" icon="leaf" href="/config/reference/spring-configuration">
+    Ajustes del servidor y la aplicación
+  </Card>
+  <Card title="Variables de Entorno" icon="code" href="/config/environments/variables">
+    Variables de entorno relacionadas con observabilidad
+  </Card>
+  <Card title="Despliegue" icon="rocket" href="/config/getting-started/local-development">
+    Despliegue del stack de Zipkin y monitoreo
+  </Card>
+  <Card title="Arquitectura de Servicios" icon="sitemap" href="/config/architecture">
+    Cómo la observabilidad se integra en el sistema
+  </Card>
+</CardGroup>

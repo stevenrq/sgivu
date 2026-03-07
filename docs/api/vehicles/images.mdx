@@ -1,0 +1,466 @@
+---
+title: 'Imágenes de Vehículos'
+description: 'Carga y gestión de imágenes de vehículos mediante URLs prefirmadas de S3'
+---
+
+## Descripción general
+
+La API de Imágenes de Vehículos proporciona endpoints para cargar, confirmar, listar y eliminar imágenes de vehículos. Las imágenes se almacenan en AWS S3, y el proceso de carga utiliza URLs prefirmadas para subidas directas del cliente a S3.
+
+## URL base
+
+```
+https://your-domain.com/v1/vehicles/{vehicleId}/images
+```
+
+---
+
+## Flujo de carga
+
+El proceso de carga de imágenes sigue un flujo de tres pasos:
+
+1. **Solicitar URL prefirmada** - Obtener una URL temporal de carga desde la API
+2. **Subir a S3** - Subir la imagen directamente a S3 usando la URL prefirmada
+3. **Confirmar carga** - Notificar a la API que la carga se completó y registrar los metadatos
+
+---
+
+## Generar URL prefirmada de carga
+
+```http
+POST /v1/vehicles/{vehicleId}/images/presigned-upload
+```
+
+Genera una URL prefirmada para subir una imagen directamente a S3.
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `vehicle:update`
+
+### Parámetros de ruta
+
+<ParamField path="vehicleId" type="integer" required>
+  ID del vehículo al que se asociará la imagen
+</ParamField>
+
+### Cuerpo de la solicitud
+
+<ParamField body="contentType" type="string" required>
+  Tipo MIME de la imagen. Valores permitidos:
+  - `image/jpeg`
+  - `image/png`
+  - `image/webp`
+</ParamField>
+
+```json
+{
+  "contentType": "image/jpeg"
+}
+```
+
+### Respuesta
+
+<ResponseField name="url" type="string">
+  URL prefirmada de S3 para subir la imagen
+</ResponseField>
+
+<ResponseField name="key" type="string">
+  Clave del objeto en S3 (necesaria para la confirmación)
+</ResponseField>
+
+<ResponseField name="expiresIn" type="integer">
+  Tiempo de expiración de la URL en segundos
+</ResponseField>
+
+<ResponseField name="contentType" type="string">
+  El tipo de contenido que debe usarse para la carga
+</ResponseField>
+
+```json
+{
+  "url": "https://sgivu-bucket.s3.amazonaws.com/images/vehicle-15-1709740800.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=...",
+  "key": "images/vehicle-15-1709740800.jpg",
+  "expiresIn": 900,
+  "contentType": "image/jpeg"
+}
+```
+
+### Códigos de estado
+
+- `200 OK` - URL prefirmada generada exitosamente
+- `400 Bad Request` - Tipo de contenido inválido
+- `401 Unauthorized` - No autenticado
+- `403 Forbidden` - Falta el permiso `vehicle:update`
+- `404 Not Found` - El vehículo no existe
+
+### Ejemplo
+
+```bash
+curl -X POST https://your-domain.com/v1/vehicles/15/images/presigned-upload \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "contentType": "image/jpeg"
+  }'
+```
+
+---
+
+## Subir a S3
+
+Una vez que tenga la URL prefirmada, suba la imagen directamente a S3:
+
+```bash
+curl -X PUT "PRESIGNED_URL" \
+  -H "Content-Type: image/jpeg" \
+  --data-binary @car-photo.jpg
+```
+
+<Note>
+  El header Content-Type **debe** coincidir con el tipo de contenido especificado al generar la URL prefirmada.
+</Note>
+
+---
+
+## Confirmar carga
+
+```http
+POST /v1/vehicles/{vehicleId}/images/confirm-upload
+```
+
+Confirma que una imagen fue subida exitosamente a S3 y registra sus metadatos en la base de datos.
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `vehicle:update`
+
+### Parámetros de ruta
+
+<ParamField path="vehicleId" type="integer" required>
+  ID del vehículo
+</ParamField>
+
+### Cuerpo de la solicitud
+
+<ParamField body="fileName" type="string" required>
+  Nombre original del archivo
+</ParamField>
+
+<ParamField body="contentType" type="string" required>
+  Tipo MIME de la imagen cargada
+</ParamField>
+
+<ParamField body="size" type="integer" required>
+  Tamaño del archivo en bytes
+</ParamField>
+
+<ParamField body="key" type="string" required>
+  Clave del objeto en S3 (recibida al generar la URL prefirmada)
+</ParamField>
+
+<ParamField body="primary" type="boolean" default="false">
+  Indica si esta es la imagen principal del vehículo
+</ParamField>
+
+```json
+{
+  "fileName": "front-view.jpg",
+  "contentType": "image/jpeg",
+  "size": 245760,
+  "key": "images/vehicle-15-1709740800.jpg",
+  "primary": true
+}
+```
+
+### Respuesta
+
+<ResponseField name="id" type="integer">
+  ID del registro de imagen
+</ResponseField>
+
+<ResponseField name="vehicleId" type="integer">
+  ID del vehículo
+</ResponseField>
+
+<ResponseField name="fileName" type="string">
+  Nombre original del archivo
+</ResponseField>
+
+<ResponseField name="key" type="string">
+  Clave del objeto en S3
+</ResponseField>
+
+<ResponseField name="url" type="string">
+  URL pública o URL prefirmada de descarga
+</ResponseField>
+
+<ResponseField name="contentType" type="string">
+  Tipo MIME
+</ResponseField>
+
+<ResponseField name="size" type="integer">
+  Tamaño del archivo en bytes
+</ResponseField>
+
+<ResponseField name="isPrimary" type="boolean">
+  Indica si es la imagen principal
+</ResponseField>
+
+<ResponseField name="createdAt" type="string">
+  Marca de tiempo de la carga
+</ResponseField>
+
+```json
+{
+  "id": 42,
+  "vehicleId": 15,
+  "fileName": "front-view.jpg",
+  "key": "images/vehicle-15-1709740800.jpg",
+  "url": "https://sgivu-bucket.s3.amazonaws.com/images/vehicle-15-1709740800.jpg",
+  "contentType": "image/jpeg",
+  "size": 245760,
+  "isPrimary": true,
+  "createdAt": "2026-03-06T10:35:00"
+}
+```
+
+### Códigos de estado
+
+- `200 OK` - Carga confirmada y metadatos registrados
+- `400 Bad Request` - Datos inválidos o clave de S3 no encontrada
+- `401 Unauthorized` - No autenticado
+- `403 Forbidden` - Falta el permiso `vehicle:update`
+- `404 Not Found` - El vehículo no existe
+
+### Ejemplo
+
+```bash
+curl -X POST https://your-domain.com/v1/vehicles/15/images/confirm-upload \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "fileName": "front-view.jpg",
+    "contentType": "image/jpeg",
+    "size": 245760,
+    "key": "images/vehicle-15-1709740800.jpg",
+    "primary": true
+  }'
+```
+
+---
+
+## Listar imágenes de un vehículo
+
+```http
+GET /v1/vehicles/{vehicleId}/images
+```
+
+Obtiene todas las imágenes asociadas a un vehículo.
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `vehicle:read`
+
+### Parámetros de ruta
+
+<ParamField path="vehicleId" type="integer" required>
+  ID del vehículo
+</ParamField>
+
+### Respuesta
+
+```json
+[
+  {
+    "id": 42,
+    "vehicleId": 15,
+    "fileName": "front-view.jpg",
+    "url": "https://sgivu-bucket.s3.amazonaws.com/images/vehicle-15-1709740800.jpg",
+    "contentType": "image/jpeg",
+    "size": 245760,
+    "isPrimary": true,
+    "createdAt": "2026-03-06T10:35:00"
+  },
+  {
+    "id": 43,
+    "vehicleId": 15,
+    "fileName": "side-view.jpg",
+    "url": "https://sgivu-bucket.s3.amazonaws.com/images/vehicle-15-1709740850.jpg",
+    "contentType": "image/jpeg",
+    "size": 198432,
+    "isPrimary": false,
+    "createdAt": "2026-03-06T10:36:00"
+  }
+]
+```
+
+### Códigos de estado
+
+- `200 OK` - Imágenes obtenidas exitosamente
+- `401 Unauthorized` - No autenticado
+- `404 Not Found` - El vehículo no existe
+
+### Ejemplo
+
+```bash
+curl -X GET https://your-domain.com/v1/vehicles/15/images \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+---
+
+## Eliminar imagen
+
+```http
+DELETE /v1/vehicles/{vehicleId}/images/{imageId}
+```
+
+Elimina una imagen de vehículo tanto de la base de datos como de S3.
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `vehicle:delete`
+
+### Parámetros de ruta
+
+<ParamField path="vehicleId" type="integer" required>
+  ID del vehículo
+</ParamField>
+
+<ParamField path="imageId" type="integer" required>
+  ID de la imagen a eliminar
+</ParamField>
+
+### Códigos de estado
+
+- `204 No Content` - Imagen eliminada exitosamente
+- `401 Unauthorized` - No autenticado
+- `403 Forbidden` - Falta el permiso `vehicle:delete`
+- `404 Not Found` - El vehículo o la imagen no existe
+
+### Ejemplo
+
+```bash
+curl -X DELETE https://your-domain.com/v1/vehicles/15/images/42 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+---
+
+## Comportamiento de la imagen principal
+
+### Asignación automática de imagen principal
+
+- La **primera imagen** cargada para un vehículo se marca automáticamente como principal (`isPrimary=true`)
+- Solo una imagen por vehículo puede ser la principal a la vez
+- Establecer una nueva imagen como principal desmarcará automáticamente la imagen principal anterior
+
+### Eliminación de la imagen principal
+
+- Cuando se elimina la imagen principal, la **imagen restante más antigua** se promueve automáticamente como principal
+- Si no quedan imágenes después de la eliminación, el vehículo no tiene imagen principal
+
+---
+
+## Tipos de contenido permitidos
+
+Solo se aceptan los siguientes formatos de imagen:
+
+- `image/jpeg` - Imágenes JPEG/JPG
+- `image/png` - Imágenes PNG
+- `image/webp` - Imágenes WebP
+
+<Warning>
+  Intentar cargar otros tipos de archivo resultará en un error `400 Bad Request`.
+</Warning>
+
+---
+
+## Configuración de S3
+
+### Requisitos de CORS
+
+El bucket de S3 debe estar configurado con reglas CORS apropiadas para permitir cargas desde el navegador:
+
+```json
+[
+  {
+    "AllowedOrigins": ["https://your-domain.com"],
+    "AllowedMethods": ["GET", "PUT"],
+    "AllowedHeaders": ["*"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3000
+  }
+]
+```
+
+Los orígenes CORS se configuran mediante la propiedad `aws.s3.allowed-origins` en `sgivu-config`.
+
+### Expiración de URLs prefirmadas
+
+Las URLs prefirmadas expiran después de **15 minutos** (900 segundos). Las cargas deben completarse dentro de este periodo.
+
+---
+
+## Ejemplo completo de carga
+
+A continuación se muestra un ejemplo completo de carga de una imagen:
+
+```bash
+# Step 1: Get presigned URL
+RESPONSE=$(curl -X POST https://your-domain.com/v1/vehicles/15/images/presigned-upload \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"contentType": "image/jpeg"}')
+
+URL=$(echo $RESPONSE | jq -r '.url')
+KEY=$(echo $RESPONSE | jq -r '.key')
+
+# Step 2: Upload to S3
+curl -X PUT "$URL" \
+  -H "Content-Type: image/jpeg" \
+  --data-binary @car-photo.jpg
+
+# Step 3: Confirm upload
+curl -X POST https://your-domain.com/v1/vehicles/15/images/confirm-upload \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"fileName\": \"car-photo.jpg\",
+    \"contentType\": \"image/jpeg\",
+    \"size\": 245760,
+    \"key\": \"$KEY\",
+    \"primary\": true
+  }"
+```
+
+---
+
+## Respuestas de error
+
+### 400 Bad Request - Tipo de contenido inválido
+
+```json
+{
+  "error": "invalid_content_type",
+  "message": "Content type must be image/jpeg, image/png, or image/webp"
+}
+```
+
+### 400 Bad Request - Clave de S3 no encontrada
+
+```json
+{
+  "error": "validation_error",
+  "message": "The specified S3 key does not exist or upload was not completed"
+}
+```
+
+### 404 Not Found
+
+```json
+{
+  "error": "not_found",
+  "message": "Vehicle with ID 999 not found"
+}
+```

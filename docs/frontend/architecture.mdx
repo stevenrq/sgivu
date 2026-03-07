@@ -1,0 +1,623 @@
+---
+title: Arquitectura del Frontend
+description: Patrones arquitectónicos y estructura del frontend Angular de SGIVU
+---
+
+# Arquitectura del Frontend
+
+El Frontend de SGIVU sigue las mejores prácticas modernas de Angular con una arquitectura basada en features, gestión de estado reactiva mediante Signals y diseño modular de Component.
+
+## Principios Arquitectónicos
+
+### 1. Organización Basada en Features
+
+La aplicación está organizada por features en lugar de capas técnicas:
+
+```
+src/app/
+├── features/              # Feature modules
+│   ├── auth/             # Authentication feature
+│   ├── dashboard/        # Dashboard feature
+│   ├── users/           # User management feature
+│   ├── clients/         # Client management feature
+│   ├── vehicles/        # Vehicle inventory feature
+│   └── purchase-sales/  # Transaction management feature
+└── shared/              # Shared code across features
+```
+
+**Beneficios:**
+- Límites de dominio claros
+- Facilidad para localizar código
+- Facilita la carga diferida (lazy loading)
+- Soporta escalabilidad del equipo
+
+### 2. Standalone Components
+
+Todos los Component son standalone (no requieren NgModule):
+
+```typescript
+@Component({
+  selector: 'app-vehicle-list',
+  standalone: true,
+  imports: [CommonModule, RouterLink, DataTableComponent],
+  templateUrl: './vehicle-list.component.html'
+})
+export class VehicleListComponent {}
+```
+
+**Ventajas:**
+- Gestión de módulos simplificada
+- Mejor tree-shaking
+- Dependencias más explícitas
+- Más fácil entender los requisitos de cada Component
+
+### 3. Gestión de Estado Basada en Signals
+
+La aplicación utiliza Angular Signals para el estado reactivo:
+
+```typescript
+export class AuthService {
+  private readonly _isAuthenticated = signal(false);
+  private readonly _user = signal<User | null>(null);
+  
+  public readonly isAuthenticated: Signal<boolean> = 
+    this._isAuthenticated.asReadonly();
+  
+  public readonly currentAuthenticatedUser: Signal<User | null> = 
+    this._user.asReadonly();
+  
+  public readonly isAdmin: Signal<boolean> = computed(() => {
+    return this._user()?.roles.some(r => r.name === 'ADMIN') ?? false;
+  });
+}
+```
+
+**Características Clave:**
+- Reactivo por defecto
+- Reactividad de grano fino
+- Valores computados
+- Effects para efectos secundarios
+- Mejor rendimiento que Observable para estado local
+
+### 4. Inyección de Dependencias
+
+Los Service utilizan la inyección de dependencias de Angular con la función `inject()`:
+
+```typescript
+@Injectable({ providedIn: 'root' })
+export class VehicleService {
+  private readonly http = inject(HttpClient);
+  private readonly router = inject(Router);
+  private readonly confirmService = inject(ConfirmActionService);
+}
+```
+
+**Beneficios:**
+- Constructor más limpio
+- Testeabilidad
+- Service singleton
+- Inicialización diferida
+
+## Estructura de la Aplicación
+
+### Configuración Central
+
+#### app.config.ts
+
+Configuración central de la aplicación:
+
+```typescript
+export const appConfig: ApplicationConfig = {
+  providers: [
+    provideZoneChangeDetection({ eventCoalescing: true }),
+    provideRouter(routes),
+    provideHttpClient(withInterceptors([defaultOAuthInterceptor])),
+    provideCharts(withDefaultRegisterables()),
+    { provide: LOCALE_ID, useValue: 'es-CO' },
+    provideAppInitializer(() => inject(ThemeService).initialize()),
+    provideAppInitializer(() => inject(AuthService).initializeAuthentication())
+  ]
+};
+```
+
+**La configuración incluye:**
+- Detección de cambios con Zone.js (preparada para zoneless)
+- Router con lazy loading
+- Cliente HTTP con Interceptor OAuth
+- Integración con Chart.js
+- Configuración de locale (es-CO)
+- Inicializadores de aplicación para tema y autenticación
+
+#### app.routes.ts
+
+Carga diferida basada en rutas:
+
+```typescript
+export const routes: Routes = [
+  { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
+  { path: 'login', loadComponent: () => import('./features/auth/...') },
+  { 
+    path: 'dashboard', 
+    loadComponent: () => import('./features/dashboard/...'),
+    canActivate: [authGuard, permissionGuard]
+  },
+  { 
+    path: 'users', 
+    loadChildren: () => import('./features/users/user.routes')
+  },
+  { 
+    path: 'vehicles', 
+    loadChildren: () => import('./features/vehicles/vehicle.routes')
+  }
+];
+```
+
+**Características:**
+- Lazy loading para división de código
+- Guard de rutas para autenticación y autorización
+- Rutas hijas para Feature Module
+- Redirección para ruta por defecto
+
+### Estructura de un Feature Module
+
+Cada feature sigue una estructura consistente:
+
+```
+features/users/
+├── components/           # Feature components
+│   ├── user-list/
+│   ├── user-form/
+│   └── user-profile/
+├── services/            # Feature-specific services
+│   └── user.service.ts
+├── models/              # Data models
+│   ├── user.model.ts
+│   └── person.model.ts
+├── interfaces/          # TypeScript interfaces
+│   └── user-count.interface.ts
+├── resolvers/           # Route resolvers
+│   └── user-profile.resolver.ts
+└── user.routes.ts       # Feature routes
+```
+
+## Módulo Compartido (Shared)
+
+Código compartido utilizado en todos los features:
+
+### Components
+
+Component reutilizables de UI:
+- **navbar** - Barra de navegación superior
+- **sidebar** - Menú de navegación lateral
+- **data-table** - Tabla de datos genérica con ordenamiento/filtrado
+- **pager** - Component de paginación
+- **kpi-card** - Visualización de KPI en el Dashboard
+- **page-header** - Encabezados de página consistentes
+- **form-shell** - Envoltorio de formularios con funcionalidad común
+- **loading-overlay** - Indicador de estado de carga
+- **not-found** - Página 404
+- **forbidden** - Página 403 de acceso denegado
+- **settings** - Configuración del usuario
+- **configuration** - Configuración de la aplicación
+
+### Services
+
+Lógica de negocio compartida:
+- **theme.service** - Gestión de tema (modo claro/oscuro)
+- **confirm-action.service** - Diálogos de confirmación
+- **demand-prediction.service** - Predicciones de demanda basadas en ML
+- **client-ui-helper.service** - Utilidades de UI para clientes
+- **user-ui-helper.service** - Utilidades de UI para usuarios
+- **vehicle-ui-helper.service** - Utilidades de UI para vehículos
+
+### Utilidades
+
+Funciones auxiliares:
+- **form.utils** - Validación y manipulación de formularios
+- **date.utils** - Formateo y conversión de fechas
+- **currency.utils** - Formateo de moneda (COP)
+- **error-handler.utils** - Manejo y visualización de errores
+- **filter-query.utils** - Construcción de parámetros de consulta URL
+- **crud-operations.factory** - Operaciones CRUD genéricas
+- **swal-alert.utils** - Wrappers de SweetAlert2
+- **address-form.utils** - Gestión de formularios de dirección
+- **list-page-manager** - Gestión de estado de páginas de listado
+- **vehicle-status-labels.utils** - Visualización de estados de vehículos
+
+### Directives
+
+- **has-permission** - Renderizado condicional basado en permisos
+- **row-navigate** - Navegación al hacer clic en una fila de tabla
+
+### Pipes
+
+- **cop-currency** - Formateo de números como Peso Colombiano
+- **utc-to-gmt-minus5** - Conversión de UTC a zona horaria colombiana (GMT-5)
+
+### Models
+
+Modelos de datos compartidos:
+- **paginated-response** - Envoltorio de paginación de API
+- **role.model** - Rol de usuario
+- **permission.model** - Permiso de usuario
+- **address.model** - Información de dirección
+- **demand-prediction.model** - Datos de predicción
+- **form-config.model** - Configuración dinámica de formularios
+
+## Arquitectura de Autenticación
+
+### Flujo OAuth2/OIDC
+
+La autenticación se delega a `sgivu-gateway`:
+
+```
+┌─────────────┐          ┌──────────────┐          ┌─────────────┐
+│   Browser   │          │ sgivu-gateway│          │ sgivu-auth  │
+│  (Angular)  │          │    (BFF)     │          │  (OAuth2)   │
+└─────────────┘          └──────────────┘          └─────────────┘
+       │                        │                         │
+       │  1. Login Request      │                         │
+       │──────────────────────→ │                         │
+       │                        │  2. Redirect to Auth    │
+       │                        │────────────────────────→│
+       │                        │                         │
+       │  3. OAuth2 Login Page  │                         │
+       │←─────────────────────────────────────────────────│
+       │                        │                         │
+       │  4. User Login         │                         │
+       │────────────────────────────────────────────────→│
+       │                        │                         │
+       │  5. Authorization Code │                         │
+       │←─────────────────────────────────────────────────│
+       │                        │                         │
+       │  6. Callback with Code │                         │
+       │──────────────────────→ │  7. Exchange for Token │
+       │                        │────────────────────────→│
+       │                        │                         │
+       │                        │  8. Access Token        │
+       │  9. Session Cookie     │←────────────────────────│
+       │←────────────────────── │                         │
+```
+
+### Service de Autenticación
+
+**Responsabilidades Clave:**
+1. Inicializar el estado de autenticación al cargar la aplicación
+2. Verificar la sesión mediante el Endpoint `/auth/session`
+3. Almacenar el usuario y el estado de autenticación en Signals
+4. Proveer propiedades computadas (ej., `isAdmin`)
+5. Gestionar los flujos de login y logout
+
+**Estado Basado en Signals:**
+
+```typescript
+class AuthService {
+  private _isAuthenticated = signal(false);
+  private _user = signal<User | null>(null);
+  private _session = signal<AuthSessionResponse | null>(null);
+  
+  readonly isAuthenticated = this._isAuthenticated.asReadonly();
+  readonly currentAuthenticatedUser = this._user.asReadonly();
+  readonly isAdmin = computed(() => 
+    this._user()?.roles.some(r => r.name === 'ADMIN') ?? false
+  );
+}
+```
+
+### Guard de Rutas
+
+#### authGuard
+
+Protege rutas que requieren autenticación:
+
+```typescript
+export const authGuard: CanActivateFn = () => {
+  const authService = inject(AuthService);
+  const router = inject(Router);
+  
+  if (!authService.isAuthenticated()) {
+    router.navigate(['/login']);
+    return false;
+  }
+  return true;
+};
+```
+
+#### permissionGuard
+
+Protege rutas que requieren permisos específicos:
+
+```typescript
+export const permissionGuard: CanActivateFn = (route) => {
+  const permissionService = inject(PermissionService);
+  const router = inject(Router);
+  
+  const canActivateFn = route.data['canActivateFn'];
+  if (canActivateFn && !canActivateFn(permissionService)) {
+    router.navigate(['/forbidden']);
+    return false;
+  }
+  return true;
+};
+```
+
+**Uso en Rutas:**
+
+```typescript
+{
+  path: 'dashboard',
+  loadComponent: () => import('./dashboard.component'),
+  canActivate: [authGuard, permissionGuard],
+  data: {
+    canActivateFn: (ps: PermissionService) => ps.hasPermission('user:read')
+  }
+}
+```
+
+### HTTP Interceptor
+
+**defaultOAuthInterceptor** agrega autenticación a todas las peticiones API:
+
+```typescript
+export const defaultOAuthInterceptor: HttpInterceptorFn = (req, next) => {
+  // Skip for auth endpoints
+  if (req.url.includes('/auth/')) {
+    return next(req);
+  }
+  
+  // Add credentials for CORS
+  const authReq = req.clone({
+    withCredentials: true
+  });
+  
+  return next(authReq).pipe(
+    catchError(error => {
+      if (error.status === 401) {
+        // Handle unauthorized
+      }
+      return throwError(() => error);
+    })
+  );
+};
+```
+
+## Patrones de Gestión de Estado
+
+### Estado Basado en Services
+
+Los features gestionan el estado en Service mediante Signals:
+
+```typescript
+@Injectable({ providedIn: 'root' })
+export class VehicleService {
+  private _vehicles = signal<Vehicle[]>([]);
+  private _selectedVehicle = signal<Vehicle | null>(null);
+  private _loading = signal(false);
+  
+  readonly vehicles = this._vehicles.asReadonly();
+  readonly selectedVehicle = this._selectedVehicle.asReadonly();
+  readonly loading = this._loading.asReadonly();
+  
+  readonly availableVehicles = computed(() => 
+    this._vehicles().filter(v => v.status === 'AVAILABLE')
+  );
+  
+  loadVehicles(): void {
+    this._loading.set(true);
+    this.http.get<Vehicle[]>('/api/vehicles').subscribe({
+      next: vehicles => {
+        this._vehicles.set(vehicles);
+        this._loading.set(false);
+      },
+      error: () => this._loading.set(false)
+    });
+  }
+}
+```
+
+### Estado del Component
+
+Los Component utilizan Signals para el estado local:
+
+```typescript
+export class VehicleListComponent {
+  private vehicleService = inject(VehicleService);
+  
+  // Local state
+  protected readonly searchQuery = signal('');
+  protected readonly sortColumn = signal<string | null>(null);
+  protected readonly sortDirection = signal<'asc' | 'desc'>('asc');
+  
+  // Service state
+  protected readonly vehicles = this.vehicleService.vehicles;
+  protected readonly loading = this.vehicleService.loading;
+  
+  // Computed filtered list
+  protected readonly filteredVehicles = computed(() => {
+    const query = this.searchQuery().toLowerCase();
+    return this.vehicles().filter(v => 
+      v.brand.toLowerCase().includes(query) ||
+      v.model.toLowerCase().includes(query)
+    );
+  });
+}
+```
+
+## Estrategia de Detección de Cambios
+
+### Estrategia OnPush
+
+Todos los Component usan `OnPush` para un rendimiento óptimo:
+
+```typescript
+@Component({
+  selector: 'app-vehicle-list',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  // ...
+})
+export class VehicleListComponent {}
+```
+
+**Beneficios:**
+- Reduce los ciclos de detección de cambios
+- Mejor rendimiento
+- Funciona perfectamente con Signals
+- Prepara para la migración a zoneless
+
+### Ruta de Migración a Zoneless
+
+La aplicación está preparada para detección de cambios sin Zone.js:
+
+**Estado Actual:**
+- La mayoría de Component usan Signals
+- Estrategia OnPush en todos los Component
+- ~20 propiedades mutables restantes
+
+**Para Habilitar Zoneless:**
+1. Reemplazar `provideZoneChangeDetection()` por `provideZonelessChangeDetection()`
+2. Eliminar `zone.js` de los polyfills en `angular.json`
+3. Desinstalar zone.js: `npm uninstall zone.js`
+4. Convertir las propiedades mutables restantes a Signals
+
+## Comunicación HTTP
+
+### Patrón de Service
+
+Llamadas HTTP encapsuladas en Service:
+
+```typescript
+@Injectable({ providedIn: 'root' })
+export class VehicleService {
+  private readonly http = inject(HttpClient);
+  private readonly apiUrl = `${environment.apiUrl}/v1/vehicles`;
+  
+  getVehicles(params?: HttpParams): Observable<PaginatedResponse<Vehicle>> {
+    return this.http.get<PaginatedResponse<Vehicle>>(this.apiUrl, { params });
+  }
+  
+  getVehicle(id: string): Observable<Vehicle> {
+    return this.http.get<Vehicle>(`${this.apiUrl}/${id}`);
+  }
+  
+  createVehicle(vehicle: Vehicle): Observable<Vehicle> {
+    return this.http.post<Vehicle>(this.apiUrl, vehicle);
+  }
+  
+  updateVehicle(id: string, vehicle: Vehicle): Observable<Vehicle> {
+    return this.http.put<Vehicle>(`${this.apiUrl}/${id}`, vehicle);
+  }
+  
+  deleteVehicle(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.apiUrl}/${id}`);
+  }
+}
+```
+
+### Manejo de Errores
+
+Manejo de errores centralizado:
+
+```typescript
+import { handleApiError } from '@shared/utils/error-handler.utils';
+
+this.vehicleService.deleteVehicle(id).subscribe({
+  next: () => {
+    showSuccessAlert('Vehicle deleted successfully');
+    this.loadVehicles();
+  },
+  error: (error) => handleApiError(error)
+});
+```
+
+## Gestión de Formularios
+
+### Reactive Forms
+
+Todos los formularios utilizan Reactive Forms con validación:
+
+```typescript
+export class VehicleFormComponent {
+  private fb = inject(FormBuilder);
+  
+  protected vehicleForm = this.fb.group({
+    brand: ['', [Validators.required]],
+    model: ['', [Validators.required]],
+    year: [null, [Validators.required, Validators.min(1900)]],
+    price: [null, [Validators.required, Validators.min(0)]],
+    status: ['AVAILABLE', Validators.required]
+  });
+  
+  onSubmit(): void {
+    if (this.vehicleForm.valid) {
+      const vehicle = this.vehicleForm.value as Vehicle;
+      this.vehicleService.createVehicle(vehicle).subscribe({
+        next: () => this.router.navigate(['/vehicles']),
+        error: (error) => handleApiError(error)
+      });
+    }
+  }
+}
+```
+
+### Utilidades de Formularios
+
+Funciones auxiliares compartidas en `shared/utils/form.utils.ts`:
+- `markFormGroupTouched()` - Marca todos los campos como tocados
+- `getFormValidationErrors()` - Extrae errores de validación
+- `resetForm()` - Reinicia el estado del formulario
+- `patchFormValue()` - Aplicación segura de valores al formulario
+
+## Optimizaciones de Rendimiento
+
+### Lazy Loading
+
+Feature Module cargados bajo demanda:
+- Reduce el tamaño del bundle inicial
+- Carga inicial de página más rápida
+- Mejor experiencia de usuario
+
+### División de Código (Code Splitting)
+
+Fragmentación automática por ruta:
+```
+main.js              - Core Angular + app config
+features-users.js    - User management feature
+features-vehicles.js - Vehicle inventory feature
+...
+```
+
+### Funciones TrackBy
+
+Renderizado de listas optimizado:
+
+```typescript
+protected trackById = (index: number, item: { id: string }) => item.id;
+```
+
+```html
+<tr *ngFor="let vehicle of vehicles(); trackBy: trackById">
+```
+
+### Optimización de Imágenes
+
+Carga de imágenes con URLs prefirmadas a S3:
+1. Solicitar URL prefirmada al Backend
+2. Subir directamente a S3
+3. Confirmar la carga con el Backend
+4. Mostrar la imagen subida
+
+Beneficios:
+- Sin datos de imagen a través del Backend
+- Cargas más rápidas
+- Menor carga en el servidor
+
+## Próximos Pasos
+
+<CardGroup cols={2}>
+  <Card title="Funcionalidades" icon="puzzle-piece" href="/frontend/features">
+    Explora los Feature Module en detalle
+  </Card>
+  <Card title="Configuración" icon="rocket" href="/frontend/setup">
+    Configura el entorno de desarrollo
+  </Card>
+</CardGroup>

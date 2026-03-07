@@ -1,0 +1,358 @@
+---
+title: API Gateway
+description: Capa de Backend-for-Frontend y enrutamiento con Spring Cloud Gateway
+---
+
+## Descripción general
+
+`sgivu-gateway` es el API Gateway y Backend-for-Frontend (BFF) del ecosistema SGIVU. Construido con Spring Cloud Gateway (WebFlux), cumple las siguientes funciones:
+
+- **BFF** para la SPA, proporcionando `/auth/session` y flujos de autenticación
+- **Proxy y enrutador** para todas las APIs de negocio (`/v1/*`) con seguridad, Circuit Breakers, reescritura de rutas y fallbacks
+
+## Tecnologías
+
+- **Java**: 21
+- **Spring Boot**: 3.5.8
+- **Spring Cloud Gateway**: Enrutamiento basado en WebFlux
+- **Spring Security**: Cliente OAuth2 + Resource Server
+- **Spring Session**: Gestión de sesiones basada en Redis
+- **Resilience4j**: Patrón Circuit Breaker
+- **Micrometer Tracing**: Integración con Zipkin
+- **SpringDoc OpenAPI**: Agregación de Swagger UI
+- **Lombok**: Generación de código
+
+## Configuración de puerto
+
+- **Puerto por defecto**: 8080 (configurable vía `PORT` o Config Server)
+
+## Requisitos previos
+
+- JDK 21
+- Maven 3.9+
+- Docker & docker-compose
+- **Redis**: Almacenamiento de sesiones (definido como `sgivu-redis` en docker-compose)
+- **Servicios requeridos**: `sgivu-config`, `sgivu-discovery`, `sgivu-auth`
+
+## Endpoints
+
+### Endpoints BFF
+
+<ResponseField name="GET /auth/session" type="public">
+  Retorna información de la sesión actual: subject, username, roles, isAdmin
+</ResponseField>
+
+### Rutas proxy
+
+<ResponseField name="/docs/<service>/..." type="public">
+  Documentación Swagger agregada desde los microservicios
+</ResponseField>
+
+<ResponseField name="/v1/*" type="protected">
+  APIs de negocio que requieren autenticación y autorización
+  - Token Relay habilitado
+  - Circuit Breaker con fallback
+  - Descubrimiento automático de servicios vía Eureka
+</ResponseField>
+
+<ResponseField name="GET /fallback/*" type="public">
+  Endpoints de fallback cuando los servicios downstream fallan
+</ResponseField>
+
+<ResponseField name="GET /actuator/health" type="public">
+  Estado de salud del Gateway
+</ResponseField>
+
+## Ejecución del servicio
+
+### Desarrollo con Docker Compose
+
+```bash
+cd infra/compose/sgivu-docker-compose
+docker compose -f docker-compose.dev.yml up -d
+```
+
+### Ejecución local
+
+```bash
+./mvnw clean package
+./mvnw spring-boot:run
+```
+
+### Construcción Docker
+
+```bash
+./build-image.bash
+docker build -t stevenrq/sgivu-gateway:v1 .
+docker run -p 8080:8080 --env-file infra/compose/sgivu-docker-compose/.env stevenrq/sgivu-gateway:v1
+```
+
+## Configuración de enrutamiento
+
+### Rutas de documentación
+
+Patrón: `/docs/<service>/...`
+
+- Reescribe rutas y las redirige a los Endpoints Swagger de cada microservicio
+- Acceso público (no requiere autenticación)
+- Ejemplo: `/docs/user/v3/api-docs` → `http://sgivu-user/v3/api-docs`
+
+### Rutas de API
+
+Patrón: `/v1/*`
+
+**Filtros aplicados**:
+1. **TokenRelay**: Reenvía el token OAuth2 a los servicios downstream
+2. **CircuitBreaker**: Circuit Breaker de Resilience4j con fallback
+3. **Service Discovery**: Resuelve servicios vía Eureka
+
+**Endpoints protegidos**:
+- `/v1/users/**`
+- `/v1/persons/**`
+- `/v1/companies/**`
+- `/v1/vehicles/**`
+- `/v1/purchase-sales/**`
+- `/v1/ml/**`
+
+### Enrutamiento del servicio ML
+
+Dirige al servicio ML en Python: `http://sgivu-ml:8000`
+
+## Filtros globales
+
+### ZipkinTracingGlobalFilter
+
+**Propósito**: Integración de trazabilidad distribuida
+
+**Acciones**:
+- Crea spans para cada solicitud
+- Agrega el header `X-Trace-Id` para correlación de trazas
+- Etiqueta los spans con el estado HTTP y la duración
+
+### AddUserIdHeaderGlobalFilter
+
+**Propósito**: Propagación del contexto de usuario
+
+**Acciones**:
+- Extrae el subject/claim del token JWT
+- Agrega el header `X-User-ID` a las solicitudes downstream
+- Permite el rastreo de usuarios en los microservicios
+
+## Configuración de seguridad
+
+### Cliente OAuth2
+
+El Gateway actúa como cliente OAuth2 para los flujos de inicio de sesión:
+
+- **Flujo de autorización**: PKCE (Proof Key for Code Exchange)
+- **Registro de cliente**: Configurado en `sgivu-config-repo/sgivu-gateway.yml`
+- **Provider**: Apunta al issuer de `sgivu-auth`
+
+### Resource Server
+
+Valida los tokens JWT para las rutas de API:
+
+- **Issuer**: Configuración OpenID de `sgivu-auth`
+- **Endpoint JWKS**: Utilizado para la verificación de firmas
+- **Token Relay**: Reenvía el token validado a los servicios downstream
+
+### Rutas públicas
+
+No requieren autenticación:
+- `/docs/**`
+- `/v3/api-docs/**`
+- `/swagger-ui/**`
+- `/oauth2/**`
+- `/login/**`
+- `/auth/session`
+- `/fallback/**`
+
+### Rutas protegidas
+
+Requieren un token JWT válido:
+- Todos los Endpoints `/v1/**`
+
+### Configuración CORS
+
+<Info>
+Revisa la configuración CORS en `SecurityConfig` para que coincida con el origen de tu Frontend:
+
+```java
+.cors(cors -> cors.configurationSource(request -> {
+    CorsConfiguration config = new CorsConfiguration();
+    config.setAllowedOrigins(List.of("http://localhost:3000"));
+    config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE"));
+    config.setAllowedHeaders(List.of("*"));
+    config.setAllowCredentials(true);
+    return config;
+}))
+```
+</Info>
+
+## Circuit Breaker
+
+### Configuración
+
+Cada ruta de API incluye un Circuit Breaker de Resilience4j:
+
+```yaml
+filters:
+  - TokenRelay=
+  - CircuitBreaker=serviceCircuitBreaker,forward:/fallback/service
+```
+
+### Comportamiento de fallback
+
+Cuando un servicio no está disponible:
+1. El Circuit Breaker se abre tras superar el umbral de fallos
+2. La solicitud se redirige a `/fallback/<service>`
+3. Retorna una respuesta de error controlada
+4. El Circuit Breaker pasa a estado semi-abierto tras el timeout para verificar la recuperación
+
+## Gestión de sesiones
+
+### Configuración de Redis
+
+**Spring Session** almacena las sesiones en Redis:
+
+```yaml
+spring:
+  session:
+    store-type: redis
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: 6379
+      password: ${REDIS_PASSWORD}
+```
+
+<Warning>
+Asegúrate de que Redis sea accesible y esté configurado con autenticación por contraseña en producción.
+</Warning>
+
+## Observabilidad
+
+### Trazabilidad distribuida
+
+**Integración con Zipkin**:
+- Endpoint: Configurado vía Config Server
+- Header: `X-Trace-Id` agregado a todas las solicitudes
+- Spans: Creados para cada ruta del Gateway
+
+**Configuración de Brave**:
+```yaml
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+  zipkin:
+    tracing:
+      endpoint: http://sgivu-zipkin:9411/api/v2/spans
+```
+
+### Health Checks
+
+```bash
+curl http://localhost:8080/actuator/health
+```
+
+La respuesta incluye:
+- Estado del Gateway
+- Estados de los Circuit Breakers
+- Disponibilidad de los servicios downstream
+
+## Pruebas
+
+```bash
+./mvnw test
+```
+
+**Pruebas de integración recomendadas**:
+- Enrutamiento y reescritura de rutas (`/docs/*`)
+- Propagación de Token Relay
+- Comportamiento de Circuit Breaker y fallback
+- Ejecución de filtros globales (X-Trace-Id, X-User-ID)
+
+## Solución de problemas
+
+<AccordionGroup>
+  <Accordion title="401/403 en llamadas a la API">
+    **Síntomas**: Las solicitudes a la API retornan no autorizado o prohibido
+    
+    **Soluciones**:
+    - Verificar que el token Bearer sea válido (comprobar los claims aud/issuer)
+    - Asegurar que `sgivu-auth` esté operativo y accesible
+    - Verificar que el Endpoint JWKS sea alcanzable
+    - Comprobar que el token no haya expirado
+  </Accordion>
+  
+  <Accordion title="Fallos de enrutamiento">
+    **Síntomas**: 503 Service Unavailable o errores de enrutamiento
+    
+    **Soluciones**:
+    - Verificar que los servicios estén registrados en Eureka (`http://sgivu-discovery:8761`)
+    - Comprobar la configuración de `eureka.client.service-url.defaultZone`
+    - Revisar que los nombres de aplicación de los servicios coincidan con las URIs de las rutas
+    - Inspeccionar los logs del Gateway para errores de resolución de rutas
+  </Accordion>
+  
+  <Accordion title="Problemas de sesión">
+    **Síntomas**: Los usuarios son desconectados inesperadamente o se pierde la sesión
+    
+    **Soluciones**:
+    - Verificar que Redis esté ejecutándose y sea accesible
+    - Comprobar las variables de entorno `REDIS_HOST` y `REDIS_PASSWORD`
+    - Revisar los logs de Redis en busca de errores de conexión
+    - Confirmar la configuración del timeout de sesión
+  </Accordion>
+  
+  <Accordion title="Circuit Breaker siempre abierto">
+    **Síntomas**: Todas las solicitudes se redirigen a los Endpoints de fallback
+    
+    **Soluciones**:
+    - Verificar el estado de salud del servicio downstream
+    - Revisar la configuración del Circuit Breaker (umbral, timeout)
+    - Inspeccionar los logs del servicio en busca de errores
+    - Verificar la conectividad de red entre el Gateway y los servicios
+  </Accordion>
+  
+  <Accordion title="Errores CORS">
+    **Síntomas**: El navegador bloquea las solicitudes con errores de política CORS
+    
+    **Soluciones**:
+    - Agregar el origen del Frontend a `allowedOrigins` en SecurityConfig
+    - Verificar que `allowedMethods` incluya los métodos HTTP requeridos
+    - Comprobar que `allowCredentials` esté establecido en `true` para autenticación basada en cookies
+    - Revisar la consola del navegador para obtener detalles específicos del error CORS
+  </Accordion>
+</AccordionGroup>
+
+## Referencia de configuración
+
+### Variables de entorno
+
+| Variable | Descripción | Ejemplo |
+|----------|-------------|----------|
+| `PORT` | Puerto del servidor | `8080` |
+| `REDIS_HOST` | Host de Redis | `sgivu-redis` |
+| `REDIS_PASSWORD` | Contraseña de Redis | `redis_password` |
+| `EUREKA_URL` | URL del servidor Eureka | `http://sgivu-discovery:8761/eureka/` |
+| `spring.security.oauth2.client.registration.*` | Configuración del cliente OAuth2 | Vía Config Server |
+| `spring.security.oauth2.client.provider.*` | Configuración del provider OAuth2 | Vía Config Server |
+
+## Servicios relacionados
+
+<CardGroup cols={2}>
+  <Card title="Servidor de Autorización" icon="lock" href="/services/auth">
+    Provider OAuth2 y emisor de JWT
+  </Card>
+  <Card title="Discovery" icon="compass" href="/services/discovery">
+    Registro de servicios para enrutamiento
+  </Card>
+  <Card title="Config Server" icon="gear" href="/services/config">
+    Configuración centralizada
+  </Card>
+  <Card title="Servicio de Usuarios" icon="users" href="/services/user">
+    APIs de gestión de usuarios
+  </Card>
+</CardGroup>

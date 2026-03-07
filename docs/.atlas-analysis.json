@@ -1,0 +1,184 @@
+{
+  "projectType": "saas",
+  "projectName": "SGIVU",
+  "projectDescription": "Vehicle inventory management system with demand prediction for used car dealerships",
+  "theme": "linden",
+  "primaryColor": "#2563eb",
+  "lightColor": "#3b82f6",
+  "darkColor": "#1e40af",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "introduction",
+              "architecture",
+              "features"
+            ]
+          },
+          {
+            "group": "Getting Started",
+            "pages": [
+              "getting-started/quickstart",
+              "getting-started/installation",
+              "getting-started/configuration",
+              "getting-started/docker-deployment"
+            ]
+          },
+          {
+            "group": "Core Features",
+            "pages": [
+              "features/authentication",
+              "features/user-management",
+              "features/vehicle-management",
+              "features/client-management",
+              "features/purchase-sales",
+              "features/demand-prediction"
+            ]
+          },
+          {
+            "group": "Infrastructure",
+            "pages": [
+              "infrastructure/deployment",
+              "infrastructure/docker-compose",
+              "infrastructure/nginx",
+              "infrastructure/monitoring"
+            ]
+          },
+          {
+            "group": "Security",
+            "pages": [
+              "security/oauth2-oidc",
+              "security/bff-pattern",
+              "security/jwt-tokens",
+              "security/service-communication"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Backend Services",
+        "groups": [
+          {
+            "group": "Services",
+            "pages": [
+              "services/overview",
+              "services/auth",
+              "services/gateway",
+              "services/config",
+              "services/discovery",
+              "services/user",
+              "services/vehicle",
+              "services/purchase-sale",
+              "services/client"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Machine Learning",
+        "groups": [
+          {
+            "group": "ML Service",
+            "pages": [
+              "ml/overview",
+              "ml/prediction-api",
+              "ml/training",
+              "ml/model-management"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Frontend",
+        "groups": [
+          {
+            "group": "Angular Application",
+            "pages": [
+              "frontend/overview",
+              "frontend/setup",
+              "frontend/architecture",
+              "frontend/features"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Authentication",
+            "pages": [
+              "api/auth/oauth2",
+              "api/auth/session"
+            ]
+          },
+          {
+            "group": "User Management",
+            "pages": [
+              "api/users/overview",
+              "api/users/roles-permissions"
+            ]
+          },
+          {
+            "group": "Vehicle Management",
+            "pages": [
+              "api/vehicles/crud",
+              "api/vehicles/images"
+            ]
+          },
+          {
+            "group": "Client Management",
+            "pages": [
+              "api/clients/overview"
+            ]
+          },
+          {
+            "group": "Purchase & Sales",
+            "pages": [
+              "api/purchase-sales/overview"
+            ]
+          },
+          {
+            "group": "Machine Learning",
+            "pages": [
+              "api/ml/predict",
+              "api/ml/retrain",
+              "api/ml/models"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "OAuth 2.1/OIDC authentication with JWT tokens",
+    "Microservices architecture with Spring Cloud",
+    "Vehicle inventory management with S3 image storage",
+    "Client and purchase-sale tracking",
+    "Machine learning demand prediction with FastAPI",
+    "BFF pattern for secure token management",
+    "Docker Compose orchestration",
+    "Redis session storage for horizontal scaling",
+    "Distributed tracing with Zipkin"
+  ],
+  "publicApiSurface": [
+    "POST /oauth2/authorize - OAuth2 authorization",
+    "POST /oauth2/token - Token endpoint",
+    "GET /auth/session - BFF session info",
+    "GET /v1/users - List users",
+    "POST /v1/users - Create user",
+    "GET /v1/vehicles - List vehicles",
+    "POST /v1/vehicles - Create vehicle",
+    "GET /v1/clients - List clients",
+    "POST /v1/clients - Create client",
+    "GET /v1/purchase-sales - List transactions",
+    "POST /v1/purchase-sales - Create transaction",
+    "POST /v1/ml/predict - Demand prediction",
+    "POST /v1/ml/retrain - Retrain model",
+    "GET /v1/ml/models/latest - Get latest model metadata"
+  ]
+}

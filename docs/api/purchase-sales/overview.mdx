@@ -1,0 +1,653 @@
+---
+title: 'Contratos de Compra y Venta'
+description: 'Gestión de contratos de compra y venta de vehículos'
+---
+
+## Descripción general
+
+La API de Compra y Venta (`sgivu-purchase-sale`) gestiona el ciclo de vida completo de los contratos de compra y venta de vehículos. Se integra con los servicios de usuarios, clientes y vehículos para enriquecer los datos del contrato, y proporciona capacidades completas de búsqueda, generación de reportes y exportación.
+
+## URL base
+
+```
+https://your-domain.com/v1/purchase-sales
+```
+
+---
+
+## Crear contrato
+
+```http
+POST /v1/purchase-sales
+```
+
+Crea un nuevo contrato de compra o venta.
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `contract:create`
+
+### Cuerpo de la solicitud
+
+<ParamField body="contractType" type="string" required>
+  Tipo de contrato: `PURCHASE` o `SALE`
+</ParamField>
+
+<ParamField body="contractStatus" type="string" default="PENDING">
+  Estado del contrato: `PENDING`, `APPROVED`, `COMPLETED`, `CANCELLED`
+</ParamField>
+
+<ParamField body="clientId" type="integer" required>
+  ID del cliente (persona o empresa)
+</ParamField>
+
+<ParamField body="userId" type="integer" required>
+  ID del usuario (empleado que procesa el contrato)
+</ParamField>
+
+<ParamField body="vehicleId" type="integer" required>
+  ID del vehículo
+</ParamField>
+
+<ParamField body="purchasePrice" type="number">
+  Precio de compra (para contratos tipo `PURCHASE`)
+</ParamField>
+
+<ParamField body="salePrice" type="number">
+  Precio de venta (para contratos tipo `SALE`)
+</ParamField>
+
+<ParamField body="paymentMethod" type="string" required>
+  Método de pago: `CASH`, `FINANCING`, `CREDIT_CARD`, `BANK_TRANSFER`
+</ParamField>
+
+<ParamField body="notes" type="string">
+  Notas o comentarios adicionales
+</ParamField>
+
+<ParamField body="term" type="string">
+  Términos y condiciones del contrato
+</ParamField>
+
+```json
+{
+  "contractType": "SALE",
+  "contractStatus": "PENDING",
+  "clientId": 50,
+  "userId": 1,
+  "vehicleId": 15,
+  "salePrice": 75000000,
+  "paymentMethod": "FINANCING",
+  "notes": "Cliente requiere financiación a 48 meses",
+  "term": "Entrega inmediata previa aprobación de crédito"
+}
+```
+
+### Respuesta
+
+```json
+{
+  "id": 120,
+  "contractType": "SALE",
+  "contractStatus": "PENDING",
+  "clientId": 50,
+  "userId": 1,
+  "vehicleId": 15,
+  "salePrice": 75000000,
+  "paymentMethod": "FINANCING",
+  "notes": "Cliente requiere financiación a 48 meses",
+  "term": "Entrega inmediata previa aprobación de crédito",
+  "createdAt": "2026-03-06T10:30:00",
+  "updatedAt": "2026-03-06T10:30:00"
+}
+```
+
+### Códigos de estado
+
+- `201 Created` - Contrato creado exitosamente
+- `400 Bad Request` - Datos de entrada inválidos
+- `401 Unauthorized` - No autenticado
+- `403 Forbidden` - Falta el permiso `contract:create`
+
+### Ejemplo
+
+```bash
+curl -X POST https://your-domain.com/v1/purchase-sales \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "contractType": "SALE",
+    "clientId": 50,
+    "userId": 1,
+    "vehicleId": 15,
+    "salePrice": 75000000,
+    "paymentMethod": "FINANCING"
+  }'
+```
+
+---
+
+## Obtener contrato por ID
+
+```http
+GET /v1/purchase-sales/{id}
+```
+
+Obtiene un contrato con datos enriquecidos (detalles de cliente, usuario y vehículo).
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `contract:read`
+
+### Parámetros de ruta
+
+<ParamField path="id" type="integer" required>
+  ID del contrato
+</ParamField>
+
+### Respuesta
+
+```json
+{
+  "id": 120,
+  "contractType": "SALE",
+  "contractStatus": "PENDING",
+  "client": {
+    "id": 50,
+    "type": "PERSON",
+    "name": "María García López",
+    "nationalId": "1234567890",
+    "email": "maria.garcia@example.com",
+    "phone": "3001234567"
+  },
+  "user": {
+    "id": 1,
+    "username": "steven",
+    "fullName": "Steven Rodriguez",
+    "email": "steven@example.com"
+  },
+  "vehicle": {
+    "id": 15,
+    "type": "CAR",
+    "plate": "ABC123",
+    "brand": "Toyota",
+    "line": "Corolla",
+    "model": "2022",
+    "status": "AVAILABLE"
+  },
+  "salePrice": 75000000,
+  "paymentMethod": "FINANCING",
+  "notes": "Cliente requiere financiación a 48 meses",
+  "term": "Entrega inmediata previa aprobación de crédito",
+  "createdAt": "2026-03-06T10:30:00",
+  "updatedAt": "2026-03-06T10:30:00"
+}
+```
+
+### Códigos de estado
+
+- `200 OK` - Contrato encontrado
+- `401 Unauthorized` - No autenticado
+- `404 Not Found` - El contrato no existe
+
+### Ejemplo
+
+```bash
+curl -X GET https://your-domain.com/v1/purchase-sales/120 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+---
+
+## Listar contratos
+
+### Lista simple
+
+```http
+GET /v1/purchase-sales
+```
+
+Retorna todos los contratos en formato simple (sin datos enriquecidos).
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `contract:read`
+
+### Lista detallada
+
+```http
+GET /v1/purchase-sales/detailed
+```
+
+Retorna todos los contratos con datos enriquecidos de cliente, usuario y vehículo.
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `contract:read`
+
+### Lista paginada
+
+```http
+GET /v1/purchase-sales/page/{page}
+```
+
+Retorna contratos paginados (formato simple).
+
+```http
+GET /v1/purchase-sales/page/{page}/detailed
+```
+
+Retorna contratos paginados con datos enriquecidos.
+
+### Ejemplo
+
+```bash
+# Simple paginated list
+curl -X GET https://your-domain.com/v1/purchase-sales/page/0 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Detailed paginated list
+curl -X GET https://your-domain.com/v1/purchase-sales/page/0/detailed \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+---
+
+## Buscar contratos
+
+```http
+GET /v1/purchase-sales/search
+```
+
+Búsqueda avanzada con múltiples criterios, paginación y enriquecimiento opcional.
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `contract:read`
+
+### Parámetros de consulta
+
+<ParamField query="page" type="integer" default="0">
+  Número de página (basado en 0)
+</ParamField>
+
+<ParamField query="size" type="integer" default="10">
+  Tamaño de página
+</ParamField>
+
+<ParamField query="detailed" type="boolean" default="true">
+  Retornar datos enriquecidos (detalles de cliente, usuario y vehículo)
+</ParamField>
+
+<ParamField query="contractType" type="string">
+  Filtrar por tipo de contrato: `PURCHASE` o `SALE`
+</ParamField>
+
+<ParamField query="contractStatus" type="string">
+  Filtrar por estado: `PENDING`, `APPROVED`, `COMPLETED`, `CANCELLED`
+</ParamField>
+
+<ParamField query="clientId" type="integer">
+  Filtrar por ID de cliente
+</ParamField>
+
+<ParamField query="userId" type="integer">
+  Filtrar por ID de usuario
+</ParamField>
+
+<ParamField query="vehicleId" type="integer">
+  Filtrar por ID de vehículo
+</ParamField>
+
+<ParamField query="paymentMethod" type="string">
+  Filtrar por método de pago
+</ParamField>
+
+<ParamField query="startDate" type="string">
+  Filtrar por fecha de inicio (ISO 8601: YYYY-MM-DD)
+</ParamField>
+
+<ParamField query="endDate" type="string">
+  Filtrar por fecha de fin (ISO 8601: YYYY-MM-DD)
+</ParamField>
+
+<ParamField query="minPurchasePrice" type="number">
+  Precio de compra mínimo
+</ParamField>
+
+<ParamField query="maxPurchasePrice" type="number">
+  Precio de compra máximo
+</ParamField>
+
+<ParamField query="minSalePrice" type="number">
+  Precio de venta mínimo
+</ParamField>
+
+<ParamField query="maxSalePrice" type="number">
+  Precio de venta máximo
+</ParamField>
+
+<ParamField query="term" type="string">
+  Buscar en los términos del contrato (coincidencia parcial)
+</ParamField>
+
+### Respuesta
+
+```json
+{
+  "content": [
+    {
+      "id": 120,
+      "contractType": "SALE",
+      "contractStatus": "PENDING",
+      "client": {...},
+      "user": {...},
+      "vehicle": {...},
+      "salePrice": 75000000,
+      "paymentMethod": "FINANCING",
+      "createdAt": "2026-03-06T10:30:00"
+    }
+  ],
+  "pageable": {
+    "pageNumber": 0,
+    "pageSize": 10
+  },
+  "totalElements": 85,
+  "totalPages": 9
+}
+```
+
+### Ejemplo
+
+```bash
+curl -X GET "https://your-domain.com/v1/purchase-sales/search?contractType=SALE&contractStatus=PENDING&minSalePrice=50000000&maxSalePrice=100000000&startDate=2026-01-01&endDate=2026-12-31" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+---
+
+## Actualizar contrato
+
+```http
+PUT /v1/purchase-sales/{id}
+```
+
+Actualiza un contrato existente.
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `contract:update`
+
+### Parámetros de ruta
+
+<ParamField path="id" type="integer" required>
+  ID del contrato a actualizar
+</ParamField>
+
+### Cuerpo de la solicitud
+
+Misma estructura que Crear contrato.
+
+```json
+{
+  "contractStatus": "APPROVED",
+  "notes": "Crédito aprobado por el banco"
+}
+```
+
+### Códigos de estado
+
+- `200 OK` - Contrato actualizado exitosamente
+- `400 Bad Request` - Datos de entrada inválidos
+- `401 Unauthorized` - No autenticado
+- `403 Forbidden` - Falta el permiso `contract:update`
+- `404 Not Found` - El contrato no existe
+
+### Ejemplo
+
+```bash
+curl -X PUT https://your-domain.com/v1/purchase-sales/120 \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "contractStatus": "APPROVED",
+    "notes": "Crédito aprobado por el banco"
+  }'
+```
+
+---
+
+## Eliminar contrato
+
+```http
+DELETE /v1/purchase-sales/{id}
+```
+
+Elimina un contrato de forma permanente.
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `contract:delete`
+
+### Parámetros de ruta
+
+<ParamField path="id" type="integer" required>
+  ID del contrato a eliminar
+</ParamField>
+
+### Códigos de estado
+
+- `204 No Content` - Contrato eliminado exitosamente
+- `401 Unauthorized` - No autenticado
+- `403 Forbidden` - Falta el permiso `contract:delete`
+- `404 Not Found` - El contrato no existe
+
+### Ejemplo
+
+```bash
+curl -X DELETE https://your-domain.com/v1/purchase-sales/120 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+---
+
+## Filtrar por entidad
+
+### Obtener contratos por cliente
+
+```http
+GET /v1/purchase-sales/client/{clientId}
+```
+
+Obtiene todos los contratos de un cliente específico.
+
+### Obtener contratos por usuario
+
+```http
+GET /v1/purchase-sales/user/{userId}
+```
+
+Obtiene todos los contratos procesados por un usuario específico.
+
+### Obtener contratos por vehículo
+
+```http
+GET /v1/purchase-sales/vehicle/{vehicleId}
+```
+
+Obtiene todos los contratos (detallados) de un vehículo específico.
+
+### Ejemplos
+
+```bash
+# Contracts by client
+curl -X GET https://your-domain.com/v1/purchase-sales/client/50 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Contracts by user
+curl -X GET https://your-domain.com/v1/purchase-sales/user/1 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Contracts by vehicle
+curl -X GET https://your-domain.com/v1/purchase-sales/vehicle/15 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+---
+
+## Exportar reportes
+
+### Exportar reporte en PDF
+
+```http
+GET /v1/purchase-sales/report/pdf
+```
+
+Genera y descarga un reporte en PDF de los contratos.
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `contract:read`
+
+**Content-Type:** `application/pdf`
+
+#### Parámetros de consulta
+
+<ParamField query="startDate" type="string">
+  Filtro de fecha de inicio (ISO 8601: YYYY-MM-DD)
+</ParamField>
+
+<ParamField query="endDate" type="string">
+  Filtro de fecha de fin (ISO 8601: YYYY-MM-DD)
+</ParamField>
+
+#### Ejemplo
+
+```bash
+curl -X GET "https://your-domain.com/v1/purchase-sales/report/pdf?startDate=2026-01-01&endDate=2026-12-31" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -o contracts-report.pdf
+```
+
+---
+
+### Exportar reporte en Excel
+
+```http
+GET /v1/purchase-sales/report/excel
+```
+
+Genera y descarga un reporte en Excel (XLSX) de los contratos.
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `contract:read`
+
+**Content-Type:** `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
+
+#### Parámetros de consulta
+
+Igual que la exportación en PDF.
+
+#### Ejemplo
+
+```bash
+curl -X GET "https://your-domain.com/v1/purchase-sales/report/excel?startDate=2026-01-01&endDate=2026-12-31" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -o contracts-report.xlsx
+```
+
+---
+
+### Exportar reporte en CSV
+
+```http
+GET /v1/purchase-sales/report/csv
+```
+
+Genera y descarga un reporte en CSV de los contratos.
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `contract:read`
+
+**Content-Type:** `text/csv`
+
+#### Parámetros de consulta
+
+Igual que la exportación en PDF.
+
+#### Ejemplo
+
+```bash
+curl -X GET "https://your-domain.com/v1/purchase-sales/report/csv?startDate=2026-01-01&endDate=2026-12-31" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -o contracts-report.csv
+```
+
+---
+
+## Tipos de contrato
+
+- `PURCHASE` - Contrato de compra de vehículo (el concesionario compra al cliente)
+- `SALE` - Contrato de venta de vehículo (el concesionario vende al cliente)
+
+---
+
+## Estados del contrato
+
+- `PENDING` - Contrato creado pero aún no procesado
+- `APPROVED` - Contrato aprobado y listo para completarse
+- `COMPLETED` - Contrato completado y finalizado
+- `CANCELLED` - Contrato cancelado
+
+---
+
+## Métodos de pago
+
+- `CASH` - Pago en efectivo
+- `FINANCING` - Financiación/préstamo
+- `CREDIT_CARD` - Pago con tarjeta de crédito
+- `BANK_TRANSFER` - Transferencia bancaria
+
+---
+
+## Integración con otros servicios
+
+El servicio de Compra y Venta se integra con:
+
+- **sgivu-user** - Obtiene detalles del usuario para el enriquecimiento del contrato
+- **sgivu-client** - Obtiene detalles del cliente (persona/empresa)
+- **sgivu-vehicle** - Obtiene detalles del vehículo y actualiza su estado
+
+<Note>
+  Cuando un contrato de tipo `SALE` se marca como `COMPLETED`, el estado del vehículo asociado debe actualizarse a `SOLD`.
+</Note>
+
+---
+
+## Respuestas de error
+
+### 400 Bad Request
+
+```json
+{
+  "error": "validation_error",
+  "message": "Invalid contract data",
+  "details": [
+    {
+      "field": "salePrice",
+      "message": "Sale price is required for SALE contracts"
+    }
+  ]
+}
+```
+
+### 404 Not Found
+
+```json
+{
+  "error": "not_found",
+  "message": "Contract with ID 999 not found"
+}
+```
