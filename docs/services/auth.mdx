@@ -1,0 +1,268 @@
+---
+title: Authorization Server
+description: Servicio de autenticación OAuth2 y OpenID Connect
+---
+
+## Descripción general
+
+`sgivu-auth` es el Authorization Server que implementa los estándares OAuth2 y OpenID Connect. Emite JWT tokens firmados con un keystore JKS, gestiona clientes OAuth2, autoriza usuarios y persiste sesiones y autorizaciones en PostgreSQL.
+
+## Tecnologías
+
+- **Java**: 21
+- **Spring Boot**: 4.0.1
+- **Spring Authorization Server**: OAuth2 / OIDC
+- **Spring Security**: Autenticación y autorización
+- **Spring Cloud Config**: Cliente
+- **Eureka Client**: Registro de servicios
+- **Spring Data JPA**: Persistencia en PostgreSQL
+- **Flyway**: Migraciones de base de datos
+- **Spring Session**: Sesiones basadas en JDBC
+- **Spring Boot Actuator**: Monitoreo de salud
+- **Micrometer Tracing**: Integración con Zipkin
+- **SpringDoc OpenAPI**: Documentación de API
+
+## Configuración de puerto
+
+- **Puerto por defecto**: 9000
+- **Actuator**: `/actuator/health`, `/actuator/info`
+
+## Prerrequisitos
+
+- JDK 21
+- Maven 3.9+
+- Docker & docker-compose
+- Base de datos PostgreSQL
+- Servicios `sgivu-config` y `sgivu-discovery` en ejecución
+
+## Endpoints
+
+### OpenID Connect / OAuth2
+
+<ResponseField name="/.well-known/openid-configuration" type="GET">
+  Endpoint de descubrimiento OIDC que expone los metadatos del issuer
+</ResponseField>
+
+<ResponseField name="/oauth2/authorize" type="GET">
+  Endpoint de autorización OAuth2 para el flujo PKCE
+</ResponseField>
+
+<ResponseField name="/oauth2/token" type="POST">
+  Endpoint de tokens para intercambiar Authorization Codes por Access Tokens
+</ResponseField>
+
+<ResponseField name="/oauth2/jwks" type="GET">
+  JSON Web Key Set para verificación de firma de JWT
+</ResponseField>
+
+<ResponseField name="/login" type="GET">
+  Página de inicio de sesión para autenticación de usuarios
+</ResponseField>
+
+## Ejecución del servicio
+
+### Desarrollo con Docker Compose
+
+```bash
+cd infra/compose/sgivu-docker-compose
+docker compose -f docker-compose.dev.yml up -d
+```
+
+### Ejecución local
+
+```bash
+./mvnw clean package
+./mvnw spring-boot:run
+```
+
+### Construcción Docker
+
+```bash
+./build-image.bash
+docker build -t stevenrq/sgivu-auth:v1 .
+docker run --env-file infra/compose/sgivu-docker-compose/.env -p 9000:9000 stevenrq/sgivu-auth:v1
+```
+
+## Configuración de seguridad
+
+### JWT Keystore
+
+El servicio utiliza un keystore JKS para firmar los JWT tokens:
+
+- **Ubicación**: Configurada vía `sgivu.jwt.keystore.location`
+- **Contraseña**: Configurada vía `sgivu.jwt.keystore.password`
+- **Importante**: El archivo `keystore.jks` está en `.gitignore` y debe proporcionarse mediante un gestor de secretos o pipeline CI/CD
+
+<Warning>
+Nunca haga commit de `keystore.jks` en el control de versiones. Use variables de entorno o gestores de secretos en producción.
+</Warning>
+
+### Clientes OAuth2 por defecto
+
+Al iniciar, `ClientRegistrationRunner` registra estos clientes:
+
+| Client ID | Secret | Uso |
+|-----------|--------|-----|
+| `sgivu-gateway` | `gateway-client.secret` | Autenticación del API Gateway |
+| `postman-client` | `postman-secret` | Pruebas de API con Postman |
+| `oauth2-debugger-client` | `oauth2-debugger-secret` | Herramientas de depuración OAuth2 |
+
+<Warning>
+Los secretos de cliente por defecto NO son seguros para producción. Rote los secretos antes de desplegar en producción.
+</Warning>
+
+### Comunicación interna entre servicios
+
+El servicio valida credenciales llamando al servicio de usuarios:
+
+- Utiliza `CredentialsValidationService` para verificar usuario/contraseña
+- Requiere el header `SERVICE_INTERNAL_SECRET_KEY` para llamadas internas de API
+- Implementado en `JpaUserDetailsService`
+
+## Esquema de base de datos
+
+### Migraciones Flyway
+
+Ubicación: `src/main/resources/db/migration`
+
+**V1__initial_schema.sql** crea:
+
+- `clients`: Registros de clientes OAuth2
+- `authorizations`: Authorization Codes y tokens emitidos
+- `authorization_consents`: Registros de consentimiento de usuarios
+- `SPRING_SESSION`: Tablas de gestión de sesiones (Spring Session JDBC)
+
+### Configuración
+
+Conexión a base de datos configurada en `sgivu-config-repo/sgivu-auth-*.yml`:
+
+```yaml
+spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+```
+
+## Observabilidad
+
+### Endpoints de Actuator
+
+- `/actuator/health`: Estado de salud del servicio
+- `/actuator/info`: Información de la aplicación
+- Endpoints adicionales expuestos según el perfil activo (dev expone más)
+
+### Trazabilidad distribuida
+
+**Integración con Zipkin**:
+- Endpoint: `http://sgivu-zipkin:9411/api/v2/spans`
+- Spans clave en:
+  - `CredentialsValidationService`: Validación de credenciales de usuario
+  - `JpaUserDetailsService`: Carga de detalles de usuario
+
+## Despliegue en producción
+
+### Configuración de Nginx
+
+En producción, Nginx enruta estas rutas hacia `sgivu-auth`:
+- `/oauth2/*`
+- `/login`
+- `/.well-known/*`
+
+### Configuración de la URL del Issuer
+
+<Warning>
+Asegúrese de que la variable de entorno `ISSUER_URL` coincida con el hostname expuesto a los clientes:
+
+```bash
+ISSUER_URL=https://your-domain.com
+```
+
+Una discrepancia entre el issuer en el JWT y la URL real provocará fallos de autenticación.
+</Warning>
+
+## Pruebas
+
+```bash
+./mvnw test
+```
+
+Las pruebas verifican:
+- Flujo de autorización OAuth2
+- Generación y validación de JWT tokens
+- Registro de clientes
+- Gestión de sesiones
+
+## Solución de problemas
+
+<AccordionGroup>
+  <Accordion title="Errores de discrepancia del issuer">
+    **Problema**: El issuer del JWT no coincide con la URL que usan los clientes.
+    
+    **Solución**: Verifique que la variable de entorno `ISSUER_URL` coincida con la URL real (incluyendo el hostname del proxy Nginx).
+  </Accordion>
+  
+  <Accordion title="Keystore faltante">
+    **Problema**: La aplicación falla al iniciar con un error de keystore.
+    
+    **Solución**: 
+    - Asegúrese de que `keystore.jks` esté disponible en tiempo de ejecución
+    - Verifique que `sgivu.jwt.keystore.location` apunte a la ruta correcta
+    - Compruebe que `sgivu.jwt.keystore.password` sea correcto
+  </Accordion>
+  
+  <Accordion title="Servicio de usuarios inaccesible">
+    **Problema**: `CredentialsValidationService` falla durante el inicio de sesión.
+    
+    **Solución**:
+    - Verifique la conectividad de red con el servicio sgivu-user
+    - Compruebe que `SERVICE_INTERNAL_SECRET_KEY` esté configurado correctamente
+    - Asegúrese de que sgivu-user esté registrado en Eureka
+  </Accordion>
+  
+  <Accordion title="Problemas de persistencia de sesiones">
+    **Problema**: Los usuarios pierden la sesión inesperadamente.
+    
+    **Solución**:
+    - Verifique la conexión a PostgreSQL para las tablas de Spring Session
+    - Compruebe que la tabla `SPRING_SESSION` exista y sea accesible
+    - Revise la configuración del tiempo de expiración de sesión
+  </Accordion>
+</AccordionGroup>
+
+## Referencia de configuración
+
+### Variables de entorno
+
+| Variable | Descripción | Ejemplo |
+|----------|-------------|---------|
+| `PORT` | Puerto del servidor | `9000` |
+| `ISSUER_URL` | URL del issuer OAuth2 | `https://api.sgivu.com` |
+| `DB_HOST` | Host de PostgreSQL | `sgivu-postgres-auth` |
+| `DB_PORT` | Puerto de PostgreSQL | `5432` |
+| `DB_NAME` | Nombre de la base de datos | `sgivu_auth` |
+| `DB_USERNAME` | Usuario de la base de datos | `sgivu_user` |
+| `DB_PASSWORD` | Contraseña de la base de datos | `secure_password` |
+| `SERVICE_INTERNAL_SECRET_KEY` | Clave de API interna | `secret-key-value` |
+| `sgivu.jwt.keystore.location` | Ruta del archivo keystore | `classpath:keystore.jks` |
+| `sgivu.jwt.keystore.password` | Contraseña del keystore | `keystore-password` |
+
+## Servicios relacionados
+
+<CardGroup cols={2}>
+  <Card title="Gateway" icon="shield" href="/services/gateway">
+    Configuración de cliente OAuth2 y relay de tokens
+  </Card>
+  <Card title="Servicio de usuarios" icon="users" href="/services/user">
+    Endpoint de validación de credenciales de usuario
+  </Card>
+  <Card title="Config Server" icon="gear" href="/services/config">
+    Gestión centralizada de configuración
+  </Card>
+  <Card title="Discovery" icon="compass" href="/services/discovery">
+    Registro y descubrimiento de servicios
+  </Card>
+</CardGroup>

@@ -1,0 +1,96 @@
+---
+title: "SGIVU - Sistema de Gestión de Inventario de Vehículos Usados con Predicción de Demanda"
+description: "Plataforma completa de gestión de inventario de vehículos con predicción de demanda para concesionarios de vehículos usados"
+---
+
+<Note>
+  SGIVU es un sistema integral de gestión de inventario de vehículos diseñado para concesionarios de vehículos usados, con autenticación OAuth 2.1, arquitectura de microservicios y predicción de demanda impulsada por ML.
+</Note>
+
+## Funcionalidades Principales
+
+<CardGroup cols={2}>
+  <Card title="Autenticación y Autorización" icon="shield-check" href="/features/authentication">
+    OAuth 2.1/OIDC con tokens JWT y control de acceso basado en roles
+  </Card>
+  <Card title="Gestión de Vehículos" icon="car" href="/features/vehicle-management">
+    Catálogo completo de vehículos con almacenamiento de imágenes en S3 y búsqueda avanzada
+  </Card>
+  <Card title="Predicción de Demanda" icon="chart-line" href="/features/demand-prediction">
+    Pronóstico de demanda impulsado por ML con FastAPI y scikit-learn
+  </Card>
+  <Card title="Arquitectura de Microservicios" icon="cubes" href="/architecture">
+    Microservicios escalables con Spring Cloud y descubrimiento de servicios
+  </Card>
+</CardGroup>
+
+## Enlaces Rápidos
+
+<CardGroup cols={2}>
+  <Card title="Comenzar" icon="rocket" href="/getting-started/quickstart">
+    Despliega SGIVU localmente en minutos
+  </Card>
+  <Card title="Descripción de la Arquitectura" icon="sitemap" href="/architecture">
+    Comprende el diseño del sistema
+  </Card>
+  <Card title="Referencia API" icon="code" href="/api/auth/oauth2">
+    Explora las APIs REST
+  </Card>
+  <Card title="Servicios Backend" icon="server" href="/services/overview">
+    Conoce cada microservicio
+  </Card>
+</CardGroup>
+
+## Stack Tecnológico
+
+SGIVU está construido con tecnologías modernas listas para producción:
+
+- **Backend**: Spring Boot 4.0, Spring Cloud, Spring Security OAuth2
+- **Frontend**: Angular 21 con TypeScript
+- **Servicio ML**: FastAPI, scikit-learn, XGBoost
+- **Bases de Datos**: PostgreSQL, Redis
+- **Infraestructura**: Docker, Docker Compose, Nginx
+- **Observabilidad**: Actuator, Micrometer, Zipkin
+
+## Aspectos Destacados de la Arquitectura
+
+<Steps>
+  <Step title="API Gateway con Patrón BFF">
+    El gateway actúa como Backend-For-Frontend, gestionando tokens OAuth2 de forma segura con almacenamiento de sesiones en Redis
+  </Step>
+  <Step title="Descubrimiento de Servicios">
+    El registro de servicios Eureka permite la comunicación dinámica entre servicios
+  </Step>
+  <Step title="Configuración Centralizada">
+    Spring Cloud Config Server gestiona la configuración de todos los microservicios
+  </Step>
+  <Step title="Integración ML">
+    El servicio ML basado en FastAPI proporciona APIs de predicción de demanda con capacidades de reentrenamiento de modelos
+  </Step>
+</Steps>
+
+## Contenido
+
+### Servicios Principales
+
+- **sgivu-auth**: Servidor de Autorización OAuth 2.1/OIDC
+- **sgivu-gateway**: API Gateway con patrón BFF
+- **sgivu-user**: Gestión de usuarios y roles
+- **sgivu-vehicle**: Catálogo de vehículos y gestión de imágenes
+- **sgivu-client**: Gestión de relaciones con clientes
+- **sgivu-purchase-sale**: Seguimiento de transacciones
+- **sgivu-ml**: Servicio de predicción de demanda
+
+### Infraestructura de Soporte
+
+- **sgivu-config**: Servidor de configuración centralizada
+- **sgivu-discovery**: Registro de servicios Eureka
+- **sgivu-frontend**: Aplicación web basada en Angular
+
+## Comenzar
+
+<CardGroup cols={1}>
+  <Card title="Guía de Inicio Rápido" icon="play" href="/getting-started/quickstart" horizontal>
+    Despliega el stack completo con Docker Compose y realiza tu primera llamada a la API
+  </Card>
+</CardGroup>

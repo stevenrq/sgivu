@@ -1,0 +1,862 @@
+---
+title: Funcionalidades del Frontend
+description: Documentación detallada de los módulos de funcionalidades del Frontend de SGIVU
+---
+
+# Funcionalidades del Frontend
+
+El Frontend de SGIVU está organizado en módulos de funcionalidades, cada uno encargado de un dominio específico de la aplicación. Este documento proporciona información detallada sobre cada módulo.
+
+## Autenticación (auth)
+
+### Descripción general
+
+Gestiona la autenticación de usuarios, el manejo de sesiones y la autorización en toda la aplicación.
+
+**Ubicación**: `src/app/features/auth/`
+
+### Components
+
+#### LoginComponent
+
+**Path**: `/login`
+
+Inicia el flujo de login OAuth2 redirigiendo al Endpoint de autorización del Gateway.
+
+```typescript
+startLogin(): void {
+  const authUrl = `${environment.apiUrl}/oauth2/authorization/sgivu-gateway`;
+  window.location.href = authUrl;
+}
+```
+
+#### CallbackComponent
+
+**Path**: `/callback`
+
+Maneja el callback OAuth2 tras una autenticación exitosa. Verifica la sesión y redirige al Dashboard.
+
+### Services
+
+#### AuthService
+
+**Responsabilidades clave:**
+- Inicializar la autenticación al arrancar la aplicación
+- Verificar el estado de la sesión vía `/auth/session`
+- Gestionar el estado de autenticación con signals
+- Manejar los flujos de login y logout
+- Almacenar la información del usuario actual
+
+**API pública:**
+
+```typescript
+class AuthService {
+  // Signals (readonly)
+  readonly isAuthenticated: Signal<boolean>;
+  readonly isDoneLoading: Signal<boolean>;
+  readonly currentAuthenticatedUser: Signal<User | null>;
+  readonly isAdmin: Signal<boolean>;
+  
+  // Methods
+  initializeAuthentication(): Promise<void>;
+  login(): void;
+  logout(): void;
+  checkSession(): Observable<AuthSessionResponse>;
+}
+```
+
+#### PermissionService
+
+**Responsabilidades clave:**
+- Verificar permisos de usuario
+- Evaluar acceso basado en roles
+- Soportar Guards de permisos
+
+**API pública:**
+
+```typescript
+class PermissionService {
+  hasPermission(permission: string): boolean;
+  hasAnyPermission(permissions: string[]): boolean;
+  hasAllPermissions(permissions: string[]): boolean;
+  hasRole(role: string): boolean;
+}
+```
+
+### Guards
+
+#### authGuard
+
+Protege rutas que requieren autenticación:
+
+```typescript
+{
+  path: 'dashboard',
+  canActivate: [authGuard],
+  loadComponent: () => import('./dashboard.component')
+}
+```
+
+#### permissionGuard
+
+Protege rutas que requieren permisos específicos:
+
+```typescript
+{
+  path: 'roles-permissions',
+  canActivate: [authGuard, permissionGuard],
+  data: {
+    canActivateFn: (ps: PermissionService) => ps.hasPermission('role:update')
+  }
+}
+```
+
+### Interceptors
+
+#### defaultOAuthInterceptor
+
+- Agrega `withCredentials: true` a las peticiones API
+- Habilita la gestión de sesiones basada en cookies
+- Maneja errores 401 por sesiones expiradas
+
+### Directives
+
+#### hasPermissionDirective
+
+Muestra/oculta elementos condicionalmente según los permisos:
+
+```html
+<button *hasPermission="'vehicle:delete'" (click)="deleteVehicle()">
+  Delete
+</button>
+```
+
+---
+
+## Dashboard
+
+### Descripción general
+
+Proporciona analíticas, KPIs y visualizaciones de métricas de negocio.
+
+**Ubicación**: `src/app/features/dashboard/`
+
+### Components
+
+#### DashboardComponent
+
+**Path**: `/dashboard`
+
+Dashboard principal con:
+- Tarjetas KPI (usuarios totales, vehículos, contratos activos, ingresos)
+- Gráfico de distribución de estados de vehículos
+- Gráfico de tendencia de ventas
+- Información de predicción de demanda
+- Feed de actividad reciente
+
+**Características:**
+- Actualizaciones de datos en tiempo real
+- Visualizaciones con Chart.js
+- Diseño de grilla responsivo
+- Visibilidad de contenido basada en permisos
+
+### Services
+
+#### DashboardService
+
+Obtiene métricas del Dashboard:
+
+```typescript
+class DashboardService {
+  getKPIs(): Observable<DashboardKPIs>;
+  getVehicleStatusDistribution(): Observable<StatusDistribution[]>;
+  getSalesTrend(startDate: Date, endDate: Date): Observable<SalesTrend[]>;
+  getRecentActivity(): Observable<Activity[]>;
+}
+```
+
+### Utilidades
+
+- Helpers de configuración de gráficos
+- Utilidades de rango de fechas
+- Formateadores de KPIs
+
+---
+
+## Gestión de Usuarios (users)
+
+### Descripción general
+
+Gestiona los usuarios de la aplicación, roles y permisos.
+
+**Ubicación**: `src/app/features/users/`
+
+**Routes**: `/users/*`
+
+### Components
+
+#### UserListComponent
+
+**Path**: `/users`
+
+Muestra una lista paginada de usuarios con:
+- Búsqueda y filtrado
+- Ordenamiento por columna
+- Insignias de rol
+- Acciones rápidas (editar, eliminar, ver perfil)
+- Visibilidad de acciones basada en permisos
+
+#### UserFormComponent
+
+**Paths**: `/users/create`, `/users/:id/edit`
+
+Formulario para crear/editar usuarios:
+- Información personal (nombre, email, teléfono)
+- Asignación de roles
+- Información de dirección
+- Validación de formulario
+- Manejo de éxito/error
+
+#### UserProfileComponent
+
+**Path**: `/users/:id`
+
+Vista detallada del perfil de usuario:
+- Información personal
+- Roles y permisos asignados
+- Historial de actividad
+- Botón de editar perfil
+
+#### RolesPermissionsComponent
+
+**Path**: `/roles-permissions`
+
+Gestión de roles y permisos del sistema:
+- Listar todos los roles
+- Asignar permisos a roles
+- Crear/editar roles
+- Ver matriz de permisos
+
+**Permiso requerido**: `role:update`
+
+### Services
+
+#### UserService
+
+Operaciones CRUD para usuarios:
+
+```typescript
+class UserService {
+  getUsers(params?: HttpParams): Observable<PaginatedResponse<User>>;
+  getUser(id: string): Observable<User>;
+  createUser(user: User): Observable<User>;
+  updateUser(id: string, user: User): Observable<User>;
+  deleteUser(id: string): Observable<void>;
+  getUserCount(): Observable<UserCount>;
+}
+```
+
+### Models
+
+```typescript
+interface User {
+  id: string;
+  username: string;
+  email: string;
+  person: Person;
+  roles: Role[];
+  enabled: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface Person {
+  id: string;
+  firstName: string;
+  lastName: string;
+  documentType: string;
+  documentNumber: string;
+  phone?: string;
+  address?: Address;
+}
+
+interface Role {
+  id: string;
+  name: string;
+  permissions: Permission[];
+}
+```
+
+### Resolvers
+
+#### userProfileResolver
+
+Precarga los datos del usuario antes de activar la ruta:
+
+```typescript
+{
+  path: ':id',
+  component: UserProfileComponent,
+  resolve: { user: userProfileResolver }
+}
+```
+
+---
+
+## Gestión de Clientes (clients)
+
+### Descripción general
+
+Gestiona clientes (personas y empresas) que compran o venden vehículos.
+
+**Ubicación**: `src/app/features/clients/`
+
+**Routes**: `/clients/*`
+
+### Components
+
+#### ClientListComponent
+
+**Path**: `/clients`
+
+Vista unificada de todos los clientes (personas + empresas):
+- Interfaz con pestañas (Todos, Personas, Empresas)
+- Búsqueda y filtrado
+- Insignias de tipo de cliente
+- Visualización de información de contacto
+
+#### PersonListComponent
+
+**Path**: `/clients/persons`
+
+Lista de clientes individuales:
+- Información personal
+- Número de documento
+- Datos de contacto
+- Historial de transacciones
+
+#### CompanyListComponent
+
+**Path**: `/clients/companies`
+
+Lista de clientes empresariales:
+- Nombre de la empresa
+- NIT (identificación tributaria)
+- Representante legal
+- Información de contacto
+
+### Services
+
+#### PersonService
+
+CRUD para clientes persona:
+
+```typescript
+class PersonService {
+  getPersons(params?: HttpParams): Observable<PaginatedResponse<Person>>;
+  getPerson(id: string): Observable<Person>;
+  createPerson(person: Person): Observable<Person>;
+  updatePerson(id: string, person: Person): Observable<Person>;
+  deletePerson(id: string): Observable<void>;
+  getPersonCount(): Observable<PersonCount>;
+}
+```
+
+#### CompanyService
+
+CRUD para clientes empresa:
+
+```typescript
+class CompanyService {
+  getCompanies(params?: HttpParams): Observable<PaginatedResponse<Company>>;
+  getCompany(id: string): Observable<Company>;
+  createCompany(company: Company): Observable<Company>;
+  updateCompany(id: string, company: Company): Observable<Company>;
+  deleteCompany(id: string): Observable<void>;
+  getCompanyCount(): Observable<CompanyCount>;
+}
+```
+
+### Models
+
+```typescript
+interface Person {
+  id: string;
+  firstName: string;
+  lastName: string;
+  documentType: string;
+  documentNumber: string;
+  email?: string;
+  phone?: string;
+  address?: Address;
+}
+
+interface Company {
+  id: string;
+  name: string;
+  taxId: string;
+  legalRepresentative: string;
+  email?: string;
+  phone?: string;
+  address?: Address;
+}
+
+type Client = Person | Company;
+```
+
+---
+
+## Inventario de Vehículos (vehicles)
+
+### Descripción general
+
+Gestiona el inventario de vehículos incluyendo autos y motocicletas.
+
+**Ubicación**: `src/app/features/vehicles/`
+
+**Routes**: `/vehicles/*`
+
+### Components
+
+#### VehicleListComponent
+
+**Path**: `/vehicles`
+
+Lista combinada de todos los vehículos:
+- Vista con pestañas (Todos, Autos, Motocicletas)
+- Filtros de estado (Disponible, Reservado, Vendido)
+- Búsqueda por marca/modelo/VIN
+- Miniaturas de imágenes
+- Visualización de precio
+- Acciones rápidas
+
+#### CarListComponent
+
+**Path**: `/vehicles/cars`
+
+Listado específico de autos:
+- Atributos específicos de autos (puertas, asientos)
+- Filtrado por rango de precio
+- Filtrado por año
+- Tipo de transmisión
+
+#### MotorcycleListComponent
+
+**Path**: `/vehicles/motorcycles`
+
+Listado específico de motocicletas:
+- Cilindrada del motor
+- Tipo de motocicleta (sport, cruiser, etc.)
+- Filtrado por rango de precio
+
+#### VehicleFormComponent
+
+**Paths**: `/vehicles/create`, `/vehicles/:id/edit`
+
+Formulario para crear/editar vehículos:
+- Selección de tipo de vehículo
+- Información básica (marca, modelo, año, VIN)
+- Especificaciones (motor, transmisión, kilometraje)
+- Precio
+- Gestión de estado
+- Carga de imágenes
+- Validación
+
+#### VehicleDetailComponent
+
+**Path**: `/vehicles/:id`
+
+Vista detallada del vehículo:
+- Especificaciones completas
+- Galería de imágenes
+- Historial de estados
+- Historial de transacciones
+- Acciones de editar/eliminar
+
+### Services
+
+#### CarService
+
+CRUD para autos:
+
+```typescript
+class CarService {
+  getCars(params?: HttpParams): Observable<PaginatedResponse<Car>>;
+  getCar(id: string): Observable<Car>;
+  createCar(car: Car): Observable<Car>;
+  updateCar(id: string, car: Car): Observable<Car>;
+  deleteCar(id: string): Observable<void>;
+}
+```
+
+#### MotorcycleService
+
+CRUD para motocicletas:
+
+```typescript
+class MotorcycleService {
+  getMotorcycles(params?: HttpParams): Observable<PaginatedResponse<Motorcycle>>;
+  getMotorcycle(id: string): Observable<Motorcycle>;
+  createMotorcycle(motorcycle: Motorcycle): Observable<Motorcycle>;
+  updateMotorcycle(id: string, motorcycle: Motorcycle): Observable<Motorcycle>;
+  deleteMotorcycle(id: string): Observable<void>;
+}
+```
+
+#### VehicleImageService
+
+Gestiona imágenes de vehículos:
+
+```typescript
+class VehicleImageService {
+  getImages(vehicleId: string): Observable<VehicleImage[]>;
+  requestPresignedUploadUrl(request: PresignedUploadRequest): Observable<PresignedUploadResponse>;
+  confirmUpload(vehicleId: string, confirmation: UploadConfirmation): Observable<VehicleImage>;
+  deleteImage(vehicleId: string, imageId: string): Observable<void>;
+  setMainImage(vehicleId: string, imageId: string): Observable<void>;
+}
+```
+
+#### VehicleImageUploadService
+
+Gestiona la carga a S3:
+
+```typescript
+class VehicleImageUploadService {
+  uploadToS3(presignedUrl: string, file: File): Observable<void>;
+  uploadMultipleImages(vehicleId: string, files: File[]): Observable<VehicleImage[]>;
+}
+```
+
+### Models
+
+```typescript
+interface Vehicle {
+  id: string;
+  type: 'CAR' | 'MOTORCYCLE';
+  brand: string;
+  model: string;
+  year: number;
+  vin: string;
+  color: string;
+  mileage: number;
+  price: number;
+  status: VehicleStatus;
+  images: VehicleImage[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface Car extends Vehicle {
+  type: 'CAR';
+  doors: number;
+  seats: number;
+  transmission: 'MANUAL' | 'AUTOMATIC';
+  fuelType: 'GASOLINE' | 'DIESEL' | 'ELECTRIC' | 'HYBRID';
+}
+
+interface Motorcycle extends Vehicle {
+  type: 'MOTORCYCLE';
+  engineDisplacement: number;
+  motorcycleType: 'SPORT' | 'CRUISER' | 'TOURING' | 'OFF_ROAD';
+}
+
+enum VehicleStatus {
+  AVAILABLE = 'AVAILABLE',
+  RESERVED = 'RESERVED',
+  SOLD = 'SOLD',
+  IN_MAINTENANCE = 'IN_MAINTENANCE'
+}
+
+interface VehicleImage {
+  id: string;
+  url: string;
+  thumbnailUrl?: string;
+  isMain: boolean;
+  uploadedAt: Date;
+}
+```
+
+### Flujo de carga de imágenes
+
+1. **Solicitar URL prefirmada**:
+   ```typescript
+   vehicleImageService.requestPresignedUploadUrl({
+     vehicleId: '123',
+     fileName: 'car.jpg',
+     contentType: 'image/jpeg'
+   });
+   ```
+
+2. **Cargar a S3**:
+   ```typescript
+   vehicleImageUploadService.uploadToS3(presignedUrl, file);
+   ```
+
+3. **Confirmar carga**:
+   ```typescript
+   vehicleImageService.confirmUpload(vehicleId, {
+     s3Key: 's3-object-key',
+     fileName: 'car.jpg'
+   });
+   ```
+
+---
+
+## Compras y Ventas (purchase-sales)
+
+### Descripción general
+
+Gestiona las transacciones de compra y venta de vehículos.
+
+**Ubicación**: `src/app/features/purchase-sales/`
+
+**Routes**: `/purchase-sales/*`
+
+### Components
+
+#### PurchaseSaleListComponent
+
+**Path**: `/purchase-sales`
+
+Lista de todas las transacciones:
+- Pestañas por tipo de transacción (Todas, Compras, Ventas)
+- Filtrado por rango de fechas
+- Búsqueda de clientes
+- Búsqueda de vehículos
+- Filtros de estado
+- Visualización de montos
+- Sugerencias rápidas para consultas comunes
+
+#### PurchaseSaleCreateComponent
+
+**Path**: `/purchase-sales/create`
+
+Crear nueva transacción:
+- Selección de tipo de transacción (Compra/Venta)
+- Selección de cliente con búsqueda
+- Selección de vehículo con búsqueda
+- Precio y condiciones de pago
+- Detalles del contrato
+- Carga de documentos
+- Flujo de trabajo multi-paso
+
+#### PurchaseVehicleFormComponent
+
+**Path**: `/purchase-sales/purchase-vehicle`
+
+Flujo rápido de compra:
+- Agregar nuevo vehículo durante la compra
+- Selección de cliente
+- Información del vehículo
+- Precio de compra
+- Flujo de trabajo simplificado
+
+### Services
+
+#### PurchaseSaleService
+
+CRUD para transacciones:
+
+```typescript
+class PurchaseSaleService {
+  getTransactions(params?: HttpParams): Observable<PaginatedResponse<Transaction>>;
+  getTransaction(id: string): Observable<Transaction>;
+  createPurchase(purchase: Purchase): Observable<Transaction>;
+  createSale(sale: Sale): Observable<Transaction>;
+  updateTransaction(id: string, transaction: Transaction): Observable<Transaction>;
+  cancelTransaction(id: string): Observable<void>;
+}
+```
+
+#### PurchaseSaleLookupService
+
+Utilidades de búsqueda y consulta:
+
+```typescript
+class PurchaseSaleLookupService {
+  searchVehicles(query: string): Observable<Vehicle[]>;
+  searchClients(query: string): Observable<Client[]>;
+  getAvailableVehicles(): Observable<Vehicle[]>;
+  getRecentClients(): Observable<Client[]>;
+}
+```
+
+#### PurchaseSaleReportService
+
+Generación de reportes:
+
+```typescript
+class PurchaseSaleReportService {
+  generateSalesReport(startDate: Date, endDate: Date): Observable<Blob>;
+  generatePurchaseReport(startDate: Date, endDate: Date): Observable<Blob>;
+  getTransactionSummary(startDate: Date, endDate: Date): Observable<TransactionSummary>;
+}
+```
+
+### Models
+
+```typescript
+interface Transaction {
+  id: string;
+  type: 'PURCHASE' | 'SALE';
+  vehicle: Vehicle;
+  client: Client;
+  amount: number;
+  date: Date;
+  status: TransactionStatus;
+  paymentMethod: string;
+  notes?: string;
+  documents: Document[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+enum TransactionStatus {
+  PENDING = 'PENDING',
+  COMPLETED = 'COMPLETED',
+  CANCELLED = 'CANCELLED'
+}
+```
+
+### Utilidades
+
+#### quick-search.utils
+
+Sugerencias de búsqueda rápida:
+- Búsquedas recientes
+- Consultas populares
+- Autocompletado
+
+#### purchase-sale-filter.utils
+
+Helpers de filtrado:
+- Construcción de parámetros de filtro
+- Validación de rango de fechas
+- Filtros de rango de montos
+
+---
+
+## Components compartidos
+
+### DataTableComponent
+
+Tabla de datos genérica con:
+- Configuración de columnas
+- Ordenamiento
+- Selección de filas
+- Navegación por filas
+- Templates de celda personalizados
+- Estado de carga
+
+**Uso**:
+
+```html
+<app-data-table
+  [data]="vehicles()"
+  [columns]="columns"
+  [loading]="loading()"
+  (rowClick)="onRowClick($event)"
+  (sort)="onSort($event)"
+/>
+```
+
+### PagerComponent
+
+Controles de paginación:
+- Selección de tamaño de página
+- Navegación de páginas
+- Visualización del total de registros
+- Ir a página
+
+**Uso**:
+
+```html
+<app-pager
+  [currentPage]="currentPage()"
+  [pageSize]="pageSize()"
+  [totalItems]="totalItems()"
+  (pageChange)="onPageChange($event)"
+/>
+```
+
+### KpiCardComponent
+
+Visualización de KPIs del Dashboard:
+- Ícono
+- Título
+- Valor
+- Porcentaje de cambio
+- Indicador de tendencia
+
+**Uso**:
+
+```html
+<app-kpi-card
+  icon="car"
+  title="Total Vehicles"
+  [value]="totalVehicles()"
+  [change]="vehicleChange()"
+/>
+```
+
+### FormShellComponent
+
+Contenedor de formulario con:
+- Encabezado de página
+- Contenedor del formulario
+- Botones de acción
+- Estado de carga
+- Visualización de errores
+
+---
+
+## Matriz de permisos
+
+### Permisos de usuario
+
+- `user:read` - Ver usuarios
+- `user:create` - Crear usuarios
+- `user:update` - Editar usuarios
+- `user:delete` - Eliminar usuarios
+
+### Permisos de cliente
+
+- `client:read` - Ver clientes
+- `client:create` - Crear clientes
+- `client:update` - Editar clientes
+- `client:delete` - Eliminar clientes
+
+### Permisos de vehículo
+
+- `vehicle:read` - Ver vehículos
+- `vehicle:create` - Crear vehículos
+- `vehicle:update` - Editar vehículos
+- `vehicle:delete` - Eliminar vehículos
+- `vehicle:manage_images` - Cargar/eliminar imágenes
+
+### Permisos de transacción
+
+- `transaction:read` - Ver transacciones
+- `transaction:create` - Crear transacciones
+- `transaction:update` - Editar transacciones
+- `transaction:cancel` - Cancelar transacciones
+- `transaction:report` - Generar reportes
+
+### Permisos de rol
+
+- `role:read` - Ver roles
+- `role:update` - Gestionar roles y permisos
+
+---
+
+## Próximos pasos
+
+<CardGroup cols={2}>
+  <Card title="Configuración" icon="rocket" href="/frontend/setup">
+    Configurar el entorno de desarrollo
+  </Card>
+  <Card title="Arquitectura" icon="sitemap" href="/frontend/architecture">
+    Conocer los patrones arquitectónicos
+  </Card>
+</CardGroup>

@@ -1,0 +1,197 @@
+---
+title: Visión General del Frontend
+description: Visión general de la aplicación Frontend Angular de SGIVU
+---
+
+# Visión General del Frontend
+
+**sgivu-frontend** es una aplicación moderna de tipo Single Page Application (SPA) construida con Angular 21 que proporciona la interfaz de usuario para la plataforma de gestión de inventario vehicular SGIVU. Maneja la gestión de clientes, inventario de vehículos, administración de usuarios y transacciones de compra/venta.
+
+## Stack Tecnológico
+
+### Framework Principal
+- **Angular 21** - Última versión del framework Angular con componentes standalone
+- **TypeScript 5.9.3** - Desarrollo en JavaScript con tipado seguro
+- **RxJS 7.8.2** - Programación reactiva con observables y signals
+- **Zone.js 0.16.0** - Detección de cambios (preparado para migración zoneless)
+
+### UI y Estilos
+- **Bootstrap 5.3.8** - Framework de UI responsivo
+- **Bootstrap Icons 1.13.1** - Librería de íconos
+- **SweetAlert2 11.26.10** - Diálogos de alerta y modales elegantes
+
+### Visualización de Datos
+- **Chart.js 4.5.1** - Librería de gráficos
+- **ng2-charts 8.0.0** - Wrapper de Angular para Chart.js
+
+### Herramientas de Desarrollo
+- **Angular CLI 21.0.3** - Interfaz de línea de comandos
+- **Karma & Jasmine** - Framework de pruebas unitarias
+- **ESLint 9.39.2** - Linting de código
+- **Prettier 3.7.4** - Formateo de código
+- **Angular ESLint 21.0.1** - Reglas de linting específicas para Angular
+
+## Características Principales
+
+### Autenticación y Autorización
+- Autenticación OAuth2/OIDC a través de `sgivu-gateway`
+- Autenticación basada en sesión con el endpoint `/auth/session`
+- Control de acceso basado en roles (RBAC)
+- Guards de rutas basados en permisos
+- Flujo PKCE gestionado por el Gateway Backend
+
+### Dashboard
+- Tarjetas KPI en tiempo real para métricas de negocio
+- Estadísticas de inventario vehicular
+- Analíticas de ventas y compras
+- Gráficos interactivos y visualizaciones
+- Información de predicción de demanda
+
+### Gestión de Usuarios
+- Operaciones CRUD de usuarios
+- Asignación de roles y permisos
+- Gestión de perfiles de usuario
+- Gestión de información personal
+
+### Gestión de Clientes
+- Gestión de clientes persona (individual)
+- Gestión de clientes empresa
+- Información de dirección con utilidades de formulario
+- Búsqueda y filtrado de clientes
+
+### Inventario de Vehículos
+- Gestión de automóviles con especificaciones detalladas
+- Gestión de motocicletas
+- Seguimiento de estado del vehículo (disponible, reservado, vendido)
+- Carga de imágenes con URLs prefirmadas hacia S3
+- Soporte de múltiples imágenes por vehículo
+- Búsqueda y filtrado de vehículos
+
+### Compras y Ventas
+- Gestión de transacciones de compra
+- Gestión de transacciones de venta
+- Búsqueda rápida de vehículos y clientes
+- Generación de reportes con rangos de fecha
+- Consulta y filtrado de transacciones
+
+## Aspectos Destacados de la Arquitectura
+
+### Patrones Modernos de Angular
+- **Standalone Components** - Sin necesidad de NgModule
+- **Signal-based State** - Gestión de estado reactiva con signals
+- **OnPush Change Detection** - Rendimiento optimizado
+- **Lazy Loading** - División de código basada en rutas
+- **Dependency Injection** - Arquitectura basada en servicios
+
+### Preparado para Zoneless
+La aplicación está preparada para la migración a detección de cambios sin zones:
+- La mayoría de los componentes usan signals (`signal`, `computed`, `effect`)
+- Estrategia de detección de cambios OnPush implementada
+- Quedan propiedades mutables mínimas (~20 en 8 componentes)
+
+### Utilidades Compartidas
+- Validación de formularios y utilidades
+- Formateadores de fecha y moneda
+- Utilidades de manejo de errores
+- Factorías de operaciones CRUD
+- Constructores de consultas de filtro
+- Utilidades wrapper de SweetAlert
+
+## Integración con el Backend
+
+El Frontend se comunica exclusivamente con el servicio `sgivu-gateway`:
+
+- **URL de la API**: Configurada en `environment.apiUrl`
+- **Autenticación**: OAuth2 vía Gateway en `/oauth2/authorization/sgivu-gateway`
+- **Verificación de Sesión**: Endpoint `/auth/session`
+- **Endpoints de la API**: Todas las APIs de negocio se proxean a través de `/v1/*`
+- **HTTP Interceptor**: `defaultOAuthInterceptor` gestiona los headers de autenticación
+
+## Configuración del Entorno
+
+La configuración se gestiona a través de archivos de entorno:
+
+```typescript
+export const environment = {
+  production: false,
+  apiUrl: 'http://localhost:8080',
+  issuer: 'http://sgivu-auth:9000',
+  clientId: 'angular-local'
+};
+```
+
+### Variables de Entorno
+- `apiUrl` - URL del Gateway Backend
+- `issuer` - URL del servidor de autorización OAuth2
+- `clientId` - Identificador del cliente OAuth2
+- `production` - Flag de modo producción
+
+## Estructura del Proyecto
+
+```
+src/app/
+├── features/              # Módulos de funcionalidad
+│   ├── auth/             # Autenticación y autorización
+│   ├── dashboard/        # Dashboard principal
+│   ├── users/           # Gestión de usuarios
+│   ├── clients/         # Gestión de clientes
+│   ├── vehicles/        # Inventario de vehículos
+│   └── purchase-sales/  # Gestión de transacciones
+├── shared/              # Componentes y utilidades compartidas
+│   ├── components/      # Componentes de UI reutilizables
+│   ├── services/        # Servicios compartidos
+│   ├── pipes/          # Pipes personalizados
+│   ├── directives/     # Directivas personalizadas
+│   ├── models/         # Modelos de datos compartidos
+│   └── utils/          # Funciones de utilidad
+├── app.config.ts       # Configuración de la aplicación
+└── app.routes.ts       # Definición de rutas
+```
+
+## Despliegue
+
+La aplicación está diseñada para hosting estático:
+
+1. **Build**: `npm run build` (genera en `dist/sgivu-frontend`)
+2. **Build de Producción**: `npm run build -- --configuration production`
+3. **Opciones de Hosting**:
+   - AWS S3 + CloudFront (recomendado)
+   - Servidor de archivos estáticos Nginx
+   - Cualquier CDN o servicio de hosting estático
+
+### Consideraciones de Despliegue
+- Asegurar la configuración correcta de enrutamiento SPA (servir `index.html` para todas las rutas)
+- Configurar `base href` correctamente
+- Configurar CORS para la comunicación con el API Gateway
+- Usar HTTPS en producción
+- Configurar los headers CSP apropiadamente
+
+## Optimizaciones de Rendimiento
+
+- **Lazy Loading**: Módulos de funcionalidad cargados bajo demanda
+- **Estrategia OnPush**: Reducción de ciclos de detección de cambios
+- **Signal-based State**: Reactividad eficiente
+- **HTTP Interceptors**: Gestión centralizada de peticiones
+- **Optimización de Imágenes**: Carga mediante URLs prefirmadas hacia S3
+- **Code Splitting**: División por rutas
+
+## Localización
+
+La aplicación está configurada para español colombiano (`es-CO`):
+- El formato de fecha sigue las convenciones colombianas
+- La moneda se muestra en COP (Peso Colombiano)
+- Pipes personalizados: `COPCurrencyPipe`, `UtcToGmtMinus5Pipe`
+
+## Próximos Pasos
+
+<CardGroup cols={2}>
+  <Card title="Guía de Configuración" icon="rocket" href="/frontend/setup">
+    Comienza con la configuración del entorno de desarrollo local
+  </Card>
+  <Card title="Arquitectura" icon="sitemap" href="/frontend/architecture">
+    Profundiza en los patrones arquitectónicos
+  </Card>
+  <Card title="Funcionalidades" icon="puzzle-piece" href="/frontend/features">
+    Explora los módulos de funcionalidad en detalle
+  </Card>
+</CardGroup>

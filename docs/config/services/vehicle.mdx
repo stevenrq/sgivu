@@ -1,0 +1,473 @@
+---
+title: Configuración del Servicio de Vehículos
+description: Gestión del catálogo de vehículos con integración AWS S3 para la plataforma SGIVU
+---
+
+El Servicio de Vehículos (`sgivu-vehicle`) gestiona el catálogo de vehículos, incluyendo datos de vehículos, imágenes y almacenamiento de medios mediante AWS S3.
+
+## Descripción del Servicio
+
+<CardGroup cols={2}>
+  <Card title="Puerto" icon="network-wired">
+    8083
+  </Card>
+  <Card title="Base de Datos" icon="database">
+    PostgreSQL
+  </Card>
+  <Card title="Almacenamiento" icon="cloud">
+    AWS S3
+  </Card>
+  <Card title="Rol" icon="car">
+    Catálogo de Vehículos
+  </Card>
+</CardGroup>
+
+## Características Principales
+
+- Gestión del catálogo de vehículos (operaciones CRUD)
+- Almacenamiento de imágenes y medios con AWS S3
+- Soporte de carga de archivos multipart (hasta 100MB)
+- Migración de base de datos con Flyway
+- API RESTful con documentación OpenAPI
+- Autenticación interna entre servicios
+- Configuración CORS para acceso del frontend
+
+## Configuración Base
+
+### Configuración del Servidor
+
+```yaml
+server:
+  port: ${PORT:8083}
+```
+
+### Configuración de JPA
+
+```yaml
+spring:
+  jpa:
+    open-in-view: false
+```
+
+<Info>
+Deshabilitar open-in-view impone límites de transacción explícitos y previene problemas de carga diferida (lazy loading).
+</Info>
+
+## Configuración de Carga de Archivos
+
+### Configuración Multipart
+
+```yaml
+spring:
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 100MB
+```
+
+<Accordion title="Límites de Carga">
+- **max-file-size: 10MB**: Límite de tamaño por archivo individual
+- **max-request-size: 100MB**: Tamaño total de la solicitud (soporta múltiples archivos)
+- Permite la carga masiva de imágenes de vehículos
+- Previene el agotamiento de memoria por cargas grandes
+</Accordion>
+
+<Warning>
+Asegúrese de que su proxy inverso (nginx, gateway) también permita estos tamaños de solicitud, o las cargas fallarán antes de llegar al servicio.
+</Warning>
+
+### Destino de Almacenamiento Local
+
+```yaml
+spring:
+  destination:
+    folder: ./src/main/resources/static/images/vehicles
+```
+
+<Note>
+Esta carpeta local se usa para almacenamiento temporal o desarrollo. En producción se utiliza S3 exclusivamente.
+</Note>
+
+## Configuración de AWS S3
+
+### Configuración de S3
+
+```yaml
+aws:
+  s3:
+    vehicles-bucket: ${AWS_VEHICLES_BUCKET}
+    allowed-origins: ${AWS_S3_ALLOWED_ORIGINS:http://localhost:4200,https://localhost:4200}
+  access:
+    key: ${AWS_ACCESS_KEY}
+  secret:
+    key: ${AWS_SECRET_KEY}
+  region: ${AWS_REGION}
+```
+
+<Accordion title="Detalles de Configuración AWS">
+- **vehicles-bucket**: Nombre del bucket S3 para imágenes de vehículos
+- **allowed-origins**: Orígenes CORS para URLs pre-firmadas de S3
+- **access.key**: ID de clave de acceso AWS
+- **secret.key**: Clave secreta de acceso AWS
+- **region**: Región de AWS (ej., us-east-1, eu-west-1)
+</Accordion>
+
+<Warning>
+Nunca versione credenciales de AWS en el control de código fuente. Use variables de entorno o roles IAM de AWS (recomendado).
+</Warning>
+
+### Política del Bucket S3
+
+Su bucket S3 debería tener:
+
+- Acceso público de lectura para imágenes de vehículos (o usar URLs pre-firmadas)
+- Configuración CORS que coincida con `allowed-origins`
+- Políticas de ciclo de vida para gestionar imágenes antiguas
+
+### Ejemplo de Configuración CORS en S3
+
+```json
+[
+  {
+    "AllowedHeaders": ["*"],
+    "AllowedMethods": ["GET", "PUT", "POST", "DELETE"],
+    "AllowedOrigins": [
+      "http://localhost:4200",
+      "https://your-production-domain.com"
+    ],
+    "ExposeHeaders": ["ETag"]
+  }
+]
+```
+
+## Configuración de Base de Datos
+
+### Migración con Flyway
+
+```yaml
+spring:
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: ${FLYWAY_BASELINE_ON_MIGRATE:false}
+    baseline-version: 0
+    validate-on-migrate: true
+```
+
+<Tabs>
+  <Tab title="Desarrollo">
+    ```yaml
+    spring:
+      datasource:
+        url: jdbc:postgresql://${DEV_VEHICLE_DB_HOST:host.docker.internal}:${DEV_VEHICLE_DB_PORT:5432}/${DEV_VEHICLE_DB_NAME}
+        username: ${DEV_VEHICLE_DB_USERNAME}
+        password: ${DEV_VEHICLE_DB_PASSWORD}
+        driver-class-name: org.postgresql.Driver
+      jpa:
+        hibernate:
+          ddl-auto: validate
+        show-sql: true
+        properties:
+          hibernate:
+            format_sql: true
+      flyway:
+        baseline-on-migrate: true
+        clean-disabled: true
+    ```
+    
+    Desarrollo habilita el registro de SQL y permite la migración baseline.
+  </Tab>
+  <Tab title="Producción">
+    ```yaml
+    spring:
+      datasource:
+        url: jdbc:postgresql://${PROD_VEHICLE_DB_HOST}:${PROD_VEHICLE_DB_PORT}/${PROD_VEHICLE_DB_NAME}
+        username: ${PROD_VEHICLE_DB_USERNAME}
+        password: ${PROD_VEHICLE_DB_PASSWORD}
+        driver-class-name: org.postgresql.Driver
+      jpa:
+        hibernate:
+          ddl-auto: validate
+      flyway:
+        clean-disabled: true
+        baseline-on-migrate: ${FLYWAY_BASELINE_ON_MIGRATE:false}
+    ```
+    
+    Producción deshabilita el registro de SQL y previene Flyway clean.
+  </Tab>
+</Tabs>
+
+## Integración de Servicios
+
+### Registro en Eureka
+
+```yaml
+eureka:
+  instance:
+    instance-id: ${spring.cloud.client.hostname}:${spring.application.name}:${random.value}
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://sgivu-discovery:8761/eureka}
+```
+
+### Mapa de Descubrimiento de Servicios
+
+```yaml
+services:
+  map:
+    sgivu-auth:
+      name: sgivu-auth
+      url: ${SGIVU_AUTH_URL:http://sgivu-auth:9000}
+```
+
+### Autenticación Interna entre Servicios
+
+```yaml
+service:
+  internal:
+    secret-key: "${SERVICE_INTERNAL_SECRET_KEY}"
+```
+
+<Info>
+El Servicio de Compra-Venta utiliza este secreto para consultar datos de vehículos.
+</Info>
+
+## Observabilidad
+
+### Endpoints de Actuator
+
+<Tabs>
+  <Tab title="Desarrollo">
+    ```yaml
+    management:
+      endpoints:
+        web:
+          exposure:
+            include: "*"
+      endpoint:
+        health:
+          show-details: always
+    ```
+  </Tab>
+  <Tab title="Producción">
+    ```yaml
+    management:
+      endpoints:
+        web:
+          exposure:
+            include: health, info, prometheus
+      endpoint:
+        health:
+          show-details: never
+    ```
+  </Tab>
+</Tabs>
+
+### Trazabilidad Distribuida
+
+```yaml
+management:
+  tracing:
+    sampling:
+      probability: 0.1
+  zipkin:
+    tracing:
+      endpoint: http://sgivu-zipkin:9411/api/v2/spans
+```
+
+### Registro de Logs
+
+```yaml
+logging:
+  level:
+    root: INFO
+    software:
+      amazon:
+        awssdk: info
+```
+
+<Accordion title="Registro del AWS SDK">
+El logger del AWS SDK está configurado en nivel `info` para:
+- Mostrar operaciones S3 importantes
+- Evitar logs verbosos de nivel DEBUG
+- Mantener visibilidad de las llamadas a la API de AWS
+</Accordion>
+
+## Documentación de la API
+
+```yaml
+springdoc:
+  swagger-ui:
+    url: /docs/vehicle/v3/api-docs
+    configUrl: /docs/vehicle/v3/api-docs/swagger-config
+```
+
+<Tabs>
+  <Tab title="Producción">
+    ```yaml
+    openapi:
+      server:
+        url: ${OPENAPI_SERVER_URL}
+    ```
+  </Tab>
+</Tabs>
+
+## Variables de Entorno Requeridas
+
+### Todos los Entornos
+
+| Variable | Descripción | Ejemplo |
+|----------|-------------|----------|
+| `SERVICE_INTERNAL_SECRET_KEY` | Secreto compartido para APIs internas | `your-secret-key` |
+| `AWS_VEHICLES_BUCKET` | Nombre del bucket S3 | `sgivu-vehicles` |
+| `AWS_ACCESS_KEY` | ID de clave de acceso AWS | `AKIAIOSFODNN7EXAMPLE` |
+| `AWS_SECRET_KEY` | Clave secreta de acceso AWS | `wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY` |
+| `AWS_REGION` | Región de AWS | `us-east-1` |
+
+<Warning>
+En producción, use roles IAM de AWS en lugar de claves de acceso cuando ejecute en EC2/ECS.
+</Warning>
+
+### Desarrollo
+
+| Variable | Descripción | Valor por Defecto |
+|----------|-------------|----------|
+| `DEV_VEHICLE_DB_HOST` | Host de la base de datos | `host.docker.internal` |
+| `DEV_VEHICLE_DB_PORT` | Puerto de la base de datos | `5432` |
+| `DEV_VEHICLE_DB_NAME` | Nombre de la base de datos | Requerido |
+| `DEV_VEHICLE_DB_USERNAME` | Usuario de la base de datos | Requerido |
+| `DEV_VEHICLE_DB_PASSWORD` | Contraseña de la base de datos | Requerido |
+
+### Producción
+
+| Variable | Descripción |
+|----------|-------------|
+| `PROD_VEHICLE_DB_HOST` | Host de la base de datos |
+| `PROD_VEHICLE_DB_PORT` | Puerto de la base de datos |
+| `PROD_VEHICLE_DB_NAME` | Nombre de la base de datos |
+| `PROD_VEHICLE_DB_USERNAME` | Usuario de la base de datos |
+| `PROD_VEHICLE_DB_PASSWORD` | Contraseña de la base de datos |
+| `OPENAPI_SERVER_URL` | URL pública de documentación de la API |
+
+### Opcionales
+
+| Variable | Descripción | Valor por Defecto |
+|----------|-------------|----------|
+| `PORT` | Puerto del servicio | `8083` |
+| `EUREKA_URL` | URL del servidor Eureka | `http://sgivu-discovery:8761/eureka` |
+| `AWS_S3_ALLOWED_ORIGINS` | Orígenes CORS | `http://localhost:4200,https://localhost:4200` |
+
+## Endpoints de la API
+
+Endpoints típicos del Servicio de Vehículos:
+
+```
+GET    /api/vehicles              - Listar vehículos
+GET    /api/vehicles/{id}         - Obtener vehículo por ID
+POST   /api/vehicles              - Crear vehículo
+PUT    /api/vehicles/{id}         - Actualizar vehículo
+DELETE /api/vehicles/{id}         - Eliminar vehículo
+POST   /api/vehicles/{id}/images  - Cargar imágenes
+DELETE /api/vehicles/{id}/images/{imageId} - Eliminar imagen
+```
+
+<Info>
+Todos los endpoints requieren autenticación a través del gateway.
+</Info>
+
+## Modelo de Datos del Vehículo
+
+La entidad típica de vehículo incluye:
+
+- Información básica (marca, modelo, año, VIN)
+- Especificaciones (motor, transmisión, color)
+- Precio y disponibilidad
+- URLs de imágenes (almacenadas en S3)
+- Marcas de tiempo de creación/actualización
+
+## Patrones de Integración con S3
+
+### Flujo de Carga
+
+1. El cliente sube imágenes vía POST `/api/vehicles/{id}/images`
+2. El servicio recibe el archivo multipart
+3. El servicio sube a S3 con una clave única
+4. La URL de S3 se almacena en la base de datos
+5. La respuesta incluye la URL de la imagen
+
+### URLs Pre-firmadas
+
+Para cargas directas seguras:
+
+```java
+// Generate pre-signed URL
+GeneratePresignedUrlRequest request = new GeneratePresignedUrlRequest(
+    bucketName, objectKey)
+    .withMethod(HttpMethod.PUT)
+    .withExpiration(expiration);
+URL url = s3Client.generatePresignedUrl(request);
+```
+
+### Eliminación de Imágenes
+
+Al eliminar un vehículo o imagen:
+
+1. Eliminar el registro de la base de datos
+2. Eliminar el objeto de S3
+3. Manejar fallos de forma adecuada (consistencia eventual)
+
+<Note>
+Considere implementar eliminación lógica (soft deletes) y tareas periódicas de limpieza para objetos S3 huérfanos.
+</Note>
+
+## Consideraciones de Seguridad
+
+### Seguridad del Bucket S3
+
+- Usar políticas IAM de privilegio mínimo
+- Habilitar versionado del bucket S3
+- Configurar cifrado del lado del servidor (SSE-S3 o SSE-KMS)
+- Habilitar registro de acceso
+- Bloquear acceso público a menos que sea necesario
+
+### Seguridad en la Carga de Archivos
+
+- Validar tipos de archivo (solo permitir imágenes)
+- Escanear en busca de malware
+- Generar nombres de archivo únicos (prevenir sobrescritura)
+- Limitar tamaños de archivo
+
+## Optimización de Rendimiento
+
+### Rendimiento de S3
+
+- Usar CloudFront CDN para la entrega de imágenes
+- Implementar estrategias de caché
+- Comprimir imágenes antes de la carga
+- Usar S3 Transfer Acceleration para archivos grandes
+
+### Rendimiento de Base de Datos
+
+- Indexar columnas de búsqueda (marca, modelo, año)
+- Usar paginación para endpoints de listado
+- Cachear vehículos consultados frecuentemente
+
+## Archivos de Configuración
+
+- `sgivu-vehicle.yml` - Configuración base
+- `sgivu-vehicle-dev.yml` - Sobrescrituras de desarrollo
+- `sgivu-vehicle-prod.yml` - Sobrescrituras de producción
+
+## Servicios Relacionados
+
+<CardGroup cols={3}>
+  <Card title="Compra-Venta" icon="handshake" href="/config/services/purchase-sale">
+    Consulta datos de vehículos
+  </Card>
+  <Card title="Servicio de Auth" icon="shield-halved" href="/config/services/auth">
+    Validación de tokens
+  </Card>
+  <Card title="Gateway" icon="door-open" href="/config/services/gateway">
+    Enrutamiento de API
+  </Card>
+</CardGroup>

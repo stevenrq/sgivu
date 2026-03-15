@@ -1,0 +1,267 @@
+---
+title: Gestión de Clientes
+description: Administra clientes individuales y corporativos para transacciones de vehículos
+---
+
+## Descripción General
+
+La Gestión de Clientes permite mantener una base de datos completa de tus clientes, ya sean personas físicas o empresas. Esta información es esencial para crear contratos de compra y venta, y mantener las relaciones comerciales.
+
+## Tipos de Clientes
+
+SGIVU admite dos tipos de clientes:
+
+<CardGroup cols={2}>
+  <Card title="Personas Físicas" icon="user">
+    Individuos particulares que compran o venden vehículos. Incluye información personal y datos de contacto.
+  </Card>
+  
+  <Card title="Empresas" icon="building">
+    Entidades comerciales involucradas en transacciones de vehículos. Incluye información corporativa y datos de contacto empresarial.
+  </Card>
+</CardGroup>
+
+## Gestión de Clientes Individuales
+
+### Agregar una Nueva Persona
+
+<Steps>
+  <Step title="Navegar a Gestión de Clientes">
+    Accede a la sección de Gestión de Clientes desde tu panel principal. Necesitas el permiso `person:create` para agregar nuevos clientes individuales.
+  </Step>
+  
+  <Step title="Ingresar Información Personal">
+    Completa los datos del cliente:
+    - **Nombre Completo**: Nombre y apellido
+    - **Correo Electrónico**: Email de contacto principal
+    - **Teléfono**: Número de teléfono de contacto
+    - **Fecha de Nacimiento**: Para verificación de edad y registro
+    - **Identificación**: Número de documento o licencia de conducir (si corresponde)
+  </Step>
+  
+  <Step title="Agregar Información de Dirección">
+    Ingresa la dirección del cliente:
+    - Dirección (calle y número)
+    - Ciudad
+    - Estado/Provincia
+    - Código postal
+    - País
+  </Step>
+  
+  <Step title="Agregar Notas (Opcional)">
+    Incluye cualquier información adicional sobre las preferencias, requisitos o historial de transacciones del cliente.
+  </Step>
+  
+  <Step title="Guardar Cliente">
+    Revisa toda la información y guarda el nuevo registro del cliente. El cliente estará disponible para su uso en contratos.
+  </Step>
+</Steps>
+
+### Actualizar Información de Persona
+
+<Card title="Editar Datos del Cliente" icon="pen-to-square">
+  Actualiza la información del cliente en cualquier momento buscando a la persona y seleccionando editar. Los cambios se reflejan inmediatamente en todos los registros relacionados.
+</Card>
+
+## Gestión de Clientes Corporativos
+
+### Agregar una Nueva Empresa
+
+<Steps>
+  <Step title="Acceder a Gestión de Empresas">
+    Desde Gestión de Clientes, selecciona la pestaña Empresas. Necesitas el permiso `company:create` para agregar nuevos clientes corporativos.
+  </Step>
+  
+  <Step title="Ingresar Información de la Empresa">
+    Completa los datos corporativos:
+    - **Razón Social**: Nombre legal de la empresa
+    - **CUIT/RFC**: Número de identificación fiscal
+    - **Correo Electrónico**: Email de contacto empresarial principal
+    - **Teléfono**: Línea telefónica principal de la empresa
+    - **Rubro**: Tipo de negocio (opcional)
+  </Step>
+  
+  <Step title="Agregar Dirección Comercial">
+    Ingresa la dirección registrada o principal de la empresa con todos los detalles.
+  </Step>
+  
+  <Step title="Agregar Persona de Contacto (Opcional)">
+    Si corresponde, incluye el nombre y la información de contacto de la persona de contacto principal en la empresa.
+  </Step>
+  
+  <Step title="Guardar Empresa">
+    Revisa toda la información y guarda el registro de la empresa. La empresa estará disponible para transacciones comerciales.
+  </Step>
+</Steps>
+
+### Actualizar Información de Empresa
+
+<Card title="Editar Datos de la Empresa" icon="building">
+  La información de la empresa se puede actualizar en cualquier momento. Esto es especialmente útil cuando cambian los datos comerciales o se asignan nuevas personas de contacto.
+</Card>
+
+## Búsqueda de Clientes
+
+SGIVU ofrece potentes funciones de búsqueda para encontrar rápidamente cualquier cliente en tu base de datos:
+
+### Búsqueda de Personas
+
+<CardGroup cols={2}>
+  <Card title="Por Nombre" icon="magnifying-glass">
+    Busca personas por nombre, apellido o ambos.
+  </Card>
+  
+  <Card title="Por Email" icon="envelope">
+    Encuentra clientes usando su dirección de correo electrónico registrada.
+  </Card>
+  
+  <Card title="Por Teléfono" icon="phone">
+    Busca por número de teléfono para una consulta rápida del cliente.
+  </Card>
+  
+  <Card title="Por Número de Documento" icon="id-card">
+    Usa números de identificación para una coincidencia exacta.
+  </Card>
+</CardGroup>
+
+### Búsqueda de Empresas
+
+<CardGroup cols={2}>
+  <Card title="Por Razón Social" icon="building">
+    Busca usando el nombre comercial para un acceso rápido.
+  </Card>
+  
+  <Card title="Por CUIT/RFC" icon="file-invoice">
+    Usa el número de identificación fiscal para coincidencias exactas.
+  </Card>
+  
+  <Card title="Por Email" icon="at">
+    Encuentra empresas usando su dirección de correo electrónico comercial.
+  </Card>
+  
+  <Card title="Por Rubro" icon="industry">
+    Filtra empresas por tipo de negocio o industria.
+  </Card>
+</CardGroup>
+
+### Funciones de Búsqueda Avanzada
+
+<Card title="Búsqueda Multicriterio" icon="filter">
+  Combina múltiples parámetros de búsqueda para refinar los resultados. Por ejemplo, busca personas en una ciudad específica o empresas en un rubro determinado.
+</Card>
+
+## Contadores y Estadísticas de Clientes
+
+SGIVU proporciona estadísticas en tiempo real sobre tu base de datos de clientes:
+
+<CardGroup cols={3}>
+  <Card title="Total de Personas" icon="users">
+    Visualiza el número total de clientes individuales en tu sistema.
+  </Card>
+  
+  <Card title="Total de Empresas" icon="building">
+    Consulta cuántos clientes corporativos estás gestionando.
+  </Card>
+  
+  <Card title="Incorporaciones Recientes" icon="clock">
+    Rastrea los clientes agregados recientemente para seguimiento y desarrollo de relaciones comerciales.
+  </Card>
+</CardGroup>
+
+## Gestión de Direcciones
+
+Tanto las personas como las empresas pueden tener información detallada de dirección:
+
+### Campos de Dirección
+
+- **Dirección**: Ubicación principal (calle y número)
+- **Ciudad**: Ciudad o municipio
+- **Estado/Provincia**: Región administrativa
+- **Código Postal**: Código ZIP o postal
+- **País**: Nombre del país
+
+<Card title="Validación de Dirección" icon="check">
+  El sistema valida la información de dirección para garantizar la calidad y consistencia de los datos en documentos oficiales y contratos.
+</Card>
+
+## Integración con Contratos
+
+Los registros de clientes están directamente vinculados a los contratos de compra y venta:
+
+<Steps>
+  <Step title="Selección de Cliente">
+    Al crear un nuevo contrato, busca y selecciona el cliente desde tu base de datos.
+  </Step>
+  
+  <Step title="Auto-completado">
+    La información del cliente se completa automáticamente en los campos del contrato, reduciendo la entrada manual de datos y los errores.
+  </Step>
+  
+  <Step title="Historial de Transacciones">
+    Visualiza todos los contratos asociados a un cliente desde su página de perfil, creando un historial completo de transacciones.
+  </Step>
+</Steps>
+
+## Privacidad y Seguridad de Datos
+
+<CardGroup cols={2}>
+  <Card title="Acceso Basado en Permisos" icon="lock">
+    Solo los usuarios con los permisos adecuados pueden ver, crear, modificar o eliminar registros de clientes.
+  </Card>
+  
+  <Card title="Protección de Datos" icon="shield-halved">
+    La información de los clientes está protegida y almacenada de forma segura. Los accesos se registran con fines de auditoría.
+  </Card>
+  
+  <Card title="Confidencialidad" icon="eye-slash">
+    La información personal y comercial se trata como confidencial y se utiliza únicamente para fines comerciales autorizados.
+  </Card>
+  
+  <Card title="Precisión de Datos" icon="check-double">
+    Revisa y actualiza periódicamente la información de los clientes para mantener registros precisos.
+  </Card>
+</CardGroup>
+
+## Buenas Prácticas
+
+<AccordionGroup>
+  <Accordion title="Mantener la información actualizada">
+    Verifica y actualiza periódicamente la información de contacto de los clientes, especialmente antes de iniciar nuevas transacciones.
+  </Accordion>
+  
+  <Accordion title="Usar formato consistente">
+    Sigue formatos estándar para números de teléfono, direcciones y números de identificación para garantizar la consistencia de los datos.
+  </Accordion>
+  
+  <Accordion title="Verificar información comercial">
+    Para empresas, verifica los números de identificación fiscal y los datos de registro comercial para asegurar transacciones legítimas.
+  </Accordion>
+  
+  <Accordion title="Documentar relaciones">
+    Usa el campo de notas para registrar detalles importantes sobre las preferencias del cliente, transacciones anteriores o requisitos especiales.
+  </Accordion>
+</AccordionGroup>
+
+## Solución de Problemas
+
+<AccordionGroup>
+  <Accordion title="No se pueden crear nuevos clientes">
+    Verifica que tengas el permiso `person:create` o `company:create`. Asegúrate de que todos los campos obligatorios estén completados correctamente.
+  </Accordion>
+  
+  <Accordion title="Advertencia de cliente duplicado">
+    El sistema puede advertirte si ya existe información de cliente similar. Verifica que no sea un duplicado antes de continuar.
+  </Accordion>
+  
+  <Accordion title="La búsqueda no devuelve resultados">
+    Revisa los términos de búsqueda y los filtros. Intenta con criterios de búsqueda más amplios o verifica que el cliente exista en la base de datos.
+  </Accordion>
+  
+  <Accordion title="No se puede actualizar la información del cliente">
+    Asegúrate de tener el permiso `person:update` o `company:update`. Verifica que no estés incumpliendo ninguna regla de validación de datos.
+  </Accordion>
+  
+  <Accordion title="La validación de dirección falla">
+    Verifica que todos los campos de dirección estén completados correctamente. Algunos campos pueden tener requisitos de formato específicos.
+  </Accordion>
+</AccordionGroup>

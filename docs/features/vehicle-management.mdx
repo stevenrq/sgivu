@@ -1,0 +1,217 @@
+---
+title: Gestión de Vehículos
+description: Administra tu inventario de vehículos con información detallada e imágenes
+---
+
+## Descripción General
+
+La Gestión de Vehículos es el núcleo del sistema de inventario de SGIVU, permitiéndote catalogar autos y motocicletas, rastrear el estado de disponibilidad y administrar imágenes de vehículos. Ya sea que estés agregando nuevo inventario o actualizando vehículos existentes, este módulo proporciona herramientas completas para la gestión de datos vehiculares.
+
+## Administración de Vehículos
+
+### Agregar un Nuevo Vehículo
+
+<Steps>
+  <Step title="Acceder a Gestión de Vehículos">
+    Navega a la sección de Gestión de Vehículos desde tu panel de control. Necesitas el permiso `vehicle:create` para agregar nuevos vehículos.
+  </Step>
+  
+  <Step title="Ingresar Detalles del Vehículo">
+    Completa la información del vehículo:
+    - **Marca y Modelo**: Fabricante y nombre específico del modelo
+    - **Año**: Año de fabricación
+    - **VIN**: Número de Identificación Vehicular (identificador único)
+    - **Tipo**: Auto o Motocicleta
+    - **Color**: Color exterior
+    - **Kilometraje**: Lectura actual del odómetro
+    - **Precio**: Precio de venta o cotización
+    - **Descripción**: Descripción detallada de características y condición
+  </Step>
+  
+  <Step title="Establecer Estado de Disponibilidad">
+    Elige el estado actual del vehículo:
+    - **Disponible**: Listo para la venta
+    - **No disponible**: Reservado, en mantenimiento o no disponible para la venta
+  </Step>
+  
+  <Step title="Agregar Imágenes del Vehículo">
+    Sube fotos del vehículo. Consulta la sección de Gestión de Imágenes más abajo para los pasos detallados.
+  </Step>
+  
+  <Step title="Guardar Vehículo">
+    Revisa toda la información y guarda el vehículo en tu inventario. El vehículo ahora es buscable y está disponible para transacciones.
+  </Step>
+</Steps>
+
+### Actualizar Información del Vehículo
+
+<Card title="Editar Detalles del Vehículo" icon="pen-to-square">
+  Puedes actualizar cualquier información del vehículo en cualquier momento buscando el vehículo y seleccionando editar. Las actualizaciones comunes incluyen cambios de precio, actualizaciones de estado y descripciones de condición.
+</Card>
+
+### Búsqueda de Vehículos
+
+SGIVU ofrece capacidades de búsqueda avanzada para encontrar vehículos rápidamente en tu inventario:
+
+<CardGroup cols={2}>
+  <Card title="Por VIN" icon="barcode">
+    Busca usando el Número de Identificación Vehicular único para coincidencias exactas.
+  </Card>
+  
+  <Card title="Por Marca y Modelo" icon="car">
+    Filtra por fabricante y nombre del modelo para explorar tipos específicos de vehículos.
+  </Card>
+  
+  <Card title="Por Estado" icon="circle-check">
+    Visualiza solo los vehículos disponibles o no disponibles.
+  </Card>
+  
+  <Card title="Filtros Avanzados" icon="filter">
+    Combina múltiples criterios como rango de año, rango de precio, kilometraje y tipo de vehículo para obtener resultados precisos.
+  </Card>
+</CardGroup>
+
+## Gestión de Imágenes
+
+Las fotos de vehículos son esenciales para mostrar tu inventario. SGIVU utiliza almacenamiento en la nube para gestionar eficientemente imágenes de alta calidad de los vehículos.
+
+### Subir Fotos de Vehículos
+
+<Steps>
+  <Step title="Solicitar Carga">
+    Desde la página de detalle del vehículo, selecciona "Agregar Imágenes". El sistema preparará un enlace de carga seguro.
+  </Step>
+  
+  <Step title="Seleccionar Fotos">
+    Elige una o más fotos desde tu dispositivo. Formatos soportados:
+    - JPEG (.jpg, .jpeg)
+    - PNG (.png)
+    - WebP (.webp)
+  </Step>
+  
+  <Step title="Subir a la Nube">
+    Tus imágenes se suben directamente al almacenamiento seguro en la nube. Esto garantiza una carga rápida y acceso confiable.
+  </Step>
+  
+  <Step title="Confirmar Carga">
+    Una vez subidas, el sistema registra las imágenes y las asocia con tu vehículo. Las imágenes aparecen inmediatamente en la galería del vehículo.
+  </Step>
+</Steps>
+
+### Administrar Imágenes del Vehículo
+
+<Card title="Imagen Principal" icon="star">
+  La primera imagen que subes se convierte automáticamente en la imagen principal del vehículo. Esta es la foto principal que se muestra en los listados y resultados de búsqueda.
+</Card>
+
+<Card title="Reordenamiento de Imágenes" icon="arrows-up-down">
+  Cuando eliminas la imagen principal, el sistema promueve automáticamente la siguiente imagen más antigua al estado principal, asegurando que tu vehículo siempre tenga una foto principal.
+</Card>
+
+<Card title="Eliminar Imágenes" icon="trash">
+  Puedes eliminar imágenes individuales en cualquier momento. Las imágenes eliminadas se remueven permanentemente del almacenamiento en la nube.
+</Card>
+
+### Mejores Prácticas para Imágenes
+
+<CardGroup cols={2}>
+  <Card title="Alta Calidad" icon="image">
+    Usa fotos claras y bien iluminadas que muestren los detalles y la condición del vehículo.
+  </Card>
+  
+  <Card title="Múltiples Ángulos" icon="camera-rotate">
+    Incluye fotos desde todos los ángulos: frente, trasera, laterales e interior.
+  </Card>
+  
+  <Card title="Tomas de Detalle" icon="magnifying-glass-plus">
+    Agrega imágenes de primer plano de características especiales, mejoras o cualquier daño.
+  </Card>
+  
+  <Card title="Iluminación Consistente" icon="sun">
+    Toma las fotos en buenas condiciones de iluminación para una representación precisa del color.
+  </Card>
+</CardGroup>
+
+## Gestión de Estado del Vehículo
+
+### Estado Disponible
+
+Los vehículos marcados como "Disponible" están:
+- Visibles en los catálogos orientados al cliente
+- Disponibles para contratos de compra/venta
+- Incluidos en reportes de inventario
+- Incluidos en las predicciones de demanda
+
+### Estado No Disponible
+
+Marca los vehículos como "No disponible" cuando estén:
+- Reservados para un cliente específico
+- En mantenimiento o reparación
+- Pendientes de completar documentación
+- Temporalmente retirados de la venta
+
+<Card title="Cambios de Estado" icon="toggle-on">
+  Puedes alternar el estado del vehículo en cualquier momento. Los cambios de estado surten efecto inmediato en toda la plataforma.
+</Card>
+
+## Tipos de Vehículos
+
+SGIVU soporta dos categorías principales de vehículos:
+
+<CardGroup cols={2}>
+  <Card title="Autos" icon="car-side">
+    Automóviles incluyendo sedanes, SUVs, camionetas y furgonetas. Registra especificaciones automotrices estándar.
+  </Card>
+  
+  <Card title="Motocicletas" icon="motorcycle">
+    Vehículos de dos ruedas con campos especializados para detalles específicos de motocicletas.
+  </Card>
+</CardGroup>
+
+## Integración con Otras Funcionalidades
+
+### Contratos de Compra/Venta
+
+Los vehículos en tu inventario pueden ser seleccionados al crear contratos de compra o venta. El sistema actualiza automáticamente el estado del vehículo según el estado del contrato.
+
+### Predicción de Demanda
+
+Los datos de vehículos alimentan el sistema de machine learning de SGIVU para predecir la demanda por segmento vehicular, ayudándote a optimizar el inventario.
+
+### Gestión de Clientes
+
+Vincula vehículos a clientes a través de contratos, creando un historial completo de transacciones para cada vehículo.
+
+## Solución de Problemas
+
+<AccordionGroup>
+  <Accordion title="La carga de imágenes falla">
+    Asegúrate de que tu imagen esté en un formato soportado (JPEG, PNG o WebP). Verifica tu conexión a internet e intenta nuevamente. Los archivos muy grandes pueden necesitar ser comprimidos antes de subirlos.
+  </Accordion>
+  
+  <Accordion title="No se puede cambiar el estado del vehículo">
+    Verifica que tengas el permiso `vehicle:update`. Si el vehículo es parte de un contrato activo, puede que necesites resolver el contrato primero.
+  </Accordion>
+  
+  <Accordion title="La búsqueda no devuelve resultados">
+    Revisa la configuración de tus filtros y términos de búsqueda. Asegúrate de que los vehículos que buscas coincidan con tus criterios de búsqueda.
+  </Accordion>
+  
+  <Accordion title="Errores de CORS al subir imágenes">
+    Este es un problema de configuración. Contacta a tu administrador del sistema para verificar la configuración de CORS del almacenamiento en la nube.
+  </Accordion>
+  
+  <Accordion title="La imagen principal no se actualiza">
+    Intenta refrescar la página. Si el problema persiste, la imagen puede no haber terminado de subirse o confirmarse.
+  </Accordion>
+</AccordionGroup>
+
+## Seguridad y Privacidad
+
+<Card title="Almacenamiento Seguro" icon="cloud-arrow-up">
+  Todas las imágenes de vehículos se almacenan en almacenamiento seguro en la nube con acceso restringido. Las URLs de carga tienen tiempo limitado y son de un solo uso para máxima seguridad.
+</Card>
+
+<Card title="Acceso Basado en Permisos" icon="lock">
+  Solo los usuarios con los permisos apropiados pueden ver, crear, modificar o eliminar vehículos. Todas las acciones se registran con fines de auditoría.
+</Card>

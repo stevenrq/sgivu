@@ -1,0 +1,217 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "name": "SGIVU",
+  "theme": "linden",
+  "colors": {
+    "primary": "#2563eb",
+    "light": "#3b82f6",
+    "dark": "#1e40af"
+  },
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/stevenrq/sgivu"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/stevenrq/sgivu"
+    }
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentación",
+        "groups": [
+          {
+            "group": "Descripción General",
+            "pages": ["introduction", "architecture", "features"]
+          },
+          {
+            "group": "Primeros Pasos",
+            "pages": [
+              "getting-started/quickstart",
+              "getting-started/installation",
+              "getting-started/configuration",
+              "getting-started/docker-deployment"
+            ]
+          },
+          {
+            "group": "Funcionalidades Principales",
+            "pages": [
+              "features/authentication",
+              "features/user-management",
+              "features/vehicle-management",
+              "features/client-management",
+              "features/purchase-sales",
+              "features/demand-prediction"
+            ]
+          },
+          {
+            "group": "Infraestructura",
+            "pages": [
+              "infrastructure/deployment",
+              "infrastructure/docker-compose",
+              "infrastructure/nginx",
+              "infrastructure/monitoring"
+            ]
+          },
+          {
+            "group": "Seguridad",
+            "pages": [
+              "security/oauth2-oidc",
+              "security/bff-pattern",
+              "security/jwt-tokens",
+              "security/service-communication"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Servicios Backend",
+        "groups": [
+          {
+            "group": "Servicios",
+            "pages": [
+              "services/overview",
+              "services/auth",
+              "services/gateway",
+              "services/config",
+              "services/discovery",
+              "services/user",
+              "services/vehicle",
+              "services/purchase-sale",
+              "services/client"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Aprendizaje Automático",
+        "groups": [
+          {
+            "group": "Servicio ML",
+            "pages": [
+              "ml/overview",
+              "ml/prediction-api",
+              "ml/training",
+              "ml/model-management"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Frontend",
+        "groups": [
+          {
+            "group": "Aplicación Angular",
+            "pages": [
+              "frontend/overview",
+              "frontend/setup",
+              "frontend/architecture",
+              "frontend/features"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Referencia API",
+        "groups": [
+          {
+            "group": "Autenticación",
+            "pages": ["api/auth/oauth2", "api/auth/session"]
+          },
+          {
+            "group": "Gestión de Usuarios",
+            "pages": ["api/users/overview", "api/users/roles-permissions"]
+          },
+          {
+            "group": "Gestión de Vehículos",
+            "pages": ["api/vehicles/crud", "api/vehicles/images"]
+          },
+          {
+            "group": "Gestión de Clientes",
+            "pages": ["api/clients/overview"]
+          },
+          {
+            "group": "Compras y Ventas",
+            "pages": ["api/purchase-sales/overview"]
+          },
+          {
+            "group": "Aprendizaje Automático",
+            "pages": ["api/ml/predict", "api/ml/retrain", "api/ml/models"]
+          }
+        ]
+      },
+      {
+        "tab": "Repositorio de Configuración",
+        "groups": [
+          {
+            "group": "Descripción General",
+            "pages": ["config/introduction", "config/architecture"]
+          },
+          {
+            "group": "Primeros Pasos",
+            "pages": [
+              "config/getting-started/setup",
+              "config/getting-started/local-development"
+            ]
+          },
+          {
+            "group": "Configuración de Servicios",
+            "pages": [
+              "config/services/overview",
+              "config/services/auth",
+              "config/services/gateway",
+              "config/services/discovery",
+              "config/services/user",
+              "config/services/client",
+              "config/services/vehicle",
+              "config/services/purchase-sale"
+            ]
+          },
+          {
+            "group": "Gestión de Entornos",
+            "pages": [
+              "config/environments/overview",
+              "config/environments/dev",
+              "config/environments/prod",
+              "config/environments/variables"
+            ]
+          },
+          {
+            "group": "Operaciones",
+            "pages": [
+              "config/operations/security",
+              "config/operations/monitoring",
+              "config/operations/refresh",
+              "config/operations/validation"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Referencia de Configuración",
+        "groups": [
+          {
+            "group": "Patrones Comunes",
+            "pages": [
+              "config/reference/spring-configuration",
+              "config/reference/eureka-settings",
+              "config/reference/database-config",
+              "config/reference/observability"
+            ]
+          },
+          {
+            "group": "Buenas Prácticas",
+            "pages": [
+              "config/best-practices/secret-management",
+              "config/best-practices/yaml-structure",
+              "config/best-practices/version-control"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

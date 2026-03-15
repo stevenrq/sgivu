@@ -1,0 +1,264 @@
+---
+title: Eureka Service Discovery
+description: Patrones de configuración de Eureka para registro y descubrimiento de servicios en la plataforma SGIVU
+---
+
+SGIVU utiliza Netflix Eureka para Service Discovery, permitiendo que los microservicios se localicen y comuniquen entre sí de forma dinámica.
+
+## Configuración estándar del cliente
+
+La mayoría de los servicios de SGIVU utilizan esta configuración estándar del cliente Eureka:
+
+```yaml
+eureka:
+  instance:
+    instance-id: ${spring.cloud.client.hostname}:${spring.application.name}:${random.value}
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://sgivu-discovery:8761/eureka}
+```
+
+## Configuración de instancia
+
+### Patrón de Instance ID
+
+<ParamField path="eureka.instance.instance-id" type="string" required>
+  Identificador único para esta instancia de servicio en Eureka. Utiliza una combinación de hostname, nombre de aplicación y valor aleatorio para garantizar la unicidad entre despliegues.
+</ParamField>
+
+```yaml
+eureka:
+  instance:
+    instance-id: ${spring.cloud.client.hostname}:${spring.application.name}:${random.value}
+```
+
+<Accordion title="¿Por qué este patrón?">
+  El patrón de instance ID proporciona varios beneficios:
+  
+  - **`${spring.cloud.client.hostname}`**: Identifica el host/contenedor
+  - **`${spring.application.name}`**: Identifica el tipo de servicio
+  - **`${random.value}`**: Garantiza la unicidad cuando múltiples instancias se ejecutan en el mismo host
+  
+  Esto es fundamental en entornos containerizados donde pueden existir múltiples instancias del mismo servicio.
+</Accordion>
+
+### Sobrescritura de hostname (solo Discovery Server)
+
+El Discovery Server utiliza una configuración de hostname específica:
+
+```yaml
+eureka:
+  instance:
+    hostname: host.docker.internal
+```
+
+<ParamField path="eureka.instance.hostname" type="string">
+  Sobrescribe el hostname para entornos Docker Desktop. Solo es utilizado por el propio Discovery Server.
+</ParamField>
+
+## Configuración del cliente
+
+### URL del servicio
+
+<ParamField path="eureka.client.service-url.defaultZone" type="string" required>
+  URL del servidor Eureka donde los servicios se registran y descubren entre sí. Soporta la variable de entorno `EUREKA_URL` para flexibilidad en el despliegue.
+</ParamField>
+
+```yaml
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://sgivu-discovery:8761/eureka}
+```
+
+<CardGroup cols={2}>
+  <Card title="Valor por defecto en contenedor" icon="docker">
+    `http://sgivu-discovery:8761/eureka`
+    
+    Se utiliza cuando los servicios se ejecutan en la red Docker
+  </Card>
+  <Card title="Sobrescritura por variable de entorno" icon="code">
+    `${EUREKA_URL}`
+    
+    Se configura mediante variable de entorno para diferentes despliegues
+  </Card>
+</CardGroup>
+
+### Variable de entorno
+
+La variable de entorno `EUREKA_URL` permite configuración dinámica:
+
+<Accordion title="Ejemplo: Despliegue en Kubernetes">
+  ```bash
+  EUREKA_URL=http://sgivu-discovery.default.svc.cluster.local:8761/eureka
+  ```
+</Accordion>
+
+<Accordion title="Ejemplo: Despliegue en AWS ECS">
+  ```bash
+  EUREKA_URL=http://discovery.internal.sgivu.com:8761/eureka
+  ```
+</Accordion>
+
+## Configuración del Discovery Server
+
+El propio Eureka Discovery Server tiene una configuración especial:
+
+```yaml
+server:
+  port: 8761
+
+eureka:
+  instance:
+    hostname: host.docker.internal
+  client:
+    registerWithEureka: false
+    fetchRegistry: false
+    serviceUrl:
+      defaultZone: http://${eureka.instance.hostname}:${server.port}/eureka/
+```
+
+### Configuraciones específicas del servidor
+
+<ParamField path="eureka.client.registerWithEureka" type="boolean">
+  Controla si el Discovery Server se registra a sí mismo en Eureka. Se establece en `false` para servidores Eureka independientes.
+</ParamField>
+
+<ParamField path="eureka.client.fetchRegistry" type="boolean">
+  Controla si el servidor obtiene el registro de otros servidores Eureka. Se establece en `false` para despliegues independientes.
+</ParamField>
+
+<Warning>
+  Solo el Discovery Server debe tener `registerWithEureka` y `fetchRegistry` establecidos en `false`. Todos los demás servicios deben registrarse en Eureka.
+</Warning>
+
+## Ejemplos de registro de servicios
+
+### Auth Service
+
+```yaml
+spring:
+  application:
+    name: sgivu-auth
+
+eureka:
+  instance:
+    instance-id: ${spring.cloud.client.hostname}:${spring.application.name}:${random.value}
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://sgivu-discovery:8761/eureka}
+
+server:
+  port: ${PORT:9000}
+```
+
+### Gateway Service
+
+```yaml
+spring:
+  application:
+    name: sgivu-gateway
+
+eureka:
+  instance:
+    instance-id: ${spring.cloud.client.hostname}:${spring.application.name}:${random.value}
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://sgivu-discovery:8761/eureka}
+
+server:
+  port: ${PORT:8080}
+```
+
+### Microservicios (User, Client, Vehicle, Purchase-Sale)
+
+Todos los microservicios de dominio siguen el mismo patrón:
+
+```yaml
+spring:
+  application:
+    name: sgivu-{service}
+
+eureka:
+  instance:
+    instance-id: ${spring.cloud.client.hostname}:${spring.application.name}:${random.value}
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://sgivu-discovery:8761/eureka}
+```
+
+## Service Discovery en acción
+
+<Steps>
+  <Step title="Inicio del servicio">
+    Cuando un servicio arranca, lee la `EUREKA_URL` (o utiliza el valor por defecto) y se conecta al Discovery Server.
+  </Step>
+  
+  <Step title="Registro">
+    El servicio se registra en Eureka utilizando su `instance-id` y `spring.application.name`.
+  </Step>
+  
+  <Step title="Heartbeat">
+    El servicio envía heartbeats periódicos a Eureka para indicar que está activo y disponible.
+  </Step>
+  
+  <Step title="Descubrimiento">
+    Otros servicios consultan Eureka para encontrar instancias disponibles por nombre de servicio (por ejemplo, `sgivu-user`).
+  </Step>
+  
+  <Step title="Load Balancing">
+    Spring Cloud LoadBalancer distribuye las solicitudes entre las instancias disponibles.
+  </Step>
+</Steps>
+
+## Solución de problemas
+
+<Accordion title="El servicio no aparece en Eureka">
+  **Verificar:**
+  1. El servicio está en ejecución y los logs muestran un registro exitoso en Eureka
+  2. `EUREKA_URL` está correctamente configurada y es accesible desde el servicio
+  3. Conectividad de red entre el servicio y el Discovery Server
+  4. Las reglas de firewall permiten tráfico en el puerto 8761
+  
+  **Problemas comunes:**
+  - Fallo en la resolución DNS del hostname `sgivu-discovery`
+  - Aislamiento de red entre contenedores
+  - Discovery Server no está en ejecución
+</Accordion>
+
+<Accordion title="El servicio aparece como DOWN en Eureka">
+  **Verificar:**
+  1. El endpoint de salud del servicio responde: `GET /actuator/health`
+  2. El intervalo de heartbeat no ha expirado
+  3. Los logs del servicio en busca de excepciones
+  
+  **Problemas comunes:**
+  - La aplicación no inició correctamente
+  - El endpoint de health check devuelve un estado no saludable
+  - Inestabilidad en la red causando heartbeats perdidos
+</Accordion>
+
+<Accordion title="Múltiples instancias con el mismo instance-id">
+  Esto no debería ocurrir con la configuración estándar que utiliza `${random.value}`. Si sucede:
+  
+  1. Verificar que `${random.value}` se está resolviendo correctamente
+  2. Buscar sobrescrituras manuales de `eureka.instance.instance-id`
+  3. Asegurar que los servicios no se estén clonando con un contexto de Spring en caché
+</Accordion>
+
+## Configuración relacionada
+
+<CardGroup cols={2}>
+  <Card title="Configuración de Spring" icon="leaf" href="/config/reference/spring-configuration">
+    Configuración de nombre de aplicación y puerto del servidor
+  </Card>
+  <Card title="Observabilidad" icon="chart-line" href="/config/reference/observability">
+    Health checks e integración de monitoreo
+  </Card>
+  <Card title="Arquitectura de servicios" icon="sitemap" href="/config/services/discovery">
+    Cómo Eureka se integra en la arquitectura general
+  </Card>
+  <Card title="Variables de entorno" icon="code" href="/config/environments/variables">
+    EUREKA_URL y otras variables relacionadas con Service Discovery
+  </Card>
+</CardGroup>

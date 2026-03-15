@@ -1,0 +1,8 @@
+.idea/
+.vscode/
+
+.env.dev
+*.env
+*.pem
+remove-containers-images.sh
+copy-from-local-to-remote.sh

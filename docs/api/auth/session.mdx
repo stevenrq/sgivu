@@ -1,0 +1,283 @@
+---
+title: 'Gestión de Session'
+description: 'Endpoints de Session y estado de autenticación'
+---
+
+## Descripción general
+
+Los endpoints de gestión de Session permiten a las aplicaciones frontend verificar el estado de autenticación y obtener información de la Session del usuario. Estos endpoints son expuestos por el BFF (Backend-for-Frontend) de `sgivu-gateway`.
+
+## URL base
+
+```
+https://your-domain.com
+```
+
+---
+
+## Obtener estado de Session
+
+```http
+GET /auth/session
+```
+
+Obtiene la información de Session del usuario autenticado actual, incluyendo los claims del JWT.
+
+**Autenticación:** Requerida - Debe estar autenticado vía OAuth2
+
+**Autorización:** Ninguna (cualquier usuario autenticado)
+
+### Respuesta
+
+<ResponseField name="sub" type="string">
+  Identificador del sujeto (nombre de usuario)
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Nombre completo del usuario autenticado
+</ResponseField>
+
+<ResponseField name="email" type="string">
+  Dirección de correo electrónico del usuario autenticado
+</ResponseField>
+
+<ResponseField name="roles" type="array">
+  Arreglo de nombres de roles asignados al usuario
+</ResponseField>
+
+<ResponseField name="permissions" type="array">
+  Arreglo de cadenas de permisos (ej., `user:read`, `vehicle:create`)
+</ResponseField>
+
+<ResponseField name="rolesAndPermissions" type="array">
+  Arreglo combinado de roles y permisos para verificaciones de autorización
+</ResponseField>
+
+<ResponseField name="iat" type="integer">
+  Marca de tiempo de emisión del token (Unix epoch)
+</ResponseField>
+
+<ResponseField name="exp" type="integer">
+  Marca de tiempo de expiración del token (Unix epoch)
+</ResponseField>
+
+```json
+{
+  "sub": "steven",
+  "name": "Steven Rodriguez",
+  "email": "steven@example.com",
+  "roles": ["ADMIN"],
+  "permissions": [
+    "user:read",
+    "user:create",
+    "user:update",
+    "user:delete",
+    "vehicle:read",
+    "vehicle:create",
+    "vehicle:update",
+    "vehicle:delete"
+  ],
+  "rolesAndPermissions": [
+    "ROLE_ADMIN",
+    "user:read",
+    "user:create",
+    "user:update",
+    "user:delete",
+    "vehicle:read",
+    "vehicle:create",
+    "vehicle:update",
+    "vehicle:delete"
+  ],
+  "iat": 1709740800,
+  "exp": 1709744400
+}
+```
+
+### Códigos de estado
+
+- `200 OK` - Información de Session obtenida exitosamente
+- `401 Unauthorized` - No autenticado o token expirado
+
+### Ejemplo
+
+```bash
+curl -X GET https://your-domain.com/auth/session \
+  -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+---
+
+## Validar credenciales
+
+```http
+POST /api/validate-credentials
+```
+
+Valida las credenciales del usuario en tiempo real durante el proceso de inicio de sesión. Proporciona retroalimentación inmediata sin enviar el formulario de login completo.
+
+**Autenticación:** Ninguna (usado durante el flujo de login)
+
+**Content-Type:** `application/json`
+
+### Cuerpo de la solicitud
+
+<ParamField body="username" type="string" required>
+  Nombre de usuario a validar
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  Contraseña a validar
+</ParamField>
+
+```json
+{
+  "username": "jperez",
+  "password": "SecureP@ss123"
+}
+```
+
+### Respuesta
+
+<ResponseField name="valid" type="boolean">
+  Indica si las credenciales son válidas
+</ResponseField>
+
+<ResponseField name="reason" type="string" nullable>
+  Si `valid` es `false`, proporciona el motivo del fallo de validación. Valores posibles:
+  - `invalid_credentials` - El nombre de usuario o la contraseña son incorrectos
+  - `disabled` - La cuenta del usuario está deshabilitada
+  - `locked` - La cuenta del usuario está bloqueada
+  - `expired` - La cuenta del usuario ha expirado
+  - `credentials` - Las credenciales han expirado
+  - `service_unavailable` - El servicio de usuarios no está disponible
+  
+  `null` si `valid` es `true`
+</ResponseField>
+
+#### Respuesta exitosa
+
+```json
+{
+  "valid": true,
+  "reason": null
+}
+```
+
+#### Respuesta fallida
+
+```json
+{
+  "valid": false,
+  "reason": "invalid_credentials"
+}
+```
+
+### Códigos de estado
+
+- `200 OK` - Validación completada (verificar el campo `valid` para el resultado)
+- `400 Bad Request` - Solicitud mal formada o campos requeridos faltantes
+- `500 Internal Server Error` - Error del servidor durante la validación
+
+### Ejemplo
+
+```bash
+curl -X POST https://your-domain.com/api/validate-credentials \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "jperez",
+    "password": "SecureP@ss123"
+  }'
+```
+
+---
+
+## Cerrar sesión
+
+```http
+GET /logout
+```
+
+Invalida la Session actual del usuario y limpia las Cookie de autenticación.
+
+**Autenticación:** Opcional (funciona con o sin autenticación)
+
+### Respuesta
+
+Redirige a la página de login o a la página principal de la aplicación.
+
+```
+HTTP/1.1 302 Found
+Location: /login
+```
+
+### Ejemplo
+
+```bash
+curl -X GET https://your-domain.com/logout \
+  -H "Cookie: SESSION=..."
+```
+
+---
+
+## Almacenamiento de Session
+
+SGIVU utiliza Spring Session con JDBC para la persistencia de sesiones:
+
+- Las sesiones se almacenan en PostgreSQL (tablas `SPRING_SESSION`)
+- Las sesiones sobreviven a reinicios de la aplicación
+- Soporta despliegues distribuidos con sesiones compartidas
+
+### Configuración de Session
+
+- **Tiempo de expiración de Session**: Configurable mediante los ajustes de Spring Session
+- **Nombre de Cookie**: `SESSION`
+- **Atributos de Cookie**: HttpOnly, Secure (en producción), SameSite=Lax
+
+---
+
+## Notas de seguridad
+
+### Autenticación interna entre servicios
+
+El endpoint de validación de credenciales utiliza el header `X-Internal-Service-Key` para la comunicación entre `sgivu-auth` y `sgivu-user`:
+
+<Warning>
+  Nunca exponga la clave de servicio interno públicamente. Esta clave solo debe usarse para comunicación entre servicios.
+</Warning>
+
+### Claims de JWT
+
+El endpoint de Session expone claims del JWT incluyendo:
+
+- **Claims estándar**: `sub`, `iat`, `exp`, `iss`, `aud`
+- **Claims personalizados**: `rolesAndPermissions` - utilizado para autorización
+
+### Headers de autorización
+
+El Gateway propaga la información del usuario a los servicios downstream mediante headers:
+
+- `X-User-ID`: ID del usuario del token
+- `X-Username`: Nombre de usuario del token
+- `Authorization`: Bearer token para validación en Resource Server
+
+---
+
+## Respuestas de error
+
+### 401 Unauthorized
+
+```json
+{
+  "error": "unauthorized",
+  "message": "Full authentication is required to access this resource"
+}
+```
+
+### 500 Internal Server Error
+
+```json
+{
+  "error": "internal_error",
+  "message": "An unexpected error occurred during validation"
+}
+```

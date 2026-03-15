@@ -1,0 +1,494 @@
+---
+title: Monitoreo y Observabilidad
+description: Monitorear el estado de Spring Cloud Config, la configuración de servicios y el trazado distribuido con Zipkin
+---
+
+## Descripción general
+
+Los microservicios de SGIVU utilizan Spring Boot Actuator para health checks y métricas, combinado con Zipkin para trazado distribuido. Esta guía muestra cómo monitorear el Config Server y los microservicios.
+
+## Configuración de Spring Boot Actuator
+
+Todos los microservicios exponen endpoints de Actuator para monitoreo de salud e información operativa.
+
+### Configuración de producción
+
+En perfiles de producción, los servicios exponen endpoints mínimos por seguridad:
+
+```yaml
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+  endpoint:
+    health:
+      show-details: never
+```
+
+<Info>
+  La configuración `show-details: never` evita que se exponga información sensible en las respuestas del endpoint de salud.
+</Info>
+
+### Configuración de desarrollo
+
+Los entornos de desarrollo exponen todos los endpoints de Actuator para depuración:
+
+```yaml
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    health:
+      show-details: always
+```
+
+<Warning>
+  Nunca use `include: "*"` en producción. Esto expone endpoints sensibles como `/actuator/env`, `/actuator/beans` y `/actuator/mappings`.
+</Warning>
+
+## Endpoints de Health Check
+
+### Acceso al estado de salud
+
+Cada microservicio expone un endpoint de health check:
+
+<CardGroup cols={2}>
+  <Card title="Config Server" icon="server">
+    ```bash
+    curl http://localhost:8888/actuator/health
+    ```
+  </Card>
+  
+  <Card title="Discovery Server" icon="network-wired">
+    ```bash
+    curl http://localhost:8761/actuator/health
+    ```
+  </Card>
+  
+  <Card title="API Gateway" icon="gateway">
+    ```bash
+    curl http://localhost:8080/actuator/health
+    ```
+  </Card>
+  
+  <Card title="Servicio Auth" icon="shield-halved">
+    ```bash
+    curl http://localhost:9000/actuator/health
+    ```
+  </Card>
+</CardGroup>
+
+### Formato de respuesta de salud
+
+**Producción (show-details: never):**
+
+```json
+{
+  "status": "UP"
+}
+```
+
+**Desarrollo (show-details: always):**
+
+```json
+{
+  "status": "UP",
+  "components": {
+    "db": {
+      "status": "UP",
+      "details": {
+        "database": "PostgreSQL",
+        "validationQuery": "isValid()"
+      }
+    },
+    "diskSpace": {
+      "status": "UP",
+      "details": {
+        "total": 250685575168,
+        "free": 150685575168,
+        "threshold": 10485760
+      }
+    },
+    "ping": {
+      "status": "UP"
+    },
+    "redis": {
+      "status": "UP",
+      "details": {
+        "version": "7.0.5"
+      }
+    }
+  }
+}
+```
+
+<Note>
+  El estado de salud puede ser `UP`, `DOWN`, `OUT_OF_SERVICE` o `UNKNOWN`. Los servicios deben monitorearse para detectar estados distintos a UP.
+</Note>
+
+## Endpoint de información
+
+El endpoint `/actuator/info` proporciona metadatos de la aplicación:
+
+```bash
+curl http://localhost:8888/actuator/info
+```
+
+Puede personalizar este endpoint agregando propiedades:
+
+```yaml
+info:
+  app:
+    name: ${spring.application.name}
+    version: @project.version@
+    environment: ${spring.profiles.active}
+```
+
+## Trazado distribuido con Zipkin
+
+### Configuración de Zipkin
+
+Todos los microservicios están configurados para enviar datos de trazas a Zipkin:
+
+```yaml
+management:
+  tracing:
+    sampling:
+      probability: 0.1
+  zipkin:
+    tracing:
+      endpoint: http://sgivu-zipkin:9411/api/v2/spans
+```
+
+### Comprensión de la probabilidad de muestreo
+
+La configuración `probability` controla qué porcentaje de solicitudes se trazan:
+
+<CardGroup cols={3}>
+  <Card title="0.1 (10%)" icon="gauge-low">
+    Valor por defecto en producción: traza 1 de cada 10 solicitudes para reducir la sobrecarga
+  </Card>
+  
+  <Card title="0.5 (50%)" icon="gauge">
+    Mayor muestreo para depurar problemas en staging
+  </Card>
+  
+  <Card title="1.0 (100%)" icon="gauge-high">
+    Desarrollo: traza cada solicitud (alta sobrecarga)
+  </Card>
+</CardGroup>
+
+### Acceso al dashboard de Zipkin
+
+Una vez que Zipkin esté en ejecución, acceda al dashboard:
+
+```bash
+open http://localhost:9411
+```
+
+### Búsqueda y análisis de trazas
+
+<Steps>
+  <Step title="Buscar trazas">
+    Busque por nombre de servicio, rango de tiempo o ID de traza en la interfaz de Zipkin.
+  </Step>
+  
+  <Step title="Ver línea de tiempo de la traza">
+    Haga clic en una traza para ver el flujo de la solicitud a través de los microservicios con información de tiempos.
+  </Step>
+  
+  <Step title="Identificar cuellos de botella">
+    Busque spans con duraciones prolongadas para identificar problemas de rendimiento.
+  </Step>
+  
+  <Step title="Analizar dependencias">
+    Use la pestaña Dependencies para visualizar los patrones de comunicación entre servicios.
+  </Step>
+</Steps>
+
+### Ejemplo de flujo de traza
+
+Una solicitud típica a través de SGIVU podría generar esta traza:
+
+```
+1. sgivu-gateway        [200ms] - Client request received
+2. └─ sgivu-auth        [50ms]  - Token validation
+3.    └─ sgivu-user     [100ms] - Fetch user data
+4.       └─ PostgreSQL  [30ms]  - Database query
+```
+
+## Monitoreo del Config Server
+
+### Salud del Config Server
+
+La salud del Config Server incluye la conectividad con el repositorio Git:
+
+```bash
+curl http://localhost:8888/actuator/health
+```
+
+La respuesta incluye:
+
+```json
+{
+  "status": "UP",
+  "components": {
+    "configServer": {
+      "status": "UP",
+      "details": {
+        "repositories": [
+          {
+            "name": "sgivu-config-repo",
+            "profiles": ["dev", "prod"],
+            "label": "main"
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+<Warning>
+  Si la salud del Config Server está en DOWN, los microservicios no podrán obtener la configuración y pueden fallar al iniciar.
+</Warning>
+
+### Monitoreo de la obtención de configuración
+
+Verifique que los servicios puedan obtener su configuración:
+
+```bash
+# Fetch auth service dev config
+curl http://localhost:8888/sgivu-auth/dev
+
+# Fetch gateway service prod config
+curl http://localhost:8888/sgivu-gateway/prod
+
+# Fetch user service default config
+curl http://localhost:8888/sgivu-user/default
+```
+
+Las respuestas exitosas indican que el Config Server está sirviendo la configuración correctamente.
+
+## Monitoreo a nivel de servicio
+
+### Métricas clave por servicio
+
+<Accordion title="sgivu-auth (Puerto 9000)">
+  **Métricas clave:**
+  - Tasa de generación de tokens OAuth2
+  - Operaciones de firma JWT
+  - Creación/validación de sesiones
+  - Uso del pool de conexiones a base de datos
+  
+  **Dependencias de salud:**
+  - Base de datos PostgreSQL
+  - Disponibilidad del keystore JWT
+  - Registro en Eureka
+</Accordion>
+
+<Accordion title="sgivu-gateway (Puerto 8080)">
+  **Métricas clave:**
+  - Throughput y latencia de solicitudes
+  - Tasa de éxito de token relay OAuth2
+  - Operaciones de sesión en Redis
+  - Estado del circuit breaker
+  
+  **Dependencias de salud:**
+  - Conexión a Redis
+  - Disponibilidad del servicio Auth
+  - Service discovery de Eureka
+</Accordion>
+
+<Accordion title="sgivu-user (Puerto 8081)">
+  **Métricas clave:**
+  - Latencia de búsqueda de usuarios
+  - Rendimiento de consultas a base de datos
+  - Tasa de éxito de llamadas API internas
+  
+  **Dependencias de salud:**
+  - Base de datos PostgreSQL
+  - Autenticación interna entre servicios
+  - Registro en Eureka
+</Accordion>
+
+<Accordion title="sgivu-client (Puerto 8082)">
+  **Métricas clave:**
+  - Operaciones de datos de clientes
+  - Tasa de transacciones en base de datos
+  - Tiempos de respuesta de la API
+  
+  **Dependencias de salud:**
+  - Base de datos PostgreSQL
+  - Autenticación interna entre servicios
+  - Registro en Eureka
+</Accordion>
+
+<Accordion title="sgivu-vehicle (Puerto 8083)">
+  **Métricas clave:**
+  - Tasa de éxito de carga de imágenes de vehículos
+  - Latencia de operaciones S3
+  - Métricas de tamaño de archivo y carga multipart
+  
+  **Dependencias de salud:**
+  - Base de datos PostgreSQL
+  - Conectividad con AWS S3
+  - Autenticación interna entre servicios
+</Accordion>
+
+## Configuración de logging
+
+### Logging en producción
+
+Los servicios en producción usan nivel de logging INFO:
+
+```yaml
+logging:
+  level:
+    root: INFO
+```
+
+### Depuración en desarrollo
+
+Los perfiles de desarrollo habilitan logging detallado para solución de problemas:
+
+```yaml
+logging:
+  level:
+    com.sgivu.gateway.security: DEBUG
+    com.sgivu.gateway.controller: DEBUG
+    org.springframework.security.oauth2.client: DEBUG
+    org.springframework.security.web.server.authentication: DEBUG
+    org.springframework.session.web.server: DEBUG
+```
+
+<Info>
+  El logging en nivel DEBUG es útil para rastrear flujos OAuth2, gestión de sesiones y filtros de seguridad durante el desarrollo.
+</Info>
+
+## Configuración de monitoreo automatizado
+
+### Health checks en Docker Compose
+
+Agregue health checks a su `docker-compose.yml`:
+
+```yaml
+services:
+  sgivu-config:
+    image: sgivu/config-server:latest
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+```
+
+### Probes de Kubernetes
+
+Para despliegues en Kubernetes:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sgivu-auth
+spec:
+  containers:
+  - name: auth
+    image: sgivu/auth-service:latest
+    livenessProbe:
+      httpGet:
+        path: /actuator/health
+        port: 9000
+      initialDelaySeconds: 60
+      periodSeconds: 10
+    readinessProbe:
+      httpGet:
+        path: /actuator/health
+        port: 9000
+      initialDelaySeconds: 30
+      periodSeconds: 5
+```
+
+## Mejores prácticas de monitoreo
+
+<CardGroup cols={2}>
+  <Card title="Configurar alertas" icon="bell">
+    Configure alertas para estado de salud DOWN, tasas de error altas o tiempos de respuesta lentos.
+  </Card>
+  
+  <Card title="Monitorear dependencias" icon="diagram-project">
+    Rastree conexiones a base de datos, disponibilidad de Redis y estado de registro en Eureka.
+  </Card>
+  
+  <Card title="Seguir tendencias" icon="chart-line">
+    Recopile métricas a lo largo del tiempo para identificar degradación gradual o problemas de capacidad.
+  </Card>
+  
+  <Card title="Correlacionar logs" icon="magnifying-glass">
+    Use IDs de traza para correlacionar logs entre servicios al depurar problemas.
+  </Card>
+</CardGroup>
+
+## Solución de problemas comunes
+
+### El servicio reporta DOWN
+
+<Steps>
+  <Step title="Verificar salud de Actuator">
+    ```bash
+    curl http://localhost:8080/actuator/health
+    ```
+    Revise el estado de los componentes para identificar qué dependencia está fallando.
+  </Step>
+  
+  <Step title="Verificar dependencias">
+    Compruebe que las bases de datos, Redis y otros servicios estén en ejecución y accesibles.
+  </Step>
+  
+  <Step title="Revisar logs">
+    Busque errores de conexión, timeouts o fallos de autenticación en los logs de la aplicación.
+  </Step>
+  
+  <Step title="Probar obtención de configuración">
+    Asegúrese de que el servicio pueda obtener su configuración desde el Config Server.
+  </Step>
+</Steps>
+
+### Alta latencia en las trazas
+
+1. **Identifique el span lento** en Zipkin
+2. **Verifique el rendimiento de las consultas a base de datos** si el span lento es una llamada al repositorio
+3. **Revise la latencia de red** entre servicios
+4. **Verifique la utilización de recursos** (CPU, memoria, I/O de disco)
+
+### Trazas faltantes
+
+- Verifique que Zipkin esté en ejecución y accesible
+- Compruebe que `management.zipkin.tracing.endpoint` esté configurado correctamente
+- Aumente `sampling.probability` temporalmente para depuración
+- Revise los logs del servicio en busca de errores de conexión con Zipkin
+
+## Recursos relacionados
+
+<CardGroup cols={2}>
+  <Card title="Refrescamiento de configuración" href="/config/operations/refresh" icon="arrows-rotate">
+    Actualice la configuración de monitoreo sin reinicios
+  </Card>
+  
+  <Card title="Seguridad" href="/config/operations/security" icon="shield">
+    Asegure los endpoints de Actuator en producción
+  </Card>
+  
+  <Card title="Validación" href="/config/operations/validation" icon="circle-check">
+    Valide los cambios de configuración antes del despliegue
+  </Card>
+  
+  <Card title="Solución de problemas" href="/config/operations/validation" icon="wrench">
+    Depure problemas comunes de configuración
+  </Card>
+</CardGroup>

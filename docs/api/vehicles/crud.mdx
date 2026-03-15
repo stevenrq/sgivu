@@ -1,0 +1,701 @@
+---
+title: 'Operaciones CRUD de Vehículos'
+description: 'Crear, leer, actualizar y eliminar registros de vehículos'
+---
+
+## Descripción general
+
+La API de Vehículos proporciona operaciones CRUD completas para gestionar automóviles y motocicletas en el sistema de inventario de SGIVU. Todos los endpoints requieren autenticación JWT y los permisos correspondientes.
+
+## URL Base
+
+```
+https://your-domain.com/v1
+```
+
+---
+
+## Automóviles
+
+### Crear automóvil
+
+```http
+POST /v1/cars
+```
+
+Registra un nuevo automóvil en el inventario.
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `vehicle:create`
+
+#### Cuerpo de la solicitud
+
+<ParamField body="plate" type="string" required>
+  Número de placa
+</ParamField>
+
+<ParamField body="brand" type="string" required>
+  Marca del vehículo / fabricante
+</ParamField>
+
+<ParamField body="line" type="string" required>
+  Línea / nombre del modelo del vehículo
+</ParamField>
+
+<ParamField body="model" type="string" required>
+  Año del modelo
+</ParamField>
+
+<ParamField body="fuelType" type="string" required>
+  Tipo de combustible (ej., GASOLINE, DIESEL, ELECTRIC, HYBRID)
+</ParamField>
+
+<ParamField body="bodyType" type="string" required>
+  Tipo de carrocería (ej., SEDAN, SUV, HATCHBACK, TRUCK)
+</ParamField>
+
+<ParamField body="transmission" type="string" required>
+  Tipo de transmisión (MANUAL, AUTOMATIC)
+</ParamField>
+
+<ParamField body="mileage" type="integer" required>
+  Kilometraje actual en kilómetros
+</ParamField>
+
+<ParamField body="capacity" type="integer" required>
+  Capacidad de pasajeros
+</ParamField>
+
+<ParamField body="salePrice" type="number" required>
+  Precio de venta
+</ParamField>
+
+<ParamField body="purchasePrice" type="number">
+  Precio de compra (opcional)
+</ParamField>
+
+<ParamField body="city" type="string" required>
+  Ciudad donde está registrado el vehículo
+</ParamField>
+
+<ParamField body="status" type="string" default="AVAILABLE">
+  Estado del vehículo (AVAILABLE, UNAVAILABLE, SOLD)
+</ParamField>
+
+<ParamField body="color" type="string">
+  Color del vehículo
+</ParamField>
+
+<ParamField body="engineCapacity" type="number">
+  Cilindrada del motor en litros
+</ParamField>
+
+```json
+{
+  "plate": "ABC123",
+  "brand": "Toyota",
+  "line": "Corolla",
+  "model": "2022",
+  "fuelType": "GASOLINE",
+  "bodyType": "SEDAN",
+  "transmission": "AUTOMATIC",
+  "mileage": 25000,
+  "capacity": 5,
+  "salePrice": 75000000,
+  "purchasePrice": 65000000,
+  "city": "Bogotá",
+  "status": "AVAILABLE",
+  "color": "Silver",
+  "engineCapacity": 1.8
+}
+```
+
+#### Respuesta
+
+```json
+{
+  "id": 15,
+  "plate": "ABC123",
+  "brand": "Toyota",
+  "line": "Corolla",
+  "model": "2022",
+  "fuelType": "GASOLINE",
+  "bodyType": "SEDAN",
+  "transmission": "AUTOMATIC",
+  "mileage": 25000,
+  "capacity": 5,
+  "salePrice": 75000000,
+  "purchasePrice": 65000000,
+  "city": "Bogotá",
+  "status": "AVAILABLE",
+  "color": "Silver",
+  "engineCapacity": 1.8,
+  "createdAt": "2026-03-06T10:30:00",
+  "updatedAt": "2026-03-06T10:30:00"
+}
+```
+
+#### Códigos de estado
+
+- `201 Created` - Vehículo creado exitosamente
+- `400 Bad Request` - Datos de entrada inválidos
+- `401 Unauthorized` - No autenticado
+- `403 Forbidden` - Falta el permiso `vehicle:create`
+
+#### Ejemplo
+
+```bash
+curl -X POST https://your-domain.com/v1/cars \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "plate": "ABC123",
+    "brand": "Toyota",
+    "line": "Corolla",
+    "model": "2022",
+    "fuelType": "GASOLINE",
+    "bodyType": "SEDAN",
+    "transmission": "AUTOMATIC",
+    "mileage": 25000,
+    "capacity": 5,
+    "salePrice": 75000000,
+    "city": "Bogotá"
+  }'
+```
+
+---
+
+### Obtener automóvil por ID
+
+```http
+GET /v1/cars/{id}
+```
+
+Obtiene información detallada de un automóvil específico.
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `vehicle:read`
+
+#### Parámetros de ruta
+
+<ParamField path="id" type="integer" required>
+  ID del automóvil
+</ParamField>
+
+#### Respuesta
+
+```json
+{
+  "id": 15,
+  "plate": "ABC123",
+  "brand": "Toyota",
+  "line": "Corolla",
+  "model": "2022",
+  "fuelType": "GASOLINE",
+  "bodyType": "SEDAN",
+  "transmission": "AUTOMATIC",
+  "mileage": 25000,
+  "capacity": 5,
+  "salePrice": 75000000,
+  "purchasePrice": 65000000,
+  "city": "Bogotá",
+  "status": "AVAILABLE",
+  "color": "Silver",
+  "engineCapacity": 1.8,
+  "images": [
+    {
+      "id": 1,
+      "url": "https://bucket.s3.amazonaws.com/images/car-15-front.jpg",
+      "isPrimary": true
+    }
+  ],
+  "createdAt": "2026-03-06T10:30:00",
+  "updatedAt": "2026-03-06T10:30:00"
+}
+```
+
+#### Códigos de estado
+
+- `200 OK` - Automóvil encontrado
+- `401 Unauthorized` - No autenticado
+- `404 Not Found` - El automóvil no existe
+
+#### Ejemplo
+
+```bash
+curl -X GET https://your-domain.com/v1/cars/15 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+---
+
+### Listar automóviles (paginado)
+
+```http
+GET /v1/cars/page/{page}
+```
+
+Obtiene una lista paginada de automóviles (10 por página).
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `vehicle:read`
+
+#### Parámetros de ruta
+
+<ParamField path="page" type="integer" required>
+  Número de página (basado en 0)
+</ParamField>
+
+#### Respuesta
+
+```json
+{
+  "content": [
+    {
+      "id": 15,
+      "plate": "ABC123",
+      "brand": "Toyota",
+      "line": "Corolla",
+      "model": "2022",
+      "status": "AVAILABLE",
+      "salePrice": 75000000
+    }
+  ],
+  "pageable": {
+    "pageNumber": 0,
+    "pageSize": 10
+  },
+  "totalElements": 150,
+  "totalPages": 15,
+  "last": false
+}
+```
+
+#### Ejemplo
+
+```bash
+curl -X GET https://your-domain.com/v1/cars/page/0 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+---
+
+### Actualizar automóvil
+
+```http
+PUT /v1/cars/{id}
+```
+
+Actualiza un registro de automóvil existente.
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `vehicle:update`
+
+#### Parámetros de ruta
+
+<ParamField path="id" type="integer" required>
+  ID del automóvil a actualizar
+</ParamField>
+
+#### Cuerpo de la solicitud
+
+Misma estructura que Crear automóvil. Se deben incluir todos los campos que necesiten ser actualizados.
+
+```json
+{
+  "plate": "ABC123",
+  "brand": "Toyota",
+  "line": "Corolla",
+  "model": "2022",
+  "fuelType": "GASOLINE",
+  "bodyType": "SEDAN",
+  "transmission": "AUTOMATIC",
+  "mileage": 30000,
+  "capacity": 5,
+  "salePrice": 72000000,
+  "city": "Bogotá",
+  "status": "AVAILABLE"
+}
+```
+
+#### Respuesta
+
+```json
+{
+  "id": 15,
+  "plate": "ABC123",
+  "mileage": 30000,
+  "salePrice": 72000000,
+  "updatedAt": "2026-03-06T14:30:00"
+}
+```
+
+#### Códigos de estado
+
+- `200 OK` - Automóvil actualizado exitosamente
+- `400 Bad Request` - Datos de entrada inválidos
+- `401 Unauthorized` - No autenticado
+- `403 Forbidden` - Falta el permiso `vehicle:update`
+- `404 Not Found` - El automóvil no existe
+
+#### Ejemplo
+
+```bash
+curl -X PUT https://your-domain.com/v1/cars/15 \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "mileage": 30000,
+    "salePrice": 72000000
+  }'
+```
+
+---
+
+### Eliminar automóvil
+
+```http
+DELETE /v1/cars/{id}
+```
+
+Elimina permanentemente un automóvil del inventario.
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `vehicle:delete`
+
+#### Parámetros de ruta
+
+<ParamField path="id" type="integer" required>
+  ID del automóvil a eliminar
+</ParamField>
+
+#### Códigos de estado
+
+- `204 No Content` - Automóvil eliminado exitosamente
+- `401 Unauthorized` - No autenticado
+- `403 Forbidden` - Falta el permiso `vehicle:delete`
+- `404 Not Found` - El automóvil no existe
+
+#### Ejemplo
+
+```bash
+curl -X DELETE https://your-domain.com/v1/cars/15 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+---
+
+### Cambiar estado del automóvil
+
+```http
+PATCH /v1/cars/{id}/status
+```
+
+Actualiza el estado de disponibilidad de un automóvil.
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `vehicle:update`
+
+#### Parámetros de ruta
+
+<ParamField path="id" type="integer" required>
+  ID del automóvil
+</ParamField>
+
+#### Cuerpo de la solicitud
+
+<ParamField body="status" type="string" required>
+  Nuevo estado: `AVAILABLE`, `UNAVAILABLE` o `SOLD`
+</ParamField>
+
+```json
+"UNAVAILABLE"
+```
+
+#### Respuesta
+
+```json
+{
+  "status": "UNAVAILABLE"
+}
+```
+
+#### Ejemplo
+
+```bash
+curl -X PATCH https://your-domain.com/v1/cars/15/status \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '"UNAVAILABLE"'
+```
+
+---
+
+### Obtener conteo de automóviles
+
+```http
+GET /v1/cars/count
+```
+
+Obtiene estadísticas sobre los automóviles en el inventario.
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `vehicle:read`
+
+#### Respuesta
+
+```json
+{
+  "total": 150,
+  "available": 120,
+  "unavailable": 20,
+  "sold": 10
+}
+```
+
+#### Ejemplo
+
+```bash
+curl -X GET https://your-domain.com/v1/cars/count \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+---
+
+### Buscar automóviles
+
+```http
+GET /v1/cars/search
+```
+
+Búsqueda multicriterio de automóviles con filtros opcionales.
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `vehicle:read`
+
+#### Parámetros de consulta
+
+<ParamField query="plate" type="string">
+  Filtrar por placa (coincidencia parcial)
+</ParamField>
+
+<ParamField query="brand" type="string">
+  Filtrar por marca
+</ParamField>
+
+<ParamField query="line" type="string">
+  Filtrar por línea/modelo
+</ParamField>
+
+<ParamField query="model" type="string">
+  Filtrar por año
+</ParamField>
+
+<ParamField query="fuelType" type="string">
+  Filtrar por tipo de combustible
+</ParamField>
+
+<ParamField query="bodyType" type="string">
+  Filtrar por tipo de carrocería
+</ParamField>
+
+<ParamField query="transmission" type="string">
+  Filtrar por transmisión
+</ParamField>
+
+<ParamField query="city" type="string">
+  Filtrar por ciudad de registro
+</ParamField>
+
+<ParamField query="status" type="string">
+  Filtrar por estado
+</ParamField>
+
+<ParamField query="minYear" type="integer">
+  Año mínimo
+</ParamField>
+
+<ParamField query="maxYear" type="integer">
+  Año máximo
+</ParamField>
+
+<ParamField query="minCapacity" type="integer">
+  Capacidad mínima de pasajeros
+</ParamField>
+
+<ParamField query="maxCapacity" type="integer">
+  Capacidad máxima de pasajeros
+</ParamField>
+
+<ParamField query="minMileage" type="integer">
+  Kilometraje mínimo
+</ParamField>
+
+<ParamField query="maxMileage" type="integer">
+  Kilometraje máximo
+</ParamField>
+
+<ParamField query="minSalePrice" type="number">
+  Precio de venta mínimo
+</ParamField>
+
+<ParamField query="maxSalePrice" type="number">
+  Precio de venta máximo
+</ParamField>
+
+#### Respuesta
+
+```json
+[
+  {
+    "id": 15,
+    "plate": "ABC123",
+    "brand": "Toyota",
+    "line": "Corolla",
+    "model": "2022",
+    "salePrice": 75000000,
+    "status": "AVAILABLE"
+  }
+]
+```
+
+#### Ejemplo
+
+```bash
+curl -X GET "https://your-domain.com/v1/cars/search?brand=Toyota&minYear=2020&maxSalePrice=80000000" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+---
+
+### Buscar automóviles (paginado)
+
+```http
+GET /v1/cars/search/page/{page}
+```
+
+Variante paginada de la búsqueda multicriterio de automóviles.
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `vehicle:read`
+
+#### Parámetros de ruta
+
+<ParamField path="page" type="integer" required>
+  Número de página (basado en 0)
+</ParamField>
+
+#### Parámetros de consulta
+
+<ParamField query="size" type="integer" default="10">
+  Tamaño de página
+</ParamField>
+
+Todos los parámetros de búsqueda del endpoint no paginado también están disponibles.
+
+#### Respuesta
+
+```json
+{
+  "content": [...],
+  "pageable": {
+    "pageNumber": 0,
+    "pageSize": 10
+  },
+  "totalElements": 45,
+  "totalPages": 5
+}
+```
+
+#### Ejemplo
+
+```bash
+curl -X GET "https://your-domain.com/v1/cars/search/page/0?size=20&brand=Toyota&status=AVAILABLE" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+---
+
+## Motocicletas
+
+Los endpoints de motocicletas siguen el mismo patrón que los de automóviles, pero utilizan `/v1/motorcycles` como ruta base.
+
+### Campos adicionales de motocicletas
+
+Las motocicletas tienen campos adicionales específicos para vehículos de dos ruedas:
+
+- `motorcycleType` - Tipo (SPORT, CRUISER, TOURING, etc.)
+- `engineCapacity` - Cilindrada del motor en CC
+- `cylinderCount` - Número de cilindros
+
+### Ejemplo: Crear motocicleta
+
+```bash
+curl -X POST https://your-domain.com/v1/motorcycles \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "plate": "XYZ789",
+    "brand": "Yamaha",
+    "line": "MT-09",
+    "model": "2023",
+    "motorcycleType": "SPORT",
+    "fuelType": "GASOLINE",
+    "transmission": "MANUAL",
+    "engineCapacity": 890,
+    "cylinderCount": 3,
+    "mileage": 5000,
+    "salePrice": 35000000,
+    "city": "Medellín",
+    "status": "AVAILABLE"
+  }'
+```
+
+<Note>
+  Todos los endpoints de motocicletas (`GET`, `PUT`, `DELETE`, `PATCH`, `search`) funcionan de manera idéntica a los de automóviles, pero operan sobre la ruta `/v1/motorcycles`.
+</Note>
+
+---
+
+## Valores de estado de vehículos
+
+- `AVAILABLE` - El vehículo está disponible para la venta
+- `UNAVAILABLE` - El vehículo no está disponible temporalmente
+- `SOLD` - El vehículo ha sido vendido
+
+---
+
+## Respuestas de error
+
+### 400 Bad Request
+
+```json
+{
+  "error": "validation_error",
+  "message": "Invalid input data",
+  "details": [
+    {
+      "field": "salePrice",
+      "message": "Sale price must be greater than 0"
+    }
+  ]
+}
+```
+
+### 404 Not Found
+
+```json
+{
+  "error": "not_found",
+  "message": "Car with ID 999 not found"
+}
+```

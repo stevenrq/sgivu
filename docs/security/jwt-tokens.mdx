@@ -1,0 +1,638 @@
+---
+title: Tokens JWT
+description: Estructura, validación y gestión del ciclo de vida de JWT en los microservicios de SGIVU
+---
+
+## Descripción general
+
+SGIVU utiliza **JSON Web Tokens (JWT)** como formato de Access Token para toda la autenticación de la API. El servicio `sgivu-auth` emite JWTs firmados con RSA-256, y todos los microservicios los validan usando la clave pública del servidor de autorización.
+
+<Note>
+Los JWTs son **stateless** — los microservicios pueden validar tokens sin consultar al servidor de autorización en cada solicitud, mejorando el rendimiento y reduciendo el acoplamiento.
+</Note>
+
+## Estructura del JWT
+
+### Header
+
+El header del JWT especifica el algoritmo y el identificador de clave:
+
+```json
+{
+  "alg": "RS256",
+  "typ": "JWT",
+  "kid": "sgivu-jwt-key"
+}
+```
+
+- **alg**: Algoritmo de firma RSA-SHA256
+- **typ**: Tipo de token (siempre "JWT")
+- **kid**: Identificador de clave para soporte de rotación (coincide con el alias del keystore)
+
+### Payload del Access Token
+
+El Access Token contiene Claims personalizados para autorización:
+
+```json
+{
+  "sub": "12345",
+  "username": "john.doe",
+  "rolesAndPermissions": [
+    "ROLE_ADMIN",
+    "ROLE_USER",
+    "user:read",
+    "user:write",
+    "vehicle:read",
+    "vehicle:create"
+  ],
+  "isAdmin": true,
+  "iss": "http://localhost:9000",
+  "aud": "sgivu-gateway",
+  "exp": 1709654400,
+  "iat": 1709652600,
+  "jti": "a1b2c3d4-e5f6-7890"
+}
+```
+
+#### Claims estándar
+
+| Claim | Descripción | Ejemplo |
+|-------|-------------|----------|
+| `sub` | Subject (ID de usuario) | `"12345"` |
+| `iss` | Issuer (URL del servidor de autorización) | `"http://localhost:9000"` |
+| `aud` | Audience (ID del cliente) | `"sgivu-gateway"` |
+| `exp` | Tiempo de expiración (timestamp Unix) | `1709654400` |
+| `iat` | Fecha de emisión (timestamp Unix) | `1709652600` |
+| `jti` | ID del JWT (identificador único) | `"a1b2c3d4..."` |
+
+#### Claims personalizados
+
+| Claim | Tipo | Descripción |
+|-------|------|-------------|
+| `username` | String | Nombre de usuario de login (para visualización) |
+| `rolesAndPermissions` | Array[String] | Roles y permisos combinados |
+| `isAdmin` | Boolean | Verificación rápida de admin (true si tiene ROLE_ADMIN) |
+
+<Info>
+**¿Por qué `sub` es el ID de usuario y no el username?**
+
+El Claim `sub` debe ser **inmutable**. Los nombres de usuario pueden cambiar, pero los IDs de usuario permanecen constantes durante todo el ciclo de vida del usuario. Esto evita la invalidación de tokens cuando se actualizan los nombres de usuario.
+</Info>
+
+### Formato de roles y permisos
+
+El Claim `rolesAndPermissions` combina:
+
+1. **Roles**: Con prefijo `ROLE_` (ej., `ROLE_ADMIN`, `ROLE_USER`)
+2. **Permisos**: Formato recurso:acción (ej., `user:read`, `vehicle:create`)
+
+**Lógica del JWT Customizer:**
+
+```java
+@Bean
+OAuth2TokenCustomizer<JwtEncodingContext> jwtCustomizer(UserDetailsService userDetailsService) {
+  return context -> {
+    Authentication principal = context.getPrincipal();
+    String username = principal.getName();
+    CustomUserDetails userDetails = 
+        (CustomUserDetails) userDetailsService.loadUserByUsername(username);
+    
+    Set<String> rolesAndPermissions = principal.getAuthorities().stream()
+      .map(GrantedAuthority::getAuthority)
+      .map(authority -> {
+        // Add ROLE_ prefix if not already present
+        if (authority.matches("^[A-Z_]+$")) {
+          return "ROLE_" + authority;
+        }
+        return authority;
+      })
+      .collect(Collectors.toSet());
+    
+    if (context.getTokenType().equals(OAuth2TokenType.ACCESS_TOKEN)) {
+      context.getClaims()
+        .claim("sub", userDetails.getId())
+        .claim("username", username)
+        .claim("rolesAndPermissions", rolesAndPermissions)
+        .claim("isAdmin", rolesAndPermissions.contains("ROLE_ADMIN"));
+    }
+  };
+}
+```
+
+### Payload del ID Token
+
+El ID Token de OIDC tiene una estructura diferente (usado para información del usuario, no para acceso a la API):
+
+```json
+{
+  "sub": "12345",
+  "userId": 12345,
+  "iss": "http://localhost:9000",
+  "aud": "sgivu-gateway",
+  "exp": 1712246400,  // 30 days
+  "iat": 1709652600
+}
+```
+
+<Warning>
+El ID Token tiene un **TTL de 30 días** (coincide con el tiempo de vida del Refresh Token) porque se usa como `id_token_hint` durante el logout de OIDC. Spring Security nunca refresca el ID Token, por lo que debe permanecer válido durante toda la sesión.
+</Warning>
+
+## Firma de tokens
+
+### Par de claves RSA
+
+El servidor de autorización firma los JWTs con una clave privada RSA almacenada en un keystore JKS:
+
+```java
+@Bean
+JWKSource<SecurityContext> jwkSource() {
+  Resource resource = resourceLoader.getResource(jwtProperties.keyStore().location());
+  KeyStore keyStore = KeyStore.getInstance("JKS");
+  keyStore.load(resource.getInputStream(), jwtProperties.keyStore().password().toCharArray());
+  
+  RSAPrivateKey privateKey = (RSAPrivateKey) keyStore.getKey(
+      jwtProperties.key().alias(), 
+      jwtProperties.key().password().toCharArray());
+  
+  Certificate certificate = keyStore.getCertificate(jwtProperties.key().alias());
+  RSAPublicKey publicKey = (RSAPublicKey) certificate.getPublicKey();
+  
+  RSAKey rsaKey = new RSAKey.Builder(publicKey)
+      .privateKey(privateKey)
+      .keyID(jwtProperties.key().alias())
+      .build();
+  
+  JWKSet jwkSet = new JWKSet(rsaKey);
+  return new ImmutableJWKSet<>(jwkSet);
+}
+```
+
+### Configuración del keystore
+
+**application.yml:**
+
+```yaml
+sgivu:
+  jwt:
+    keystore:
+      location: classpath:keystore.jks
+      password: ${KEYSTORE_PASSWORD}
+    key:
+      alias: sgivu-jwt-key
+      password: ${KEY_PASSWORD}
+```
+
+**Buenas prácticas de seguridad:**
+
+<Warning>
+1. **Nunca subir `keystore.jks` a Git** — agregarlo a `.gitignore`
+2. **Usar variables de entorno** para contraseñas en producción
+3. **Cargar desde un gestor de secretos** (AWS Secrets Manager, HashiCorp Vault)
+4. **Rotar claves periódicamente** usando el header `kid` para versionado
+</Warning>
+
+### Distribución de clave pública (JWKS)
+
+El servidor de autorización expone la clave pública a través del Endpoint JWKS:
+
+**Solicitud:**
+```bash
+curl http://localhost:9000/oauth2/jwks
+```
+
+**Respuesta:**
+```json
+{
+  "keys": [
+    {
+      "kty": "RSA",
+      "e": "AQAB",
+      "kid": "sgivu-jwt-key",
+      "n": "xGOr-H7A..."
+    }
+  ]
+}
+```
+
+Los microservicios obtienen esta clave pública para validar las firmas de los JWT.
+
+## Validación de tokens
+
+### Configuración de microservicios
+
+Todos los microservicios validan los JWTs como OAuth2 Resource Servers:
+
+```java
+@Bean
+JwtDecoder jwtDecoder() {
+  return NimbusJwtDecoder.withIssuerLocation(
+      servicesProperties.getMap().get("sgivu-auth").getUrl())
+    .build();
+}
+```
+
+Este decoder:
+
+1. **Obtiene los metadatos OIDC** desde `/.well-known/openid-configuration`
+2. **Recupera el JWKS** desde `/oauth2/jwks`
+3. **Cachea las claves públicas** localmente
+4. **Valida la firma** usando RSA-256
+5. **Verifica Claims estándar**: `iss`, `aud`, `exp`, `nbf`
+
+### Pasos de validación
+
+Para cada solicitud entrante con `Authorization: Bearer <token>`:
+
+```mermaid
+graph TD
+    A[Receive JWT] --> B{Parse Header}
+    B --> C{Extract kid}
+    C --> D{Find Public Key in Cache}
+    D -->|Not Found| E[Fetch JWKS from Auth Server]
+    E --> F[Cache Public Key]
+    D -->|Found| F
+    F --> G{Verify Signature}
+    G -->|Invalid| H[401 Unauthorized]
+    G -->|Valid| I{Check exp claim}
+    I -->|Expired| H
+    I -->|Valid| J{Check iss claim}
+    J -->|Mismatch| H
+    J -->|Match| K{Check aud claim}
+    K -->|Mismatch| H
+    K -->|Match| L[Extract Claims]
+    L --> M[Create Authentication]
+    M --> N[Allow Request]
+```
+
+### Integración con Spring Security
+
+**Configuración del Resource Server:**
+
+```java
+@Bean
+SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+  http
+    .oauth2ResourceServer(oauth2 -> oauth2
+      .jwt(jwt -> jwt.jwtAuthenticationConverter(convert()))
+    )
+    .authorizeHttpRequests(authz -> authz
+      .requestMatchers("/v1/cars/**").access(internalOrAuthenticatedAuthorizationManager())
+      .anyRequest().authenticated()
+    );
+  return http.build();
+}
+```
+
+**Conversión de JWT a GrantedAuthority:**
+
+```java
+@Bean
+JwtAuthenticationConverter convert() {
+  JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
+  
+  converter.setJwtGrantedAuthoritiesConverter(jwt -> {
+    List<String> rolesAndPermissions = jwt.getClaimAsStringList("rolesAndPermissions");
+    
+    if (rolesAndPermissions == null || rolesAndPermissions.isEmpty()) {
+      return List.of();
+    }
+    
+    return rolesAndPermissions.stream()
+      .map(SimpleGrantedAuthority::new)
+      .collect(Collectors.toList());
+  });
+  
+  return converter;
+}
+```
+
+Esto extrae `rolesAndPermissions` y los convierte a `GrantedAuthority` de Spring Security para su uso con `@PreAuthorize`.
+
+## Ciclo de vida de los tokens
+
+### Tiempos de expiración
+
+| Tipo de token | TTL | Rotación |
+|---------------|-----|----------|
+| Access Token | 30 minutos | No (expira y se reemplaza) |
+| Refresh Token | 30 días | Sí (se emite un nuevo token al refrescar) |
+| ID Token | 30 días | No (nunca se refresca) |
+
+**Configurado en `ClientRegistrationRunner`:**
+
+```java
+private TokenSettings tokenSettings() {
+  return TokenSettings.builder()
+    .accessTokenTimeToLive(Duration.ofMinutes(30))
+    .refreshTokenTimeToLive(Duration.ofDays(30))
+    .reuseRefreshTokens(false)  // Rotation enabled
+    .build();
+}
+```
+
+### Refresco de tokens
+
+El gateway refresca automáticamente los Access Tokens expirados usando el Refresh Token:
+
+```java
+@Bean
+ReactiveOAuth2AuthorizedClientManager authorizedClientManager(...) {
+  RefreshTokenReactiveOAuth2AuthorizedClientProvider refreshTokenProvider =
+      new RefreshTokenReactiveOAuth2AuthorizedClientProvider();
+  refreshTokenProvider.setClockSkew(Duration.ofSeconds(5));
+  
+  DelegatingReactiveOAuth2AuthorizedClientProvider authorizedClientProvider =
+      new DelegatingReactiveOAuth2AuthorizedClientProvider(
+        authorizationCodeProvider, 
+        refreshTokenProvider
+      );
+  
+  DefaultReactiveOAuth2AuthorizedClientManager manager =
+      new DefaultReactiveOAuth2AuthorizedClientManager(
+        clientRegistrationRepository, 
+        authorizedClientRepository
+      );
+  manager.setAuthorizedClientProvider(authorizedClientProvider);
+  
+  return manager;
+}
+```
+
+**Flujo de refresco:**
+
+```mermaid
+sequenceDiagram
+    participant Gateway
+    participant Redis
+    participant Auth
+    participant Service
+    
+    Gateway->>Redis: Load session
+    Redis-->>Gateway: OAuth2AuthorizedClient (access_token expired)
+    Gateway->>Gateway: Check access_token.expiresAt
+    
+    Note over Gateway: Access token expired
+    Gateway->>Auth: POST /oauth2/token<br/>grant_type=refresh_token<br/>refresh_token=...
+    Auth->>Auth: Validate refresh_token
+    Auth-->>Gateway: New access_token + new refresh_token
+    
+    Gateway->>Redis: Update session with new tokens
+    Gateway->>Service: Forward request with new access_token
+    Service-->>Gateway: Response
+    Gateway-->>Client: Response
+```
+
+### Rotación de Refresh Token
+
+Con `reuseRefreshTokens: false`, cada refresco emite un **nuevo Refresh Token** e invalida el anterior:
+
+**Beneficios:**
+- **Limita el tiempo de vida del token**: Incluso si es robado, los Refresh Tokens antiguos se invalidan
+- **Detecta robo de tokens**: La reutilización de un Refresh Token antiguo activa la revocación
+- **Reduce la ventana de ataque**: El atacante debe usar el token antes del refresco legítimo
+
+### Manejo de Invalid Grant
+
+Cuando el Refresh Token es rechazado (error `invalid_grant`):
+
+```java
+return authorizedClientManager
+  .authorize(authorizeRequest)
+  .onErrorResume(ClientAuthorizationException.class, ex -> {
+    if (OAuth2ErrorCodes.INVALID_GRANT.equals(ex.getError().getErrorCode())) {
+      log.warn("Refresh token invalid, re-authentication required");
+      return Mono.empty();  // Results in 401
+    }
+    return Mono.error(ex);
+  });
+```
+
+**Causas comunes:**
+- Refresh Token expirado (30 días)
+- Token revocado (el usuario cerró sesión)
+- Servidor de autorización reiniciado (tabla de autorizaciones limpiada en dev)
+- La rotación de tokens detectó reutilización (incidente de seguridad)
+
+**Resultado:**
+- `/auth/session` retorna `401`
+- Angular redirige al login
+- El usuario se re-autentica
+
+## Extracción de tokens
+
+### Desde el header Authorization
+
+Los microservicios extraen los JWTs del header `Authorization`:
+
+```http
+GET /v1/vehicles HTTP/1.1
+Host: sgivu-vehicle:8082
+Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NSIsInVzZXJuYW1lIjoiam9obi5kb2UiLCJyb2xlc0FuZFBlcm1pc3Npb25zIjpbIlJPTEVfQURNSU4iXSwiaXNBZG1pbiI6dHJ1ZSwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo5MDAwIiwiYXVkIjoic2dpdnUtZ2F0ZXdheSIsImV4cCI6MTcwOTY1NDQwMCwiaWF0IjoxNzA5NjUyNjAwfQ.signature
+```
+
+El `BearerTokenAuthenticationFilter` de Spring Security automáticamente:
+
+1. Extrae el token del esquema `Bearer`
+2. Lo pasa al `JwtDecoder` para validación
+3. Crea un `JwtAuthenticationToken` con los Claims
+4. Lo almacena en el `SecurityContext`
+
+### Acceso a Claims en código
+
+**En controladores:**
+
+```java
+@GetMapping("/profile")
+public ResponseEntity<UserProfile> getProfile(JwtAuthenticationToken authentication) {
+  Jwt jwt = authentication.getToken();
+  
+  Long userId = jwt.getClaim("sub");
+  String username = jwt.getClaim("username");
+  Boolean isAdmin = jwt.getClaim("isAdmin");
+  List<String> rolesAndPermissions = jwt.getClaim("rolesAndPermissions");
+  
+  return ResponseEntity.ok(new UserProfile(userId, username, isAdmin));
+}
+```
+
+**Usando SecurityContext:**
+
+```java
+Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+if (auth instanceof JwtAuthenticationToken jwtAuth) {
+  Long userId = jwtAuth.getToken().getClaim("sub");
+}
+```
+
+## Autorización con Claims JWT
+
+### Seguridad a nivel de método
+
+Uso de `@PreAuthorize` con Spring Expression Language (SpEL):
+
+```java
+@PreAuthorize("hasAuthority('vehicle:read')")
+@GetMapping("/v1/vehicles/{id}")
+public VehicleResponse getVehicle(@PathVariable Long id) {
+  return vehicleService.findById(id);
+}
+
+@PreAuthorize("hasAuthority('vehicle:create') and hasRole('ADMIN')")
+@PostMapping("/v1/vehicles")
+public VehicleResponse createVehicle(@RequestBody VehicleRequest request) {
+  return vehicleService.create(request);
+}
+```
+
+**Habilitar seguridad a nivel de método:**
+
+```java
+@Configuration
+@EnableMethodSecurity
+public class SecurityConfig { ... }
+```
+
+### Expresiones de autorización personalizadas
+
+Verificar Claims directamente:
+
+```java
+@PreAuthorize("authentication.token.claims['isAdmin'] == true")
+@DeleteMapping("/v1/users/{id}")
+public void deleteUser(@PathVariable Long id) {
+  userService.delete(id);
+}
+```
+
+### Seguridad a nivel de ruta
+
+Configuración en la cadena de filtros de seguridad:
+
+```java
+http.authorizeHttpRequests(authz -> authz
+  .requestMatchers("/v1/vehicles/**").hasAnyAuthority("vehicle:read", "ROLE_ADMIN")
+  .requestMatchers("/v1/users/**").hasAuthority("user:read")
+  .anyRequest().authenticated()
+)
+```
+
+## Token Relay en el Gateway
+
+El gateway agrega tokens a las solicitudes proxificadas usando el filtro `tokenRelay()`:
+
+**Configuración de ruta:**
+
+```java
+.route("vehicle-service", r -> r
+  .path("/v1/vehicles/**")
+  .filters(f -> f.tokenRelay())
+  .uri("lb://sgivu-vehicle")
+)
+```
+
+**Cómo funciona:**
+
+1. Extrae el `OAuth2AuthorizedClient` de la sesión en Redis
+2. Obtiene el `accessToken` del cliente autorizado
+3. Verifica si expiró → refresca si es necesario
+4. Agrega el header `Authorization: Bearer <token>`
+5. Reenvía al microservicio
+
+## Revocación de tokens
+
+El gateway revoca los tokens durante el logout:
+
+```java
+public class TokenRevocationServerLogoutHandler implements ServerLogoutHandler {
+  @Override
+  public Mono<Void> logout(WebFilterExchange exchange, Authentication authentication) {
+    return exchange.getExchange().getSession()
+      .flatMap(session -> {
+        // Get authorized client from session
+        return authorizedClientRepository.loadAuthorizedClient(
+          registrationId, authentication, exchange.getExchange()
+        );
+      })
+      .flatMap(authorizedClient -> {
+        // Revoke access token
+        revokeToken(authorizedClient.getAccessToken());
+        // Revoke refresh token
+        revokeToken(authorizedClient.getRefreshToken());
+        return Mono.empty();
+      });
+  }
+}
+```
+
+**Endpoint de revocación:**
+
+```http
+POST /oauth2/revoke HTTP/1.1
+Host: sgivu-auth:9000
+Content-Type: application/x-www-form-urlencoded
+Authorization: Basic c2dpdnUtZ2F0ZXdheTpzZWNyZXQ=
+
+token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+## Consideraciones para producción
+
+### Tamaño del token
+
+Los JWTs se incluyen en **cada solicitud**. Para minimizar su tamaño:
+
+- Evitar incrustar objetos grandes en los Claims
+- Usar nombres de Claims eficientes (cortos pero legibles)
+- Considerar compresión de tokens (no estándar)
+
+**Tamaño actual de tokens en SGIVU:** ~500-800 bytes (aceptable)
+
+### Desfase de reloj (Clock Skew)
+
+Permitir 5 segundos de desfase de reloj para las verificaciones de expiración:
+
+```java
+refreshTokenProvider.setClockSkew(Duration.ofSeconds(5));
+```
+
+Evita que los tokens sean rechazados debido a diferencias menores de tiempo entre servidores.
+
+### Consistencia de la URL del issuer
+
+<Warning>
+El claim `iss` en los JWT **debe coincidir exactamente** con la URL del issuer configurada en los microservicios. Si no coincide, la validación falla.
+
+**Auth Server:**
+```yaml
+sgivu:
+  issuer:
+    url: https://api.example.com
+```
+
+**Microservices:**
+```java
+NimbusJwtDecoder.withIssuerLocation("https://api.example.com").build()
+```
+
+Ambos deben usar el mismo protocolo (HTTP vs HTTPS) y el mismo hostname.
+</Warning>
+
+### Key Rotation
+
+**Recommended Process:**
+
+1. Generate new RSA key pair with new `kid` (e.g., `sgivu-jwt-key-2024`)
+2. Add to keystore alongside old key
+3. Update `sgivu.jwt.key.alias` to new `kid`
+4. Auth server starts signing with new key
+5. Old key remains in JWKS for 30 days (max refresh token lifetime)
+6. Remove old key after 30 days
+
+**¿Por qué 30 días?** Los tokens firmados con la clave anterior siguen siendo válidos hasta expirar. Los microservicios necesitan la clave pública anterior para validarlos.
+
+## Related Documentation
+
+- [OAuth2 & OIDC](/security/oauth2-oidc) - Token issuance and authorization flows
+- [BFF Pattern](/security/bff-pattern) - Cómo el gateway gestiona los tokens
+- [Service Communication](/security/service-communication) - Autenticación interna entre servicios (sin JWT)

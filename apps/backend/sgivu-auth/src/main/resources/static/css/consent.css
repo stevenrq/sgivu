@@ -1,0 +1,220 @@
+:root {
+  --color-primary: #005fcc;
+  --color-primary-dark: #004a9e;
+  --color-text: #212529;
+  --color-text-muted: #6c757d;
+  --color-surface: #ffffff;
+  --color-background: #f8f9fa;
+  --color-border: #dee2e6;
+  --color-accent: #d8ebff;
+  --color-success-soft: #e9f7ef;
+  --color-secondary-soft: #eef2f6;
+
+  --font-family-base: "Inter", "Segoe UI", sans-serif;
+  --border-radius-lg: 1.25rem;
+  --border-radius-md: 0.9rem;
+  --transition-base: all 0.2s ease-in-out;
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-text);
+  font-family: var(--font-family-base), serif;
+}
+
+body.consent-page {
+  overflow-y: auto;
+}
+
+.consent-page {
+  background:
+    radial-gradient(circle at top left, rgba(0, 95, 204, 0.1), transparent 35%),
+    linear-gradient(135deg, #f4f8fc 0%, #ffffff 45%, #eef5fb 100%);
+}
+
+.background-shape {
+  position: absolute;
+  width: 18rem;
+  height: 18rem;
+  border-radius: 50%;
+  filter: blur(10px);
+  opacity: 0.3;
+}
+
+.background-shape-left {
+  top: 4rem;
+  left: 4rem;
+  background: radial-gradient(circle, rgba(0, 95, 204, 0.18), transparent 70%);
+}
+
+.background-shape-right {
+  right: 2rem;
+  bottom: 3rem;
+  background: radial-gradient(circle, rgba(43, 110, 255, 0.14), transparent 70%);
+}
+
+.consent-card {
+  max-width: 680px;
+  background-color: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(222, 226, 230, 0.85);
+  border-radius: var(--border-radius-lg);
+  padding: 1.25rem;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 24px 60px -32px rgba(15, 23, 42, 0.35);
+}
+
+.subtitle {
+  max-width: 36rem;
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+}
+
+.scope-counter {
+  padding: 0.45rem 0.8rem;
+  border-radius: 999px;
+  background: var(--color-secondary-soft);
+  color: var(--color-primary-dark);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.scope-grid {
+  display: grid;
+  gap: 0.45rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.scope-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid rgba(0, 95, 204, 0.12);
+  border-radius: 0.7rem;
+  background: rgba(247, 251, 255, 0.98);
+}
+
+.scope-title {
+  margin-bottom: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.scope-code {
+  display: inline-block;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(0, 95, 204, 0.08);
+  color: var(--color-primary-dark);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.approved-scope-list {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.approved-scope-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid rgba(25, 135, 84, 0.18);
+  border-radius: var(--border-radius-md);
+  background: var(--color-success-soft);
+}
+
+.approved-scope-title {
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.empty-state {
+  border: 1px dashed rgba(108, 117, 125, 0.35);
+  background: rgba(248, 249, 250, 0.9);
+}
+
+.stylish-btn {
+  position: relative;
+  background-color: var(--color-primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--border-radius-md);
+  padding: 0.7rem 1rem;
+  font-size: 0.92rem;
+  font-weight: 700;
+  box-shadow: 0 10px 24px -12px rgba(0, 95, 204, 0.55);
+  overflow: hidden;
+}
+
+.stylish-btn:hover,
+.stylish-btn:focus {
+  background-color: var(--color-primary-dark);
+}
+
+.btn-text {
+  position: relative;
+  z-index: 1;
+}
+
+.btn-shine {
+  position: absolute;
+  top: -50%;
+  left: -60%;
+  width: 60%;
+  height: 200%;
+  background: rgba(255, 255, 255, 0.16);
+  transform: rotate(22deg);
+  transition: left 0.4s ease;
+}
+
+.stylish-btn:hover .btn-shine,
+.stylish-btn:focus .btn-shine {
+  left: 120%;
+}
+
+.cancel-btn {
+  min-width: 9rem;
+  border-radius: var(--border-radius-md);
+  padding: 0.7rem 1rem;
+  font-weight: 600;
+}
+
+.card-decoration {
+  position: absolute;
+  right: -5rem;
+  bottom: -5rem;
+  width: 11rem;
+  height: 11rem;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0, 95, 204, 0.12), transparent 68%);
+  pointer-events: none;
+}
+
+@media (max-width: 767.98px) {
+  .consent-card {
+    padding: 1.5rem;
+    margin-inline: 1rem;
+  }
+
+  .scope-grid,
+  .approved-scope-list {
+    grid-template-columns: 1fr;
+  }
+
+  .scope-card,
+  .approved-scope-item {
+    grid-template-columns: 1fr;
+  }
+
+  .approved-scope-item {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

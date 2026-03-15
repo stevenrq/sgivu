@@ -1,0 +1,362 @@
+---
+title: Buenas Prácticas de Seguridad
+description: Aprende a gestionar de forma segura secretos, credenciales y autenticación en el repositorio de configuración de SGIVU
+---
+
+## Descripción general
+
+La seguridad es fundamental en un repositorio de Spring Cloud Config. Esta guía cubre las mejores prácticas para gestionar datos sensibles, autenticación y control de acceso.
+
+<Warning>
+  Nunca hagas commit de secretos reales, contraseñas o credenciales en Git. Utiliza siempre variables de entorno o gestores de secretos externos.
+</Warning>
+
+## Gestión de secretos
+
+### Placeholders de variables de entorno
+
+Todos los valores de configuración sensibles deben usar la sintaxis de placeholders `${VAR_NAME}` de Spring, que se resuelve desde variables de entorno en tiempo de ejecución:
+
+```yaml
+spring:
+  datasource:
+    url: jdbc:postgresql://${DEV_AUTH_DB_HOST:host.docker.internal}:${DEV_AUTH_DB_PORT:5432}/${DEV_AUTH_DB_NAME}
+    username: ${DEV_AUTH_DB_USERNAME}
+    password: ${DEV_AUTH_DB_PASSWORD}
+```
+
+<Info>
+  Puedes proporcionar valores por defecto usando la sintaxis con dos puntos: `${VAR_NAME:default_value}`. Esto es útil para valores no sensibles como nombres de host o puertos.
+</Info>
+
+### Secretos críticos a proteger
+
+Los siguientes secretos **nunca** deben ser incluidos en texto plano:
+
+<CardGroup cols={2}>
+  <Card title="Credenciales de base de datos" icon="database">
+    - `DEV_AUTH_DB_USERNAME`
+    - `DEV_AUTH_DB_PASSWORD`
+    - `DEV_USER_DB_PASSWORD`
+  </Card>
+  
+  <Card title="OAuth2 y JWT" icon="key">
+    - `SGIVU_GATEWAY_SECRET`
+    - `JWT_KEYSTORE_PASSWORD`
+    - `JWT_KEY_PASSWORD`
+  </Card>
+  
+  <Card title="Autenticación de servicios" icon="shield">
+    - `SERVICE_INTERNAL_SECRET_KEY`
+    - `REDIS_PASSWORD`
+  </Card>
+  
+  <Card title="Claves del proveedor cloud" icon="cloud">
+    - `AWS_ACCESS_KEY`
+    - `AWS_SECRET_KEY`
+  </Card>
+</CardGroup>
+
+## Seguridad del cliente OAuth2
+
+### Configuración OAuth2 del Gateway
+
+El API Gateway utiliza el flujo de código de autorización OAuth2 para autenticar usuarios. El secreto del cliente debe almacenarse de forma segura:
+
+```yaml
+spring:
+  security:
+    oauth2:
+      client:
+        registration:
+          sgivu-gateway:
+            provider: sgivu-auth
+            client-id: sgivu-gateway
+            client-secret: ${SGIVU_GATEWAY_SECRET}
+            client-authentication-method: client_secret_basic
+            authorization-grant-type: authorization_code
+```
+
+<Steps>
+  <Step title="Generar un secreto fuerte">
+    Usa un generador aleatorio criptográficamente seguro para crear el secreto del cliente:
+    ```bash
+    openssl rand -base64 32
+    ```
+  </Step>
+  
+  <Step title="Almacenar en el entorno">
+    Agrega el secreto a tu archivo `.env` (nunca se incluye en Git):
+    ```bash
+    SGIVU_GATEWAY_SECRET=your_generated_secret_here
+    ```
+  </Step>
+  
+  <Step title="Referenciar en la configuración">
+    Usa el placeholder de variable de entorno en tus archivos YAML:
+    ```yaml
+    gateway-client:
+      url: ${SGIVU_GATEWAY_URL:http://sgivu-gateway:8080}
+      secret: ${SGIVU_GATEWAY_SECRET}
+    ```
+  </Step>
+</Steps>
+
+## Gestión del keystore JWT
+
+El servicio `sgivu-auth` usa un Java KeyStore para la firma de JWT. Todas las credenciales del keystore deben ser externalizadas:
+
+```yaml
+sgivu:
+  jwt:
+    keystore:
+      location: ${JWT_KEYSTORE_LOCATION}
+      password: ${JWT_KEYSTORE_PASSWORD}
+    key:
+      alias: ${JWT_KEY_ALIAS}
+      password: ${JWT_KEY_PASSWORD}
+```
+
+### Configuración del keystore
+
+<Steps>
+  <Step title="Generar el keystore">
+    Crea un nuevo Java KeyStore con un par de claves RSA:
+    ```bash
+    keytool -genkeypair -alias sgivu-jwt \
+      -keyalg RSA -keysize 2048 \
+      -keystore sgivu-jwt.jks \
+      -validity 3650
+    ```
+  </Step>
+  
+  <Step title="Almacenar de forma segura">
+    Coloca el archivo del keystore en una ubicación segura fuera del repositorio:
+    - Desarrollo: `/etc/sgivu/secrets/sgivu-jwt.jks`
+    - Docker: Montar como volumen
+    - Producción: Usar un servicio de gestión de secretos (AWS Secrets Manager, HashiCorp Vault)
+  </Step>
+  
+  <Step title="Configurar variables de entorno">
+    Establece la ubicación del keystore y las contraseñas:
+    ```bash
+    JWT_KEYSTORE_LOCATION=file:/etc/sgivu/secrets/sgivu-jwt.jks
+    JWT_KEYSTORE_PASSWORD=your_keystore_password
+    JWT_KEY_ALIAS=sgivu-jwt
+    JWT_KEY_PASSWORD=your_key_password
+    ```
+  </Step>
+</Steps>
+
+## Autenticación entre servicios
+
+Los microservicios utilizan una clave secreta compartida para las llamadas internas entre APIs:
+
+```yaml
+service:
+  internal:
+    secret-key: "${SERVICE_INTERNAL_SECRET_KEY}"
+```
+
+Esta clave debe:
+- Tener al menos 32 caracteres de longitud
+- Ser generada aleatoriamente usando un generador criptográfico
+- Compartirse entre todos los microservicios mediante variables de entorno
+- Rotarse periódicamente (al menos cada 90 días)
+
+<Warning>
+  Todos los servicios (user, client, vehicle, purchase-sale) deben usar la **misma** `SERVICE_INTERNAL_SECRET_KEY` para autenticarse entre sí.
+</Warning>
+
+## Seguridad de sesiones en Redis
+
+El API Gateway almacena las sesiones en Redis. Protege Redis con autenticación:
+
+```yaml
+spring:
+  data:
+    redis:
+      host: ${REDIS_HOST:sgivu-redis}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD}
+```
+
+<Info>
+  Las contraseñas de Redis deben configurarse en la configuración de Redis y pasarse mediante variables de entorno. Nunca uses Redis sin autenticación en producción.
+</Info>
+
+## Credenciales de AWS
+
+Los servicios que se integran con AWS (como `sgivu-vehicle` para almacenamiento en S3) requieren credenciales de AWS:
+
+```yaml
+aws:
+  s3:
+    vehicles-bucket: ${AWS_VEHICLES_BUCKET}
+  access:
+    key: ${AWS_ACCESS_KEY}
+  secret:
+    key: ${AWS_SECRET_KEY}
+  region: ${AWS_REGION}
+```
+
+### Buenas prácticas para AWS
+
+<CardGroup cols={2}>
+  <Card title="Usar roles IAM" icon="user-shield">
+    En producción, prefiere roles IAM sobre claves de acceso. Asigna roles a instancias EC2 o tareas ECS.
+  </Card>
+  
+  <Card title="Principio de mínimo privilegio" icon="lock">
+    Otorga solo los permisos mínimos necesarios (por ejemplo, lectura/escritura en S3 a un bucket específico).
+  </Card>
+  
+  <Card title="Rotar claves regularmente" icon="rotate">
+    Si usas claves de acceso, rótalas cada 30-90 días e invalida las claves anteriores.
+  </Card>
+  
+  <Card title="Nunca incluir claves en el repositorio" icon="ban">
+    Verifica que los archivos `.env` que contienen claves de AWS estén en `.gitignore`.
+  </Card>
+</CardGroup>
+
+## Control de acceso al repositorio
+
+### Permisos del repositorio Git
+
+<Steps>
+  <Step title="Mantener el repositorio privado">
+    El repositorio de configuración debe ser privado. Nunca lo hagas público.
+  </Step>
+  
+  <Step title="Restringir acceso de escritura">
+    Solo los miembros autorizados del equipo deben tener acceso de escritura. Usa reglas de protección de ramas.
+  </Step>
+  
+  <Step title="Habilitar registro de auditoría">
+    Rastrea todos los cambios a través del historial de Git y exige mensajes de commit descriptivos.
+  </Step>
+  
+  <Step title="Usar Pull Requests">
+    Requiere revisión de código para todos los cambios de configuración, especialmente en perfiles de producción.
+  </Step>
+</Steps>
+
+### Autenticación del Config Server
+
+El Spring Cloud Config Server debe autenticar a los clientes antes de servir la configuración:
+
+```yaml
+# In Config Server application.yml
+spring:
+  security:
+    user:
+      name: ${CONFIG_SERVER_USERNAME}
+      password: ${CONFIG_SERVER_PASSWORD}
+```
+
+Los microservicios deben proporcionar estas credenciales al obtener la configuración:
+
+```yaml
+# In microservice bootstrap.yml
+spring:
+  cloud:
+    config:
+      username: ${CONFIG_SERVER_USERNAME}
+      password: ${CONFIG_SERVER_PASSWORD}
+```
+
+## Cifrado en reposo y en tránsito
+
+### En tránsito (TLS)
+
+<Note>
+  En producción, usa siempre HTTPS/TLS para:
+  - Endpoints del Config Server
+  - Eureka Discovery Server
+  - Toda la comunicación entre microservicios
+  - Endpoints de autorización OAuth2
+</Note>
+
+Configura TLS en los perfiles de producción:
+
+```yaml
+server:
+  ssl:
+    enabled: true
+    key-store: ${SSL_KEYSTORE_PATH}
+    key-store-password: ${SSL_KEYSTORE_PASSWORD}
+    key-store-type: PKCS12
+```
+
+### En reposo (cifrado de Spring Cloud Config)
+
+Spring Cloud Config soporta el cifrado de valores sensibles en Git:
+
+```yaml
+# Encrypted value format
+spring:
+  datasource:
+    password: '{cipher}AQA3FlZHr8/ykQZPyKvQKzU8...'
+```
+
+Para habilitarlo:
+
+<Steps>
+  <Step title="Configurar la clave de cifrado">
+    Establece la clave de cifrado en el Config Server:
+    ```bash
+    ENCRYPT_KEY=my-secret-encryption-key
+    ```
+  </Step>
+  
+  <Step title="Cifrar valores">
+    Usa el endpoint de cifrado del Config Server:
+    ```bash
+    curl http://localhost:8888/encrypt -d mysecretvalue
+    ```
+  </Step>
+  
+  <Step title="Usar valores cifrados">
+    Prefija los valores cifrados con `{cipher}` en los archivos YAML.
+  </Step>
+</Steps>
+
+<Warning>
+  Aunque el cifrado en reposo añade una capa de seguridad, se sigue recomendando usar variables de entorno para los secretos más sensibles.
+</Warning>
+
+## Lista de verificación de seguridad
+
+Antes de hacer commit de cambios en la configuración:
+
+- [ ] Todas las contraseñas usan placeholders `${VAR_NAME}`
+- [ ] No hay claves de API ni tokens en texto plano
+- [ ] Los archivos `.env` están en `.gitignore`
+- [ ] Los secretos de clientes OAuth2 están externalizados
+- [ ] Las credenciales del keystore JWT no están incluidas en el repositorio
+- [ ] La clave secreta interna de servicios no está expuesta
+- [ ] Las credenciales de AWS usan roles IAM o están externalizadas
+- [ ] La contraseña de Redis está externalizada
+- [ ] Las credenciales de base de datos están externalizadas
+- [ ] La configuración de producción ha sido revisada por el equipo de seguridad
+
+## Recursos relacionados
+
+<CardGroup cols={2}>
+  <Card title="Actualización de configuración" href="/config/operations/refresh" icon="arrows-rotate">
+    Aprende a actualizar secretos sin reiniciar los servicios
+  </Card>
+  
+  <Card title="Validación" href="/config/operations/validation" icon="circle-check">
+    Valida la configuración antes de desplegar
+  </Card>
+  
+  <Card title="Monitoreo" href="/config/operations/monitoring" icon="chart-line">
+    Monitorea métricas y estado de salud relacionados con la seguridad
+  </Card>
+  
+  <Card title="Perfiles de entorno" href="/config/environments/overview" icon="layer-group">
+    Comprende cómo los perfiles separan los entornos
+  </Card>
+</CardGroup>

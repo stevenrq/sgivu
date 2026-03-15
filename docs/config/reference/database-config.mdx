@@ -1,0 +1,462 @@
+---
+title: Configuración de Base de Datos
+description: Patrones de configuración de conexión a base de datos, JPA y migraciones Flyway en SGIVU
+---
+
+SGIVU utiliza bases de datos PostgreSQL con migraciones Flyway (servicios Java) y Alembic (servicio ML) para la gestión del esquema. Esta página documenta los patrones estándar de configuración de base de datos.
+
+## Servicios con Base de Datos
+
+Los siguientes servicios requieren configuración de base de datos:
+
+<CardGroup cols={2}>
+  <Card title="Servicio Auth" icon="lock">
+    Gestiona datos OAuth2/OIDC, autenticación de usuarios y almacenamiento de sesiones
+  </Card>
+  <Card title="Servicio User" icon="user">
+    Almacena perfiles de usuario y datos relacionados
+  </Card>
+  <Card title="Servicio Client" icon="building">
+    Gestiona información de clientes/empresas
+  </Card>
+  <Card title="Servicio Vehicle" icon="car">
+    Almacena inventario de vehículos y sus detalles
+  </Card>
+  <Card title="Servicio Purchase-Sale" icon="receipt">
+    Registra transacciones y operaciones de compra/venta
+  </Card>
+  <Card title="Servicio ML" icon="brain">
+    Artefactos de modelos, features de entrenamiento y predicciones (FastAPI + Alembic)
+  </Card>
+</CardGroup>
+
+## Configuración Estándar de Base de Datos
+
+Todos los servicios con acceso a datos utilizan este patrón de configuración base:
+
+```yaml
+spring:
+  jpa:
+    open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: ${FLYWAY_BASELINE_ON_MIGRATE:false}
+    baseline-version: 0
+    validate-on-migrate: true
+```
+
+## Configuración de JPA
+
+### Open In View
+
+<ParamField path="spring.jpa.open-in-view" type="boolean" required>
+  Controla si las sesiones JPA permanecen abiertas durante el renderizado de vistas. Siempre se establece en `false` en los servicios de SGIVU.
+</ParamField>
+
+```yaml
+spring:
+  jpa:
+    open-in-view: false
+```
+
+<Warning>
+  Establecer `open-in-view: false` es una buena práctica para APIs REST. Previene excepciones de carga diferida y obliga a definir límites de transacción explícitos en los controladores.
+</Warning>
+
+### Modo DDL de Hibernate (según perfil)
+
+Los diferentes perfiles utilizan distintas estrategias DDL:
+
+#### Perfil de Desarrollo
+
+```yaml
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+```
+
+<ParamField path="spring.jpa.hibernate.ddl-auto" type="string">
+  Modo de generación de esquema de Hibernate. Se utiliza `validate` para verificar que el esquema coincide con las entidades sin modificar la base de datos.
+</ParamField>
+
+<ParamField path="spring.jpa.show-sql" type="boolean">
+  Habilita el registro de sentencias SQL. Se establece en `true` en desarrollo para depuración.
+</ParamField>
+
+#### Perfil de Producción
+
+```yaml
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+```
+
+<Info>
+  Los perfiles de producción deshabilitan el registro de SQL por rendimiento y seguridad. La validación de esquema asegura que las entidades coincidan con la estructura de la base de datos.
+</Info>
+
+## Configuración de Migraciones Flyway
+
+SGIVU utiliza Flyway para el versionado y las migraciones del esquema de base de datos.
+
+### Configuración Base
+
+<ParamField path="spring.flyway.enabled" type="boolean" required>
+  Habilita las migraciones de Flyway. Se establece en `true` para todos los servicios con base de datos.
+</ParamField>
+
+<ParamField path="spring.flyway.locations" type="string" required>
+  Ubicación en el classpath de los scripts de migración. La ubicación estándar es `classpath:db/migration`.
+</ParamField>
+
+<ParamField path="spring.flyway.baseline-on-migrate" type="boolean">
+  Crea una versión base al migrar una base de datos existente. Controlado por la variable de entorno `FLYWAY_BASELINE_ON_MIGRATE`.
+</ParamField>
+
+<ParamField path="spring.flyway.baseline-version" type="integer">
+  Número de versión para la línea base. Se establece en `0` para marcar el punto de inicio.
+</ParamField>
+
+<ParamField path="spring.flyway.validate-on-migrate" type="boolean">
+  Valida las migraciones aplicadas antes de ejecutar nuevas. Se establece en `true` para garantizar la integridad de las migraciones.
+</ParamField>
+
+```yaml
+spring:
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: ${FLYWAY_BASELINE_ON_MIGRATE:false}
+    baseline-version: 0
+    validate-on-migrate: true
+```
+
+### Configuración de Flyway por Perfil
+
+#### Perfil de Desarrollo
+
+```yaml
+spring:
+  flyway:
+    baseline-on-migrate: true
+    clean-disabled: false
+```
+
+<ParamField path="spring.flyway.clean-disabled" type="boolean">
+  Impide que Flyway elimine todos los objetos de la base de datos. Se establece en `false` en desarrollo para permitir operaciones de limpieza.
+</ParamField>
+
+<Warning>
+  Habilitar `clean-disabled: false` en desarrollo permite operaciones destructivas. Nunca utilice esto en producción.
+</Warning>
+
+#### Perfil de Producción
+
+```yaml
+spring:
+  flyway:
+    clean-disabled: true
+    baseline-on-migrate: ${FLYWAY_BASELINE_ON_MIGRATE:false}
+```
+
+<Note>
+  Los perfiles de producción deshabilitan explícitamente las operaciones de limpieza para prevenir la pérdida accidental de datos.
+</Note>
+
+## Configuración de Conexión a Base de Datos
+
+Los detalles de conexión son específicos por perfil y están controlados por variables de entorno:
+
+### Perfil de Desarrollo
+
+```yaml
+spring:
+  datasource:
+    url: jdbc:postgresql://${DEV_AUTH_DB_HOST:host.docker.internal}:${DEV_AUTH_DB_PORT:5432}/${DEV_AUTH_DB_NAME}
+    username: ${DEV_AUTH_DB_USERNAME}
+    password: ${DEV_AUTH_DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+```
+
+### Perfil de Producción
+
+```yaml
+spring:
+  datasource:
+    url: jdbc:postgresql://${PROD_AUTH_DB_HOST:host.docker.internal}:${PROD_AUTH_DB_PORT:5432}/${PROD_AUTH_DB_NAME}
+    username: ${PROD_AUTH_DB_USERNAME}
+    password: ${PROD_AUTH_DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+```
+
+<Accordion title="Patrones de Variables de Entorno">
+  Cada servicio utiliza variables de entorno con prefijo:
+  
+  **Servicio Auth:**
+  - `DEV_AUTH_DB_HOST` / `PROD_AUTH_DB_HOST`
+  - `DEV_AUTH_DB_PORT` / `PROD_AUTH_DB_PORT`
+  - `DEV_AUTH_DB_NAME` / `PROD_AUTH_DB_NAME`
+  - `DEV_AUTH_DB_USERNAME` / `PROD_AUTH_DB_USERNAME`
+  - `DEV_AUTH_DB_PASSWORD` / `PROD_AUTH_DB_PASSWORD`
+  
+  **Servicio User:**
+  - `DEV_USER_DB_HOST` / `PROD_USER_DB_HOST`
+  - (mismo patrón para las demás variables)
+  
+  Este patrón de prefijos se utiliza en todos los servicios con base de datos.
+</Accordion>
+
+## Organización de Scripts de Migración
+
+Las migraciones de Flyway deben ubicarse en `src/main/resources/db/migration` con la siguiente convención de nombres:
+
+```
+V{version}__{description}.sql
+```
+
+### Ejemplos
+
+```
+V1__initial_schema.sql
+V2__add_user_roles.sql
+V3__create_vehicle_table.sql
+V4__add_transaction_indexes.sql
+```
+
+<Info>
+  Los números de versión deben ser enteros secuenciales. Flyway aplica las migraciones en orden y registra cuáles versiones han sido aplicadas.
+</Info>
+
+## Ejemplos Completos por Servicio
+
+### Servicio Auth (sgivu-auth.yml)
+
+```yaml
+spring:
+  jpa:
+    open-in-view: false
+  session:
+    store-type: jdbc
+    jdbc:
+      initialize-schema: never
+      table-name: SPRING_SESSION
+      cleanup-cron: 0 */15 * * * *
+      flush-mode: on_save
+      save-mode: on_get_attribute
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: ${FLYWAY_BASELINE_ON_MIGRATE:false}
+    baseline-version: 0
+    validate-on-migrate: true
+```
+
+<Note>
+  El servicio Auth utiliza adicionalmente sesiones respaldadas por JDBC, lo que requiere configuración de base de datos para la tabla `SPRING_SESSION`.
+</Note>
+
+### Servicio User (sgivu-user.yml)
+
+```yaml
+spring:
+  jpa:
+    open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: ${FLYWAY_BASELINE_ON_MIGRATE:false}
+    baseline-version: 0
+    validate-on-migrate: true
+```
+
+### Servicio Vehicle (sgivu-vehicle.yml)
+
+```yaml
+spring:
+  jpa:
+    open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: ${FLYWAY_BASELINE_ON_MIGRATE:false}
+    baseline-version: 0
+    validate-on-migrate: true
+```
+
+### Servicio Client (sgivu-client.yml)
+
+```yaml
+spring:
+  jpa:
+    open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: ${FLYWAY_BASELINE_ON_MIGRATE:false}
+    baseline-version: 0
+    validate-on-migrate: true
+```
+
+### Servicio Purchase-Sale (sgivu-purchase-sale.yml)
+
+```yaml
+spring:
+  jpa:
+    open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: ${FLYWAY_BASELINE_ON_MIGRATE:false}
+    baseline-version: 0
+    validate-on-migrate: true
+```
+
+### Servicio ML (sgivu-ml) — Alembic
+
+El servicio ML utiliza **Alembic** (el equivalente Python de Flyway) para gestionar migraciones de esquema sobre SQLAlchemy async.
+
+**Estructura de migraciones:**
+
+```bash
+alembic/
+├── env.py                       # Entorno de ejecución (inyecta DSN desde Settings)
+├── script.py.mako               # Template para nuevas migraciones
+└── versions/
+    └── V1_initial_schema.py     # Esquema inicial (3 tablas + índices)
+```
+
+**Configuración vía variables de entorno (Pydantic Settings):**
+
+```bash
+# Controla si se ejecutan migraciones al iniciar la app
+DATABASE_RUN_MIGRATIONS=true
+
+# Conexión a PostgreSQL (según DATABASE_ENV)
+DATABASE_ENV=dev
+DEV_ML_DB_HOST=sgivu-postgres
+DEV_ML_DB_PORT=5432
+DEV_ML_DB_NAME=sgivu_ml_db
+DEV_ML_DB_USERNAME=postgres
+DEV_ML_DB_PASSWORD=your-password
+```
+
+**Funcionamiento:**
+- Al iniciar, si `DATABASE_RUN_MIGRATIONS=true`, ejecuta `alembic upgrade head` programáticamente
+- El DSN se genera automáticamente con driver `psycopg` (sync) para Alembic y `asyncpg` (async) para el runtime
+- El seguimiento de versiones se almacena en la tabla `alembic_version`
+- Las tablas gestionadas: `ml_model_artifacts`, `ml_training_features`, `ml_predictions`
+
+<Info>
+  Para crear una nueva migración: `cd apps/ml/sgivu-ml && alembic revision --autogenerate -m "descripcion"` — requiere que las variables de BD estén configuradas.
+</Info>
+
+## Almacenamiento de Sesiones (Servicio Auth)
+
+El servicio Auth utiliza almacenamiento de sesiones respaldado por JDBC:
+
+<ParamField path="spring.session.store-type" type="string">
+  Mecanismo de almacenamiento de sesiones. Se establece en `jdbc` para sesiones respaldadas por base de datos.
+</ParamField>
+
+<ParamField path="spring.session.jdbc.initialize-schema" type="string">
+  Controla la creación de la tabla de sesiones. Se establece en `never` ya que Flyway gestiona el esquema.
+</ParamField>
+
+<ParamField path="spring.session.jdbc.table-name" type="string">
+  Nombre de la tabla de sesiones. El valor estándar es `SPRING_SESSION`.
+</ParamField>
+
+<ParamField path="spring.session.jdbc.cleanup-cron" type="string">
+  Expresión cron para la limpieza de sesiones expiradas. Se ejecuta cada 15 minutos.
+</ParamField>
+
+```yaml
+spring:
+  session:
+    store-type: jdbc
+    jdbc:
+      initialize-schema: never
+      table-name: SPRING_SESSION
+      cleanup-cron: 0 */15 * * * *
+      flush-mode: on_save
+      save-mode: on_get_attribute
+```
+
+<Warning>
+  Establezca `initialize-schema: never` para evitar que Spring Session cree tablas. Flyway debe gestionar todos los cambios de esquema.
+</Warning>
+
+## Solución de Problemas
+
+<Accordion title="Errores de línea base de Flyway">
+  **Error:** `Found non-empty schema without schema history table`
+  
+  **Solución:** Establezca la variable de entorno `FLYWAY_BASELINE_ON_MIGRATE` en `true` para la migración inicial:
+  
+  ```bash
+  FLYWAY_BASELINE_ON_MIGRATE=true
+  ```
+  
+  Esto crea una versión base y permite que Flyway comience a gestionar una base de datos existente.
+</Accordion>
+
+<Accordion title="Fallos de validación de Flyway">
+  **Error:** `Validate failed: Migration checksum mismatch`
+  
+  **Causas:**
+  - El archivo de migración fue modificado después de ser aplicado
+  - Archivo de migración diferente con el mismo número de versión
+  
+  **Soluciones:**
+  1. Nunca modifique migraciones ya aplicadas — cree una nueva migración en su lugar
+  2. Si está en desarrollo, limpie la base de datos y vuelva a ejecutar las migraciones
+  3. Si está en producción, repare la tabla de historial de esquema de Flyway
+</Accordion>
+
+<Accordion title="Excepciones de carga diferida de JPA">
+  **Error:** `LazyInitializationException: could not initialize proxy - no Session`
+  
+  **Causa:** Intento de acceder a relaciones de carga diferida fuera de una transacción.
+  
+  **Solución:** Con `open-in-view: false`, debe:
+  1. Obtener explícitamente las relaciones requeridas en sus consultas
+  2. Usar `@Transactional` en los métodos del servicio que cargan entidades
+  3. Usar proyecciones DTO para evitar problemas de carga diferida
+</Accordion>
+
+<Accordion title="Agotamiento del pool de conexiones">
+  **Síntomas:**
+  - Tiempos de respuesta lentos
+  - Errores de timeout
+  - Excepciones "Connection is not available"
+  
+  **Soluciones:**
+  1. Asegúrese de que las transacciones se cierren correctamente (use `@Transactional`)
+  2. Configure los ajustes del pool de conexiones (HikariCP)
+  3. Verifique fugas de conexión en el código de la aplicación
+  4. Aumente el tamaño del pool si es necesario (con un análisis adecuado de recursos)
+</Accordion>
+
+## Configuración Relacionada
+
+<CardGroup cols={2}>
+  <Card title="Configuración de Spring" icon="leaf" href="/config/reference/spring-configuration">
+    Ajustes de JPA y gestión de sesiones
+  </Card>
+  <Card title="Variables de Entorno" icon="code" href="/config/environments/variables">
+    Variables de entorno para conexión a base de datos
+  </Card>
+  <Card title="Configuración de Servicios" icon="gears" href="/config/services/overview">
+    Requisitos de base de datos por servicio
+  </Card>
+  <Card title="Despliegue" icon="rocket" href="/config/getting-started/local-development">
+    Configuración de base de datos en diferentes entornos
+  </Card>
+</CardGroup>

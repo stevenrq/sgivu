@@ -1,0 +1,462 @@
+---
+title: 'Metadatos del Modelo'
+description: 'Consultar información sobre modelos entrenados'
+---
+
+## Descripción General
+
+La API de Metadatos del Modelo proporciona endpoints para obtener información sobre los modelos de predicción de demanda entrenados, incluyendo versión, métricas de rendimiento, marca de tiempo del entrenamiento y estadísticas del dataset.
+
+## URL Base
+
+```
+https://your-domain.com/v1/ml
+```
+
+---
+
+## Obtener Modelo Más Reciente
+
+```http
+GET /v1/ml/models/latest
+```
+
+Recupera los metadatos del modelo de predicción actualmente activo.
+
+**Autenticación:** Requerida (JWT o clave de servicio interno)
+
+**Autorización:** Permisos configurables (por defecto: requiere token válido)
+
+### Respuesta
+
+<ResponseField name="version" type="string">
+  Identificador de versión del modelo
+</ResponseField>
+
+<ResponseField name="trained_at" type="string">
+  Marca de tiempo de finalización del entrenamiento (ISO 8601)
+</ResponseField>
+
+<ResponseField name="metrics" type="object">
+  Métricas de rendimiento del modelo
+</ResponseField>
+
+<ResponseField name="metrics.mae" type="number">
+  Error Absoluto Medio (Mean Absolute Error)
+</ResponseField>
+
+<ResponseField name="metrics.rmse" type="number">
+  Raíz del Error Cuadrático Medio (Root Mean Square Error)
+</ResponseField>
+
+<ResponseField name="metrics.mape" type="number">
+  Error Porcentual Absoluto Medio (Mean Absolute Percentage Error)
+</ResponseField>
+
+<ResponseField name="metrics.r2" type="number">
+  Coeficiente R-cuadrado
+</ResponseField>
+
+<ResponseField name="train_samples" type="integer">
+  Cantidad de muestras de entrenamiento
+</ResponseField>
+
+<ResponseField name="test_samples" type="integer">
+  Cantidad de muestras de prueba
+</ResponseField>
+
+<ResponseField name="total_samples" type="integer">
+  Cantidad total de muestras en el dataset
+</ResponseField>
+
+<ResponseField name="algorithm" type="string">
+  Algoritmo de Machine Learning utilizado (ej., "Prophet", "ARIMA", "XGBoost")
+</ResponseField>
+
+<ResponseField name="features" type="array">
+  Lista de nombres de características utilizadas en el modelo
+</ResponseField>
+
+<ResponseField name="segments_covered" type="integer">
+  Cantidad de segmentos de vehículos con datos suficientes para predicciones
+</ResponseField>
+
+```json
+{
+  "version": "v1.3.0-20260306",
+  "trained_at": "2026-03-06T14:35:22Z",
+  "metrics": {
+    "mae": 1.32,
+    "rmse": 1.95,
+    "mape": 0.14,
+    "r2": 0.87
+  },
+  "train_samples": 8540,
+  "test_samples": 2135,
+  "total_samples": 10675,
+  "algorithm": "Prophet",
+  "features": [
+    "vehicle_type",
+    "brand",
+    "model",
+    "line",
+    "month",
+    "year",
+    "seasonality",
+    "trend",
+    "lag_1",
+    "lag_3",
+    "rolling_mean_3"
+  ],
+  "segments_covered": 245
+}
+```
+
+### Códigos de Estado
+
+- `200 OK` - Metadatos del modelo recuperados correctamente
+- `401 Unauthorized` - Autenticación faltante o inválida
+- `403 Forbidden` - Permisos insuficientes
+- `404 Not Found` - No hay modelo entrenado disponible
+
+### Ejemplo
+
+```bash
+curl -X GET https://your-domain.com/v1/ml/models/latest \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+---
+
+## Respuesta Sin Modelo Disponible
+
+Si aún no se ha entrenado ningún modelo, la API devuelve:
+
+```json
+{
+  "detail": "No hay modelos disponibles"
+}
+```
+
+**Código de estado:** 200 OK (con mensaje informativo)
+
+---
+
+## Campos de Metadatos del Modelo
+
+### Versión
+
+Identificador único del modelo siguiendo versionado semántico con marca de tiempo:
+
+- **Formato:** `v{major}.{minor}.{patch}-{YYYYMMDD}`
+- **Ejemplo:** `v1.3.0-20260306`
+- **Propósito:** Rastrear el linaje del modelo y permitir rollback
+
+### Fecha de Entrenamiento
+
+Marca de tiempo ISO 8601 que indica cuándo finalizó el entrenamiento:
+
+- **Formato:** `YYYY-MM-DDTHH:MM:SSZ`
+- **Zona horaria:** UTC
+- **Ejemplo:** `2026-03-06T14:35:22Z`
+
+### Métricas
+
+Métricas de rendimiento calculadas sobre el conjunto de prueba:
+
+#### Error Absoluto Medio (MAE)
+- **Descripción:** Error de predicción absoluto promedio
+- **Unidades:** Cantidad de vehículos
+- **Interpretación:** Menor es mejor
+- **Valor aceptable:** < 2.0
+
+#### Raíz del Error Cuadrático Medio (RMSE)
+- **Descripción:** Desviación estándar de los errores de predicción
+- **Unidades:** Cantidad de vehículos
+- **Interpretación:** Menor es mejor, penaliza errores grandes
+- **Valor aceptable:** < 3.0
+
+#### Error Porcentual Absoluto Medio (MAPE)
+- **Descripción:** Error porcentual promedio
+- **Unidades:** Decimal (0-1)
+- **Interpretación:** Menor es mejor
+- **Valor aceptable:** < 0.20 (20%)
+
+#### R-cuadrado (R²)
+- **Descripción:** Proporción de la varianza explicada
+- **Rango:** 0-1 (puede ser negativo)
+- **Interpretación:** Mayor es mejor
+- **Valor aceptable:** > 0.75
+
+### Estadísticas del Dataset
+
+#### Muestras de Entrenamiento
+Cantidad de puntos de datos utilizados para entrenar el modelo.
+
+#### Muestras de Prueba
+Cantidad de puntos de datos reservados para validación.
+
+#### Muestras Totales
+Suma de las muestras de entrenamiento y prueba.
+
+**División típica:** 80% entrenamiento, 20% prueba
+
+### Algoritmo
+
+El algoritmo de Machine Learning o estadístico utilizado:
+
+- **Prophet** - Librería de pronóstico de series temporales de Facebook
+- **ARIMA** - Auto-Regressive Integrated Moving Average
+- **XGBoost** - Gradient boosting para regresión
+- **LSTM** - Red neuronal Long Short-Term Memory
+
+### Características
+
+Lista de variables de entrada utilizadas por el modelo:
+
+**Características comunes:**
+- `vehicle_type` - AUTO o MOTOCICLETA
+- `brand` - Fabricante
+- `model` - Año del modelo
+- `line` - Línea/variante del vehículo
+- `month` - Mes del año (estacionalidad)
+- `year` - Año (tendencia)
+- `lag_1`, `lag_3` - Ventas de meses anteriores
+- `rolling_mean_3` - Media móvil de 3 meses
+
+### Segmentos Cubiertos
+
+Cantidad de segmentos de vehículos únicos (combinaciones de marca/modelo/línea) con datos históricos suficientes para predicciones.
+
+- **Mayor es mejor** - Mayor cobertura significa predicciones disponibles para más vehículos
+- **Rango típico:** 100-500 segmentos
+
+---
+
+## Casos de Uso
+
+### Dashboard de Monitoreo del Modelo
+
+Mostrar el estado actual del modelo:
+
+```javascript
+fetch('https://your-domain.com/v1/ml/models/latest', {
+  headers: { 'Authorization': `Bearer ${token}` }
+})
+  .then(res => res.json())
+  .then(model => {
+    console.log(`Current model: ${model.version}`);
+    console.log(`Accuracy (MAE): ${model.metrics.mae}`);
+    console.log(`Trained: ${new Date(model.trained_at).toLocaleString()}`);
+  });
+```
+
+### Comparación de Modelos
+
+Comparar métricas antes y después del reentrenamiento para evaluar mejoras:
+
+```python
+import requests
+
+# Get current model
+current = requests.get(
+    "https://your-domain.com/v1/ml/models/latest",
+    headers={"Authorization": f"Bearer {token}"}
+).json()
+
+print(f"Current MAE: {current['metrics']['mae']}")
+print(f"Current R²: {current['metrics']['r2']}")
+
+# Retrain
+retrain_response = requests.post(
+    "https://your-domain.com/v1/ml/retrain",
+    headers={"Authorization": f"Bearer {token}"},
+    json={}
+)
+
+new_model = retrain_response.json()
+print(f"New MAE: {new_model['metrics']['mae']}")
+print(f"New R²: {new_model['metrics']['r2']}")
+
+# Compare
+mae_improvement = current['metrics']['mae'] - new_model['metrics']['mae']
+print(f"MAE improvement: {mae_improvement:.2f}")
+```
+
+### Verificación de Disponibilidad
+
+Verificar que un modelo esté disponible antes de realizar predicciones:
+
+```python
+def is_model_available():
+    response = requests.get(
+        "https://your-domain.com/v1/ml/models/latest",
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    
+    if response.status_code != 200:
+        return False
+    
+    data = response.json()
+    return "version" in data
+
+if is_model_available():
+    # Make predictions
+    predict(...)
+else:
+    print("No model available. Please train a model first.")
+```
+
+---
+
+## Detección de Obsolescencia del Modelo
+
+Verificar si el modelo necesita reentrenamiento:
+
+```python
+from datetime import datetime, timedelta
+
+def is_model_stale(max_age_days=30):
+    response = requests.get(
+        "https://your-domain.com/v1/ml/models/latest",
+        headers={"Authorization": f"Bearer {token}"}
+    ).json()
+    
+    if "detail" in response:  # No model
+        return True
+    
+    trained_at = datetime.fromisoformat(
+        response["trained_at"].replace("Z", "+00:00")
+    )
+    age = datetime.now(trained_at.tzinfo) - trained_at
+    
+    return age.days > max_age_days
+
+if is_model_stale():
+    print("Model is stale. Triggering retraining...")
+    requests.post(
+        "https://your-domain.com/v1/ml/retrain",
+        headers={"Authorization": f"Bearer {token}"},
+        json={}
+    )
+```
+
+---
+
+## Evaluación de Calidad del Modelo
+
+```python
+def assess_model_quality(metrics):
+    mae = metrics['mae']
+    rmse = metrics['rmse']
+    mape = metrics['mape']
+    r2 = metrics['r2']
+    
+    if mae < 1.0 and mape < 0.10 and r2 > 0.90:
+        return "Excellent"
+    elif mae < 2.0 and mape < 0.20 and r2 > 0.75:
+        return "Good"
+    elif mae < 3.0 and mape < 0.30 and r2 > 0.60:
+        return "Fair"
+    else:
+        return "Poor"
+
+model = requests.get(
+    "https://your-domain.com/v1/ml/models/latest",
+    headers={"Authorization": f"Bearer {token}"}
+).json()
+
+quality = assess_model_quality(model['metrics'])
+print(f"Model quality: {quality}")
+
+if quality == "Poor":
+    print("Consider investigating data quality or algorithm choice")
+```
+
+---
+
+## Enlace a la Documentación de la API
+
+Para la documentación interactiva de la API, visite:
+
+```
+https://your-domain.com/docs
+```
+
+El servicio ML utiliza FastAPI y proporciona documentación OpenAPI automática.
+
+---
+
+## Respuestas de Error
+
+### 401 Unauthorized
+
+```json
+{
+  "detail": "Not authenticated"
+}
+```
+
+### 403 Forbidden
+
+```json
+{
+  "detail": "User does not have required permission: ml:models"
+}
+```
+
+### 404 Not Found (Sin Modelo)
+
+```json
+{
+  "detail": "No hay modelos disponibles"
+}
+```
+
+---
+
+## Endpoint de Health Check
+
+El servicio ML también proporciona un endpoint de health check:
+
+```http
+GET /actuator/health
+```
+
+**Alternativa:** `/health`
+
+**Autenticación:** Ninguna (endpoint público)
+
+### Respuesta
+
+```json
+{
+  "status": "healthy",
+  "service": "sgivu-ml",
+  "version": "1.0.0",
+  "model_available": true
+}
+```
+
+### Example
+
+```bash
+curl -X GET https://your-domain.com/health
+```
+
+---
+
+## Integration with Gateway
+
+En producción, los endpoints de ML normalmente se consumen a través del API gateway:
+
+```
+Gateway: https://your-domain.com/v1/ml/**
+  → Routes to: http://sgivu-ml:8000/v1/ml/**
+```
+
+El gateway se encarga de:
+- Validación de tokens JWT
+- Enrutamiento de solicitudes
+- Rate limiting
+- Logging y monitoreo

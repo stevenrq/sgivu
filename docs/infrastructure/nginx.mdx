@@ -1,0 +1,704 @@
+---
+title: Configuración de Nginx
+description: Configuración de Reverse Proxy y reglas de enrutamiento para el despliegue en producción de SGIVU
+---
+
+## Descripción general
+
+Nginx actúa como el punto de entrada público único de SGIVU en producción, sirviendo como Reverse Proxy que:
+- Separa el Auth Server (emisión OIDC/tokens) del Gateway (BFF + enrutamiento de APIs)
+- Enruta las solicitudes a los servicios Backend apropiados
+- Sirve la SPA Angular desde S3 como fallback catch-all
+- Permite el escalamiento y despliegue independiente de componentes
+- Simplifica las reglas de firewall (solo puertos 80/443 expuestos)
+
+## Ubicación de la configuración
+
+**Archivo**: `infra/nginx/sites-available/default.conf`
+
+**Instalación**:
+```bash
+# Copy to Nginx sites directory
+sudo cp infra/nginx/sites-available/default.conf /etc/nginx/sites-available/default
+
+# Enable site (if using sites-enabled pattern)
+sudo ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
+
+# Test configuration
+sudo nginx -t
+
+# Reload Nginx
+sudo systemctl reload nginx
+```
+
+## Arquitectura
+
+```
+┌─────────────┐
+│   Client    │
+│  (Browser)  │
+└──────┬──────┘
+       │ HTTP/HTTPS
+       │ Port 80/443
+       ▼
+┌─────────────────────┐
+│       Nginx         │
+│  (EC2 Instance)     │
+└──┬───────────────┬──┘
+   │               │
+   │ /oauth2/*     │ /v1/*
+   │ /login        │ /auth/session
+   │               │
+   ▼               ▼
+┌────────┐    ┌────────────┐
+│ Auth   │    │  Gateway   │
+│ :9000  │    │   :8080    │
+└────────┘    └─────┬──────┘
+                    │ lb://
+                    ▼
+              ┌──────────────┐
+              │ Microservices│
+              │ (via Eureka) │
+              └──────────────┘
+```
+
+## Definiciones de upstream
+
+### upstream del Gateway
+
+```nginx
+upstream gateway {
+    server 127.0.0.1:8080;
+    keepalive 32;
+}
+```
+
+- **Backend**: Servicio Gateway (puerto 8080)
+- **Keepalive**: Reutiliza conexiones TCP (reduce la latencia)
+
+### upstream de Auth
+
+```nginx
+upstream auth {
+    server 127.0.0.1:9000;
+    keepalive 32;
+}
+```
+
+- **Backend**: Servicio Auth Server (puerto 9000)
+- **Keepalive**: Reutiliza conexiones TCP
+
+<Info>
+  En la configuración de producción con Docker Compose, estos servicios se acceden a través de la red Docker. Si se usan contenedores, cambiar a `server sgivu-gateway:8080` y `server sgivu-auth:9000`.
+</Info>
+
+## Configuración del servidor
+
+### Configuración básica
+
+```nginx
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    
+    server_name ec2-98-86-100-220.compute-1.amazonaws.com _;
+    
+    access_log /var/log/nginx/sgivu-access.log;
+    error_log /var/log/nginx/sgivu-error.log;
+    
+    # Support vehicle image uploads (~5-10MB each, multiple per request)
+    client_max_body_size 50M;
+    
+    # High timeouts: ML service can take >30s for complex inferences
+    proxy_connect_timeout 60s;
+    proxy_send_timeout 60s;
+    proxy_read_timeout 60s;
+}
+```
+
+<Warning>
+  Actualizar `server_name` para que coincida con el hostname de tu EC2 o dominio. Sin Elastic IP, el hostname de EC2 cambia al reiniciar.
+</Warning>
+
+### Headers del Proxy
+
+```nginx
+proxy_http_version 1.1;
+proxy_set_header X-Real-IP $remote_addr;
+proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+proxy_set_header X-Forwarded-Proto $scheme;
+proxy_set_header X-Forwarded-Port $server_port;
+```
+
+**Propósito**:
+- **HTTP/1.1**: Requerido para keepalive con los upstream
+- **X-Real-IP**: IP real del cliente (para logging, rate limiting)
+- **X-Forwarded-For**: Cadena de proxies (para auditoría)
+- **X-Forwarded-Proto**: Protocolo original (http/https)
+- **X-Forwarded-Port**: Puerto original (80/443)
+
+## Reglas de enrutamiento
+
+### Rutas del Auth Server (Puerto 9000)
+
+El Auth Server maneja los flujos OAuth2/OIDC y la interfaz de login. Estas rutas **omiten el Gateway** para evitar dependencias circulares (el Gateway valida tokens emitidos por Auth).
+
+#### Página de Login
+
+```nginx
+location /login {
+    proxy_pass http://auth/login;
+    proxy_set_header Host $host;
+    proxy_set_header Connection "";
+}
+```
+
+#### Endpoints OAuth2
+
+```nginx
+location ~ ^/oauth2/(authorize|token|jwks|introspect|revoke) {
+    proxy_pass http://auth;
+    proxy_set_header Host $host;
+    proxy_set_header Connection "";
+}
+```
+
+**Endpoints**:
+- `/oauth2/authorize`: Flujo de código de autorización
+- `/oauth2/token`: Intercambio de tokens
+- `/oauth2/jwks`: JSON Web Key Set
+- `/oauth2/introspect`: Introspección de tokens
+- `/oauth2/revoke`: Revocación de tokens
+
+#### Descubrimiento OIDC
+
+```nginx
+location ~ ^/(\.well-known/openid-configuration|userinfo) {
+    proxy_pass http://auth;
+    proxy_set_header Host $host;
+    proxy_set_header Connection "";
+}
+```
+
+**Endpoints**:
+- `/.well-known/openid-configuration`: Metadatos OIDC
+- `/userinfo`: Endpoint de información del usuario
+
+#### Recursos estáticos
+
+```nginx
+location ^~ /js/ {
+    proxy_pass http://auth/js/;
+    proxy_set_header Host $host;
+    proxy_set_header Connection "";
+}
+
+location ^~ /css/ {
+    proxy_pass http://auth/css/;
+    proxy_set_header Host $host;
+    proxy_set_header Connection "";
+}
+
+location ^~ /assets/ {
+    proxy_pass http://auth/assets/;
+    proxy_set_header Host $host;
+    proxy_set_header Connection "";
+}
+
+location ^~ /images/ {
+    proxy_pass http://auth/images/;
+    proxy_set_header Host $host;
+    proxy_set_header Connection "";
+}
+
+location = /favicon.ico {
+    proxy_pass http://auth/favicon.ico;
+    proxy_set_header Host $host;
+    proxy_set_header Connection "";
+}
+```
+
+<Info>
+  El prefijo `^~` asegura que estas rutas tengan prioridad sobre el fallback de S3, evitando que la SPA capture los recursos del Auth Server.
+</Info>
+
+#### Endpoint de Logout
+
+```nginx
+location ~ ^/connect/logout {
+    proxy_pass http://auth;
+    proxy_set_header Host $host;
+    proxy_set_header Connection "";
+}
+```
+
+#### Endpoints de Actuator
+
+```nginx
+location /auth/actuator/ {
+    proxy_pass http://auth/actuator/;
+    proxy_set_header Host $host;
+    proxy_set_header Connection "";
+}
+```
+
+**Health Check**: `GET /auth/actuator/health`
+
+### Rutas del Gateway (Puerto 8080)
+
+El Gateway enruta las APIs de negocio a los microservicios vía Eureka e implementa el patrón BFF para la gestión de sesiones.
+
+#### APIs de negocio
+
+```nginx
+location /v1/ {
+    proxy_pass http://gateway/v1/;
+    proxy_set_header Host $host;
+    proxy_set_header Connection "";
+    # WebSocket-ready for real-time notifications
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+}
+```
+
+**Rutas API** (definidas en `GatewayRoutesConfig` del Gateway):
+- `/v1/users/**` → `lb://sgivu-user`
+- `/v1/persons/**` → `lb://sgivu-user`
+- `/v1/clients/**` → `lb://sgivu-client`
+- `/v1/companies/**` → `lb://sgivu-client`
+- `/v1/vehicles/**` → `lb://sgivu-vehicle`
+- `/v1/purchase-sales/**` → `lb://sgivu-purchase-sale`
+- `/v1/ml/**` → `http://sgivu-ml:8000`
+
+**Filtros aplicados**:
+- `TokenRelay`: Propaga el access token OAuth2
+- `CircuitBreaker`: Circuit breaker de Resilience4j
+- Fallback: `forward:/fallback/{service}`
+
+#### Endpoint de sesión BFF
+
+```nginx
+location = /auth/session {
+    proxy_pass http://gateway/auth/session;
+    proxy_set_header Host $host;
+    proxy_set_header Connection "";
+}
+```
+
+**Propósito**: La SPA consulta el estado de sesión sin exponer tokens
+
+**Respuesta**:
+```json
+{
+  "subject": "user-uuid",
+  "username": "steven",
+  "roles": ["ADMIN"],
+  "isAdmin": true
+}
+```
+
+#### Flujos de cliente OAuth2
+
+```nginx
+location ~ ^/(oauth2/authorization/|login/oauth2/code/) {
+    proxy_pass http://gateway;
+    proxy_set_header Host $host;
+    proxy_set_header Connection "";
+}
+```
+
+**Propósito**: Gateway como cliente OAuth2 (authorization_code + PKCE)
+
+#### Logout y gestión de sesiones
+
+```nginx
+location ~ ^/(logout|session) {
+    proxy_pass http://gateway;
+    proxy_set_header Host $host;
+    proxy_set_header Connection "";
+}
+```
+
+#### Documentación Swagger UI
+
+Cada microservicio tiene rutas dedicadas de Swagger UI:
+
+```nginx
+location = /docs/user {
+    return 302 /docs/user/swagger-ui.html;
+}
+
+location /docs/user/ {
+    proxy_pass http://gateway/docs/user/;
+    proxy_set_header Host $host;
+    proxy_set_header Connection "";
+    proxy_redirect / /docs/user/;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Port $server_port;
+}
+```
+
+**Documentación disponible**:
+- `/docs/auth/`: API del Auth Server
+- `/docs/user/`: API del servicio de usuarios
+- `/docs/client/`: API del servicio de clientes
+- `/docs/vehicle/`: API del servicio de vehículos
+- `/docs/purchase-sale/`: API del servicio de compra-venta
+- `/docs/gateway/`: Rutas del Gateway
+
+**Especificaciones OpenAPI**:
+```nginx
+location /v3/api-docs/ {
+    proxy_pass http://gateway/v3/api-docs;
+    proxy_set_header Host $host;
+    proxy_set_header Connection "";
+}
+```
+
+<Info>
+  Swagger UI utiliza el header `Referer` para resolver las especificaciones OpenAPI de cada servicio. El Gateway enruta en base a este header.
+</Info>
+
+#### Endpoints de Actuator
+
+```nginx
+location /gateway/actuator/ {
+    proxy_pass http://gateway/actuator/;
+    proxy_set_header Host $host;
+    proxy_set_header Connection "";
+}
+```
+
+**Health Check**: `GET /gateway/actuator/health`
+
+### Rutas de observabilidad
+
+<Warning>
+  Estos endpoints están expuestos sin autenticación. En producción, restringir el acceso mediante lista blanca de IPs, VPN o autenticación básica.
+</Warning>
+
+#### Eureka Dashboard
+
+```nginx
+location /eureka/ {
+    proxy_pass http://127.0.0.1:8761/;
+    proxy_set_header Host $host;
+    proxy_set_header Connection "";
+}
+```
+
+**Propósito**: Visualizar las instancias de servicios registrados
+
+**URL**: `http://tu-hostname-ec2/eureka/`
+
+#### Zipkin UI
+
+```nginx
+location /zipkin/ {
+    proxy_pass http://127.0.0.1:9411/zipkin/;
+    proxy_set_header Host $host;
+    proxy_set_header Connection "";
+}
+```
+
+**Propósito**: Trazabilidad distribuida y correlación de solicitudes
+
+**URL**: `http://tu-hostname-ec2/zipkin/`
+
+### Frontend (Catch-All S3)
+
+```nginx
+location / {
+    proxy_pass http://sgivu-frontend.s3-website-us-east-1.amazonaws.com/;
+    # S3 virtual-hosted style requires Host = bucket name
+    proxy_set_header Host sgivu-frontend.s3-website-us-east-1.amazonaws.com;
+    proxy_set_header Connection "";
+    
+    # Assets with hash in filename: immutable, aggressive caching
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+        proxy_pass http://sgivu-frontend.s3-website-us-east-1.amazonaws.com;
+        proxy_set_header Host sgivu-frontend.s3-website-us-east-1.amazonaws.com;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+    
+    # SPA routing: return index.html for non-existent routes
+    proxy_intercept_errors on;
+    error_page 404 = /index.html;
+}
+```
+
+**Comportamiento**:
+- Todas las rutas sin coincidencia van a S3
+- Angular Router maneja el enrutamiento del lado del cliente
+- Los assets se cachean por 1 año (nombres de archivo basados en hash inmutables)
+- Los errores 404 devuelven `index.html` para el enrutamiento SPA
+
+<Info>
+  ¡El orden importa! Las rutas más específicas (Auth, Gateway) deben definirse antes de la ubicación catch-all `/`.
+</Info>
+
+## Recursos compartidos
+
+### Assets de Swagger UI
+
+```nginx
+location /swagger-ui/ {
+    proxy_pass http://gateway/swagger-ui/;
+    proxy_set_header Host $host;
+    proxy_set_header Connection "";
+}
+
+location /webjars/ {
+    proxy_pass http://gateway/webjars/;
+    proxy_set_header Host $host;
+    proxy_set_header Connection "";
+}
+```
+
+**Propósito**: Recursos compartidos de Swagger UI cargados por todas las páginas de documentación de los microservicios
+
+## Consideraciones de seguridad
+
+### Configuración HTTPS
+
+Para producción, habilitar HTTPS con certificados SSL/TLS:
+
+```nginx
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    
+    ssl_certificate /etc/letsencrypt/live/your-domain/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/your-domain/privkey.pem;
+    
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+    
+    # ... rest of configuration
+}
+
+# Redirect HTTP to HTTPS
+server {
+    listen 80;
+    listen [::]:80;
+    server_name your-domain.com;
+    return 301 https://$server_name$request_uri;
+}
+```
+
+### Rate Limiting
+
+```nginx
+http {
+    limit_req_zone $binary_remote_addr zone=api_limit:10m rate=10r/s;
+    
+    server {
+        location /v1/ {
+            limit_req zone=api_limit burst=20 nodelay;
+            # ... proxy_pass configuration
+        }
+    }
+}
+```
+
+### Lista blanca de IPs (Observabilidad)
+
+```nginx
+location /eureka/ {
+    allow 10.0.0.0/8;      # Internal network
+    allow 203.0.113.0/24;  # Office IP range
+    deny all;
+    
+    proxy_pass http://127.0.0.1:8761/;
+}
+
+location /zipkin/ {
+    allow 10.0.0.0/8;
+    allow 203.0.113.0/24;
+    deny all;
+    
+    proxy_pass http://127.0.0.1:9411/zipkin/;
+}
+```
+
+### Autenticación básica
+
+Proteger endpoints de administración:
+
+```nginx
+location /actuator/ {
+    auth_basic "Restricted Access";
+    auth_basic_user_file /etc/nginx/.htpasswd;
+    
+    proxy_pass http://gateway/actuator/;
+}
+```
+
+Generar archivo de contraseñas:
+```bash
+sudo htpasswd -c /etc/nginx/.htpasswd admin
+```
+
+## Ajuste de rendimiento
+
+### Conexiones Keepalive
+
+```nginx
+upstream gateway {
+    server 127.0.0.1:8080;
+    keepalive 32;  # Keep 32 idle connections
+}
+```
+
+### Timeouts
+
+```nginx
+proxy_connect_timeout 60s;  # Time to establish connection
+proxy_send_timeout 60s;     # Time to send request
+proxy_read_timeout 60s;     # Time to receive response
+```
+
+<Info>
+  Los endpoints del servicio ML pueden tardar más de 30 segundos para predicciones complejas. Ajustar los timeouts según sea necesario.
+</Info>
+
+### Buffering
+
+```nginx
+proxy_buffering on;
+proxy_buffer_size 4k;
+proxy_buffers 8 4k;
+proxy_busy_buffers_size 8k;
+```
+
+### Compresión
+
+```nginx
+gzip on;
+gzip_types text/plain text/css application/json application/javascript text/xml application/xml;
+gzip_min_length 1000;
+gzip_comp_level 6;
+```
+
+## Monitoreo
+
+### Logs de acceso
+
+```nginx
+access_log /var/log/nginx/sgivu-access.log;
+error_log /var/log/nginx/sgivu-error.log;
+```
+
+**Ver logs**:
+```bash
+# Real-time access log
+sudo tail -f /var/log/nginx/sgivu-access.log
+
+# Error log
+sudo tail -f /var/log/nginx/sgivu-error.log
+
+# Filter specific status codes
+grep "500" /var/log/nginx/sgivu-access.log
+```
+
+### Módulo de estado
+
+Habilitar el estado de Nginx:
+
+```nginx
+location /nginx_status {
+    stub_status on;
+    access_log off;
+    allow 127.0.0.1;
+    deny all;
+}
+```
+
+**Verificar estado**:
+```bash
+curl http://localhost/nginx_status
+```
+
+## Solución de problemas
+
+### 502 Bad Gateway
+
+**Problema**: Nginx no puede comunicarse con el servicio Backend
+
+**Soluciones**:
+1. Verificar que el servicio esté en ejecución:
+   ```bash
+   docker compose ps sgivu-gateway
+   curl http://localhost:8080/actuator/health
+   ```
+
+2. Revisar la configuración de upstream:
+   ```bash
+   sudo nginx -t
+   ```
+
+3. Revisar los logs de error:
+   ```bash
+   sudo tail -f /var/log/nginx/sgivu-error.log
+   ```
+
+### 504 Gateway Timeout
+
+**Problema**: El servicio Backend tardó demasiado en responder
+
+**Soluciones**:
+1. Aumentar los timeouts:
+   ```nginx
+   proxy_read_timeout 120s;
+   ```
+
+2. Revisar los logs del servicio Backend:
+   ```bash
+   docker compose logs -f sgivu-ml
+   ```
+
+### Errores de certificado SSL
+
+**Problema**: "NET::ERR_CERT_AUTHORITY_INVALID"
+
+**Soluciones**:
+1. Verificar las rutas de los certificados:
+   ```bash
+   sudo ls -l /etc/letsencrypt/live/your-domain/
+   ```
+
+2. Renovar el certificado de Let's Encrypt:
+   ```bash
+   sudo certbot renew
+   sudo systemctl reload nginx
+   ```
+
+### Fallo en la prueba de configuración
+
+```bash
+# Test configuration
+sudo nginx -t
+
+# Check syntax errors
+sudo nginx -T | less
+```
+
+### Recarga sin tiempo de inactividad
+
+```bash
+# Graceful reload (zero-downtime)
+sudo systemctl reload nginx
+
+# Or
+sudo nginx -s reload
+```
+
+## Próximos pasos
+
+- [Arquitectura de despliegue](/infrastructure/deployment): Configuración general de la infraestructura
+- [Docker Compose](/infrastructure/docker-compose): Orquestación de servicios
+- [Monitoreo](/infrastructure/monitoring): Health checks y observabilidad

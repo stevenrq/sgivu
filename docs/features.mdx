@@ -1,0 +1,1158 @@
+---
+title: Funcionalidades
+description: Descripción completa de las funcionalidades de la plataforma SGIVU
+---
+
+# Funcionalidades de SGIVU
+
+SGIVU proporciona un conjunto integral de funcionalidades diseñadas para la gestión moderna de inventario de vehículos. Esta página cubre todas las capacidades principales en autenticación, dominios de negocio, aprendizaje automático y servicios de plataforma.
+
+## Autenticación y Autorización
+
+### OAuth 2.1 / OpenID Connect
+
+<CardGroup cols={2}>
+  <Card title="Autenticación Moderna" icon="fingerprint">
+    Implementación completa de OAuth 2.1 y OpenID Connect con mejores prácticas de la industria
+  </Card>
+  <Card title="Tokens JWT" icon="key">
+    Tokens de acceso JWT firmados con algoritmo RS256 usando keystore JKS
+  </Card>
+  <Card title="Flujo PKCE" icon="shield-check">
+    Authorization Code con PKCE para aplicaciones de página única seguras
+  </Card>
+  <Card title="Tokens de Actualización" icon="arrows-rotate">
+    Renovación automática de tokens para una experiencia de usuario fluida
+  </Card>
+</CardGroup>
+
+**Características Principales:**
+
+- **Emisión de Tokens**: Tokens de acceso (JWT) y tokens de actualización
+- **Descubrimiento OIDC**: Endpoint estándar `.well-known/openid-configuration`
+- **Endpoint JWKS**: Claves públicas en `/oauth2/jwks` para verificación de tokens
+- **Claims Personalizados**: Incluye `rolesAndPermissions`, `username`, `isAdmin`
+- **Gestión de Sesiones**: Spring Session JDBC para sesiones OAuth2 persistentes
+- **Múltiples Clientes**: Soporte para aplicaciones web, móviles y herramientas de prueba
+
+**Endpoints Soportados:**
+
+```bash
+# OIDC Discovery
+GET /.well-known/openid-configuration
+
+# Authorization
+GET /oauth2/authorize
+
+# Token endpoint
+POST /oauth2/token
+
+# JWKS
+GET /oauth2/jwks
+
+# Login page
+GET /login
+```
+
+### Patrón Backend for Frontend (BFF)
+
+<Info>
+El API Gateway implementa el patrón BFF, gestionando tokens OAuth2 del lado del servidor para mayor seguridad.
+</Info>
+
+**Beneficios del BFF:**
+
+<Steps>
+  <Step title="Seguridad de Tokens">
+    Los tokens de acceso y actualización se almacenan del lado del servidor en Redis, nunca expuestos al navegador
+  </Step>
+  <Step title="Cookie de Sesión">
+    Cookie de sesión simple con atributos `HttpOnly`, `SameSite=Lax`
+  </Step>
+  <Step title="Relay Automático de Tokens">
+    El Gateway incluye automáticamente tokens Bearer al hacer proxy hacia los servicios backend
+  </Step>
+  <Step title="Escalado Horizontal">
+    Las sesiones respaldadas por Redis permiten instancias de gateway sin estado
+  </Step>
+</Steps>
+
+**API de Sesión:**
+
+```bash
+# Get current session info
+GET /auth/session
+
+Response:
+{
+  "subject": "user-uuid",
+  "username": "john.doe",
+  "roles": ["USER", "ADMIN"],
+  "isAdmin": true
+}
+```
+
+### Sistema de Permisos Granular
+
+**Modelo de Permisos:**
+
+SGIVU utiliza permisos detallados mapeados a claims JWT:
+
+```
+user:create, user:read, user:update, user:delete
+person:create, person:read, person:update, person:delete
+role:create, role:read, role:update, role:delete
+permission:read
+vehicle:create, vehicle:read, vehicle:update, vehicle:delete
+client:create, client:read, client:update, client:delete
+contract:create, contract:read, contract:update, contract:delete
+ml:predict, ml:retrain
+```
+
+**Control de Acceso Basado en Roles:**
+
+- Los roles agrupan múltiples permisos
+- Los usuarios pueden tener múltiples roles
+- Los permisos se verifican vía anotaciones `@PreAuthorize`
+- El JWT incluye el array `rolesAndPermissions` para validación eficiente
+
+**Ejemplo de Autorización:**
+
+```java
+@PreAuthorize("hasAuthority('vehicle:create')")
+public VehicleResponse createVehicle(VehicleRequest request) {
+    // Only users with vehicle:create permission can execute
+}
+```
+
+### Autenticación entre Servicios
+
+**Clave Interna de Servicio:**
+
+Para comunicación entre servicios sin contexto de usuario:
+
+```bash
+GET /internal/users/username/{username}
+X-Internal-Service-Key: {shared-secret}
+```
+
+<Warning>
+La clave interna de servicio debe mantenerse secreta y almacenarse en variables de entorno o en un gestor de secretos. Nunca debe incluirse en Git.
+</Warning>
+
+## Gestión de Usuarios
+
+### Administración de Usuarios
+
+<CardGroup cols={2}>
+  <Card title="Operaciones CRUD" icon="users">
+    Gestión completa del ciclo de vida de usuarios con validación
+  </Card>
+  <Card title="Seguridad de Contraseñas" icon="lock">
+    Validación de fortaleza de contraseña personalizada con requisitos de complejidad
+  </Card>
+  <Card title="Búsqueda de Usuarios" icon="magnifying-glass">
+    Búsqueda multi-criterio con paginación y ordenamiento
+  </Card>
+  <Card title="Gestión de Estado" icon="toggle-on">
+    Habilitar/deshabilitar usuarios sin eliminación
+  </Card>
+</CardGroup>
+
+**Características de Usuario:**
+
+- **Creación de Usuarios**: Nombre de usuario, email, contraseña con validación de fortaleza
+- **Gestión de Perfiles**: Vincular usuarios a entidades de persona para perfiles detallados
+- **Asignación de Roles**: Asignar múltiples roles por usuario
+- **Control de Estado**: Estado activo/inactivo para control de acceso
+- **Pista de Auditoría**: Marcas de tiempo de creación y modificación
+- **Validación de Nombre de Usuario**: Prevenir caracteres especiales con validador personalizado
+
+**Requisitos de Contraseña:**
+
+- Longitud mínima (configurable)
+- Letras mayúsculas y minúsculas
+- Números y caracteres especiales
+- Sin contraseñas comunes
+- Validada en creación y actualización
+
+### Gestión de Personas
+
+**Entidad Persona:**
+
+- Nombre completo, documento de identidad, información de contacto
+- Gestión de direcciones con datos geográficos
+- Fecha de nacimiento e información demográfica
+- Soporte de URL de foto
+- Vinculada a cuentas de usuario
+
+**Endpoints de la API:**
+
+```bash
+# Create person
+POST /v1/persons
+
+# Get person by ID
+GET /v1/persons/{id}
+
+# Update person
+PUT /v1/persons/{id}
+
+# Search persons
+GET /v1/persons/search?name={name}&documentId={id}
+
+# Delete person
+DELETE /v1/persons/{id}
+```
+
+### Gestión de Roles y Permisos
+
+**Características de Roles:**
+
+- Crear roles personalizados con descripciones
+- Asignar múltiples permisos a roles
+- Ver jerarquía de roles
+- Auditar asignaciones de roles
+
+**Características de Permisos:**
+
+- Catálogo predefinido de permisos
+- Lista de permisos de solo lectura (no pueden crearse/eliminarse)
+- Agrupación de permisos por dominio
+- Mapeo directo de permiso a rol
+
+**Roles por Defecto:**
+
+- **ADMIN**: Acceso completo al sistema con todos los permisos
+- **USER**: Usuario estándar con permisos limitados
+- Se pueden crear roles personalizados según sea necesario
+
+## Gestión de Vehículos
+
+### Catálogo de Vehículos
+
+<CardGroup cols={2}>
+  <Card title="Tipos de Vehículos" icon="car">
+    Soporte para automóviles, motocicletas y tipos de vehículos personalizados
+  </Card>
+  <Card title="Datos Completos" icon="list">
+    Marca, modelo, año, VIN, kilometraje, precio y más
+  </Card>
+  <Card title="Seguimiento de Estado" icon="chart-line">
+    Estados: disponible, vendido, reservado, en mantenimiento
+  </Card>
+  <Card title="Gestión de Imágenes" icon="images">
+    Múltiples imágenes por vehículo con integración S3
+  </Card>
+</CardGroup>
+
+**Atributos del Vehículo:**
+
+```json
+{
+  "id": "uuid",
+  "vin": "1HGBH41JXMN109186",
+  "make": "Toyota",
+  "model": "Camry",
+  "year": 2023,
+  "color": "Silver",
+  "mileage": 15000,
+  "price": 28500.00,
+  "status": "available",
+  "vehicleType": "CAR",
+  "transmission": "AUTOMATIC",
+  "fuelType": "GASOLINE",
+  "description": "Excellent condition, single owner",
+  "images": [
+    {
+      "id": "uuid",
+      "url": "https://s3.amazonaws.com/...",
+      "isPrimary": true
+    }
+  ]
+}
+```
+
+### Búsqueda Avanzada y Filtrado
+
+**Criterios de Búsqueda:**
+
+- Marca, modelo, rango de años
+- Rango de precios (mínimo/máximo)
+- Rango de kilometraje
+- Estado (disponible, no disponible, vendido)
+- Tipo de vehículo
+- Tipo de combustible y transmisión
+- Color
+- Búsqueda de texto completo en descripción
+
+**API de Búsqueda:**
+
+```bash
+GET /v1/vehicles/search?
+  make=Toyota&
+  minYear=2020&
+  maxYear=2023&
+  minPrice=20000&
+  maxPrice=35000&
+  status=available&
+  page=0&
+  size=20&
+  sort=price,asc
+```
+
+**Paginación y Ordenamiento:**
+
+- Tamaño de página configurable
+- Ordenar por cualquier campo (precio, año, kilometraje, fecha de creación)
+- Metadatos de conteo total y página
+- Soporte de paginación basada en cursor
+
+### Gestión de Imágenes con S3
+
+**Flujo de Carga con URL Prefirmada:**
+
+<Steps>
+  <Step title="Solicitar URL de Carga">
+    El frontend solicita una URL prefirmada al backend
+    ```bash
+    POST /v1/vehicles/{vehicleId}/images/upload-url
+    Content-Type: application/json
+    
+    {
+      "filename": "front-view.jpg",
+      "contentType": "image/jpeg"
+    }
+    ```
+  </Step>
+  
+  <Step title="Recibir URL Prefirmada">
+    El backend genera una URL prefirmada válida por 5 minutos
+    ```json
+    {
+      "uploadUrl": "https://s3.amazonaws.com/...",
+      "key": "vehicles/uuid/images/front-view.jpg",
+      "expiresIn": 300
+    }
+    ```
+  </Step>
+  
+  <Step title="Cargar Directamente a S3">
+    El cliente sube la imagen directamente a S3 usando la URL prefirmada
+    ```bash
+    PUT {uploadUrl}
+    Content-Type: image/jpeg
+    
+    {binary image data}
+    ```
+  </Step>
+  
+  <Step title="Confirmar Carga">
+    Tras la carga exitosa, confirmar para registrar los metadatos
+    ```bash
+    POST /v1/vehicles/{vehicleId}/images/confirm-upload
+    
+    {
+      "key": "vehicles/uuid/images/front-view.jpg",
+      "filename": "front-view.jpg",
+      "contentType": "image/jpeg",
+      "size": 245678
+    }
+    ```
+  </Step>
+</Steps>
+
+**Características de Imágenes:**
+
+- **Formatos Soportados**: JPEG, PNG, WebP
+- **Imagen Principal**: Primera imagen o designada manualmente
+- **Ordenamiento Automático**: Si se elimina la principal, se promueve la siguiente
+- **Configuración CORS**: Bucket S3 configurado para orígenes permitidos
+- **Almacenamiento de Metadatos**: Información de imágenes almacenada en PostgreSQL
+- **Descargas con URL Prefirmada**: URLs de descarga seguras con tiempo limitado
+
+**APIs de Gestión de Imágenes:**
+
+```bash
+# List vehicle images
+GET /v1/vehicles/{id}/images
+
+# Get presigned download URL
+GET /v1/vehicles/{id}/images/{imageId}/download-url
+
+# Set primary image
+PUT /v1/vehicles/{id}/images/{imageId}/primary
+
+# Delete image
+DELETE /v1/vehicles/{id}/images/{imageId}
+```
+
+<Note>
+La carga directa a S3 reduce la carga del backend y mejora el rendimiento de las subidas. El backend valida y realiza seguimiento de los metadatos después de la carga.
+</Note>
+
+## Gestión de Clientes
+
+### Clientes Persona y Empresa
+
+<CardGroup cols={2}>
+  <Card title="Clientes Individuales" icon="user">
+    Gestiona clientes persona con datos personales e información de contacto
+  </Card>
+  <Card title="Clientes Corporativos" icon="building">
+    Maneja clientes empresa con registro comercial y representantes
+  </Card>
+</CardGroup>
+
+**Clientes Persona:**
+
+```json
+{
+  "id": "uuid",
+  "type": "PERSON",
+  "firstName": "John",
+  "lastName": "Doe",
+  "documentId": "123456789",
+  "email": "john.doe@example.com",
+  "phone": "+1-555-0123",
+  "dateOfBirth": "1985-06-15",
+  "address": {
+    "street": "123 Main St",
+    "city": "Springfield",
+    "state": "IL",
+    "zipCode": "62701",
+    "country": "USA"
+  }
+}
+```
+
+**Clientes Empresa:**
+
+```json
+{
+  "id": "uuid",
+  "type": "COMPANY",
+  "companyName": "Acme Corporation",
+  "taxId": "98-7654321",
+  "registrationNumber": "REG-123456",
+  "email": "contact@acme.com",
+  "phone": "+1-555-0199",
+  "website": "https://acme.com",
+  "address": {
+    "street": "456 Business Ave",
+    "city": "Chicago",
+    "state": "IL",
+    "zipCode": "60601",
+    "country": "USA"
+  },
+  "contactPerson": {
+    "name": "Jane Smith",
+    "title": "Purchasing Manager",
+    "email": "jane.smith@acme.com",
+    "phone": "+1-555-0188"
+  }
+}
+```
+
+### Búsqueda y Analíticas de Clientes
+
+**Características de Búsqueda:**
+
+- Búsqueda por nombre, documento de identidad, NIT
+- Filtro por tipo de cliente (persona/empresa)
+- Filtrado basado en ubicación
+- Búsqueda por email y teléfono
+- Filtros por rango de fechas
+- Paginación y ordenamiento
+
+**Estadísticas de Clientes:**
+
+```bash
+# Get client counts
+GET /v1/clients/statistics
+
+Response:
+{
+  "totalClients": 1523,
+  "personClients": 1234,
+  "companyClients": 289,
+  "activeClients": 1456,
+  "newThisMonth": 42
+}
+```
+
+### Gestión de Direcciones
+
+**Características de Direcciones:**
+
+- Campos de dirección completos (calle, ciudad, estado/departamento, código postal, país)
+- Soporte de geocodificación (latitud/longitud)
+- Múltiples direcciones por cliente
+- Designación de dirección principal
+- Validación de direcciones
+- Formatos de dirección internacionales
+
+## Gestión de Compras y Ventas
+
+### Ciclo de Vida de Contratos
+
+<Steps>
+  <Step title="Creación del Contrato">
+    Crear contrato de compra o venta vinculando cliente, vehículo y usuario
+  </Step>
+  <Step title="Gestión de Estado">
+    Seguimiento del contrato a través de estados: BORRADOR → ACTIVO → COMPLETADO/CANCELADO
+  </Step>
+  <Step title="Generación de Documentos">
+    Generar contratos PDF con todos los detalles y firmas
+  </Step>
+  <Step title="Informes">
+    Exportar contratos a PDF, Excel o CSV para análisis
+  </Step>
+</Steps>
+
+**Tipos de Contrato:**
+
+- **COMPRA**: Adquisición de vehículos para inventario
+- **VENTA**: Venta de vehículos a clientes
+
+**Atributos del Contrato:**
+
+```json
+{
+  "id": "uuid",
+  "contractNumber": "PS-2026-00123",
+  "contractType": "SALE",
+  "contractStatus": "ACTIVE",
+  "contractDate": "2026-03-06",
+  "totalAmount": 28500.00,
+  "downPayment": 5000.00,
+  "financedAmount": 23500.00,
+  "interestRate": 4.5,
+  "termMonths": 60,
+  "monthlyPayment": 437.89,
+  "client": {
+    "id": "client-uuid",
+    "name": "John Doe"
+  },
+  "vehicle": {
+    "id": "vehicle-uuid",
+    "vin": "1HGBH41JXMN109186",
+    "description": "2023 Toyota Camry"
+  },
+  "user": {
+    "id": "user-uuid",
+    "name": "Sales Agent"
+  },
+  "notes": "Trade-in applied, warranty included"
+}
+```
+
+### Búsqueda Avanzada de Contratos
+
+**Criterios de Búsqueda:**
+
+```bash
+GET /v1/purchase-sales/search?
+  contractType=SALE&
+  contractStatus=ACTIVE&
+  clientId={uuid}&
+  vehicleId={uuid}&
+  fromDate=2026-01-01&
+  toDate=2026-12-31&
+  minAmount=20000&
+  maxAmount=50000&
+  page=0&
+  size=20
+```
+
+### Generación de Informes
+
+**Formatos de Informes:**
+
+<CardGroup cols={3}>
+  <Card title="PDF" icon="file-pdf">
+    Documentos de contrato profesionales usando OpenPDF
+  </Card>
+  <Card title="Excel" icon="file-excel">
+    Hojas de cálculo detalladas con Apache POI
+  </Card>
+  <Card title="CSV" icon="file-csv">
+    Exportaciones de datos para análisis e importación
+  </Card>
+</CardGroup>
+
+**Endpoints de Informes:**
+
+```bash
+# Generate PDF contract
+GET /v1/purchase-sales/{id}/pdf
+Content-Type: application/pdf
+
+# Export to Excel
+GET /v1/purchase-sales/export/excel?
+  fromDate=2026-01-01&
+  toDate=2026-03-31
+Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+
+# Export to CSV
+GET /v1/purchase-sales/export/csv?
+  contractType=SALE&
+  contractStatus=COMPLETED
+Content-Type: text/csv
+```
+
+**Contenido de los Informes:**
+
+- Detalles y términos del contrato
+- Información del cliente
+- Especificaciones del vehículo
+- Calendario de pagos
+- Firmas y marcas de tiempo
+- Marca y logotipos de la empresa
+
+## Aprendizaje Automático
+
+### Pronóstico de Demanda
+
+<Info>
+El servicio ML de SGIVU proporciona analítica predictiva para la gestión de inventario y el pronóstico de ventas.
+</Info>
+
+**Capacidades de ML:**
+
+- Predicción de demanda por segmento de vehículo
+- Recomendaciones de optimización de precios
+- Pronóstico de rotación de inventario
+- Análisis de tendencias estacionales
+- Reconocimiento de patrones históricos
+
+**API de Predicción:**
+
+```bash
+POST /v1/ml/predict
+Content-Type: application/json
+
+{
+  "features": {
+    "make": "Toyota",
+    "model": "Camry",
+    "year": 2023,
+    "mileage": 15000,
+    "season": "SPRING",
+    "economicIndicator": 1.05
+  }
+}
+
+Response:
+{
+  "prediction": 0.78,
+  "confidence": 0.92,
+  "recommendation": "HIGH_DEMAND",
+  "estimatedDaysToSell": 12
+}
+```
+
+### Predicción con Contexto Histórico
+
+```bash
+POST /v1/ml/predict-with-history
+
+Response:
+{
+  "prediction": 0.78,
+  "confidence": 0.92,
+  "historical": [
+    {
+      "date": "2026-02-01",
+      "value": 0.72
+    },
+    {
+      "date": "2026-02-15",
+      "value": 0.75
+    },
+    {
+      "date": "2026-03-01",
+      "value": 0.78
+    }
+  ],
+  "trend": "INCREASING"
+}
+```
+
+**Soporte de Visualización:**
+
+Los datos históricos permiten a las bibliotecas de gráficos del frontend (Chart.js) mostrar tendencias y predicciones.
+
+### Entrenamiento y Reentrenamiento de Modelos
+
+**Características de Entrenamiento:**
+
+- Reentrenamiento automático programado
+- Reentrenamiento manual con rangos de fechas
+- Pipelines de ingeniería de características
+- Versionado de modelos con joblib
+- Registro de métricas de entrenamiento
+
+**API de Reentrenamiento:**
+
+```bash
+POST /v1/ml/retrain
+Content-Type: application/json
+
+{
+  "startDate": "2025-01-01",
+  "endDate": "2026-03-01",
+  "hyperparameters": {
+    "n_estimators": 100,
+    "max_depth": 10
+  }
+}
+
+Response:
+{
+  "modelVersion": "v2.1.0",
+  "trainingDate": "2026-03-06T10:30:00Z",
+  "metrics": {
+    "rmse": 0.045,
+    "mae": 0.032,
+    "r2_score": 0.89
+  },
+  "featureImportance": {
+    "year": 0.35,
+    "mileage": 0.28,
+    "make": 0.22,
+    "season": 0.15
+  }
+}
+```
+
+### Gestión de Modelos
+
+**Metadatos del Modelo:**
+
+```bash
+GET /v1/ml/models/latest
+
+Response:
+{
+  "version": "v2.1.0",
+  "algorithm": "RandomForestRegressor",
+  "trainedAt": "2026-03-06T10:30:00Z",
+  "trainingSamples": 15234,
+  "features": [
+    "make", "model", "year", "mileage",
+    "price", "season", "economicIndicator"
+  ],
+  "metrics": {
+    "rmse": 0.045,
+    "mae": 0.032,
+    "r2_score": 0.89
+  }
+}
+```
+
+**Persistencia de Modelos:**
+
+- Artefactos almacenados con serialización `joblib`
+- Almacenamiento opcional en PostgreSQL para versiones
+- Snapshots de características para reproducibilidad
+- Registro de predicciones para monitoreo
+
+## Servicios de Plataforma
+
+### Configuración Centralizada
+
+<CardGroup cols={2}>
+  <Card title="Configuración basada en Git" icon="git">
+    Configuración de producción desde repositorio Git para control de versiones
+  </Card>
+  <Card title="Modo Nativo" icon="folder">
+    Configuración de desarrollo desde sistema de archivos local
+  </Card>
+</CardGroup>
+
+**Gestión de Configuración:**
+
+- **Configuración por servicio**: `sgivu-{servicio}.yml`
+- **Basada en perfiles**: `sgivu-{servicio}-{perfil}.yml`
+- **Valores por defecto globales**: `application.yml`
+- **Actualización dinámica**: Actualizaciones de configuración sin reinicio (donde sea soportado)
+- **Soporte de etiquetas**: Configuración basada en ramas/tags
+
+**Acceso a la Configuración:**
+
+```bash
+# Get configuration for a service
+GET http://localhost:8888/{application}/{profile}
+
+# Get configuration YAML
+GET http://localhost:8888/{application}-{profile}.yml
+
+# Example
+GET http://localhost:8888/sgivu-gateway/dev
+GET http://localhost:8888/sgivu-gateway-prod.yml
+```
+
+### Descubrimiento de Servicios con Eureka
+
+**Características de Descubrimiento:**
+
+- Registro automático de servicios
+- Monitoreo de verificaciones de salud
+- Soporte de balanceo de carga
+- Metadatos de servicios
+- Desregistro de instancias al apagar
+- Soporte multi-zona
+
+**Dashboard de Eureka:**
+
+Interfaz web en `http://localhost:8761` que muestra:
+
+- Todas las instancias de servicios registrados
+- Estado de salud de instancias
+- Metadatos de servicios
+- Marcas de tiempo de registro
+- Estadísticas de renovación
+
+**Resolución de Servicios:**
+
+Los servicios usan nombres lógicos resueltos vía Eureka:
+
+```yaml
+# Gateway route
+uri: lb://sgivu-vehicle
+
+# Resolved to: http://192.168.1.10:8083 (actual instance)
+```
+
+### Circuit Breaking y Resiliencia
+
+**Integración con Resilience4j:**
+
+<CardGroup cols={2}>
+  <Card title="Circuit Breaker" icon="circle-exclamation">
+    Previene fallos en cascada con circuit breaking automático
+  </Card>
+  <Card title="Rutas de Fallback" icon="route">
+    Degradación elegante con respuestas de fallback
+  </Card>
+</CardGroup>
+
+**Configuración del Circuit Breaker:**
+
+```yaml
+resilience4j:
+  circuitbreaker:
+    instances:
+      vehicleService:
+        failure-rate-threshold: 50
+        slow-call-rate-threshold: 50
+        slow-call-duration-threshold: 2s
+        wait-duration-in-open-state: 10s
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+```
+
+**Estados del Circuit Breaker:**
+
+1. **CLOSED**: Operación normal, las solicitudes fluyen normalmente
+2. **OPEN**: Demasiados fallos, las solicitudes se rechazan inmediatamente
+3. **HALF_OPEN**: Probando si el servicio se ha recuperado
+
+**Manejo de Fallback:**
+
+```bash
+# When circuit opens, Gateway returns fallback
+GET /v1/vehicles/search
+
+# Fallback response:
+{
+  "error": "Service temporarily unavailable",
+  "fallback": true,
+  "message": "Vehicle service is experiencing issues. Please try again later.",
+  "statusCode": 503
+}
+```
+
+### Trazado Distribuido
+
+**Integración con Zipkin:**
+
+- Propagación de Trace ID entre servicios
+- Creación de spans para cada llamada de servicio
+- Seguimiento de tiempos y latencia
+- Trazado de errores
+- Visualización de dependencias
+
+**Encabezados de Trazado:**
+
+```bash
+X-Trace-Id: 1234567890abcdef
+X-Span-Id: abcdef1234567890
+X-Parent-Span-Id: fedcba0987654321
+```
+
+**Características de la UI de Zipkin:**
+
+- Visualización de línea de tiempo de trazas
+- Grafo de dependencias entre servicios
+- Distribución de latencia
+- Seguimiento de tasa de errores
+- Búsqueda por Trace ID, servicio o rango de tiempo
+
+**Acceder a Zipkin:**
+
+```bash
+http://localhost:9411
+```
+
+### Verificaciones de Salud y Monitoreo
+
+**Spring Boot Actuator:**
+
+Todos los servicios Java exponen endpoints de salud:
+
+```bash
+GET /actuator/health
+
+Response:
+{
+  "status": "UP",
+  "components": {
+    "db": {
+      "status": "UP",
+      "details": {
+        "database": "PostgreSQL",
+        "validationQuery": "isValid()"
+      }
+    },
+    "diskSpace": {
+      "status": "UP",
+      "details": {
+        "total": 499963174912,
+        "free": 250000000000,
+        "threshold": 10485760
+      }
+    },
+    "eureka": {
+      "status": "UP"
+    }
+  }
+}
+```
+
+**Indicadores de Salud Personalizados:**
+
+- Conectividad de base de datos
+- Disponibilidad de APIs externas
+- Acceso al bucket S3
+- Conexión a Redis
+- Estado de registro en Eureka
+
+**Endpoints de Métricas:**
+
+```bash
+# Metrics
+GET /actuator/metrics
+
+# Specific metric
+GET /actuator/metrics/jvm.memory.used
+GET /actuator/metrics/http.server.requests
+```
+
+## Funcionalidades del Frontend
+
+### SPA Angular 21
+
+<CardGroup cols={2}>
+  <Card title="Diseño Responsivo" icon="mobile">
+    Diseño responsivo con Bootstrap 5 para escritorio y móvil
+  </Card>
+  <Card title="Gráficos Interactivos" icon="chart-line">
+    Integración con Chart.js para visualización de datos
+  </Card>
+  <Card title="Formularios Reactivos" icon="pen-to-square">
+    Formularios reactivos de Angular con validación
+  </Card>
+  <Card title="Carga Diferida" icon="spinner">
+    Carga diferida de módulos para rendimiento
+  </Card>
+</CardGroup>
+
+**Funcionalidades Principales del Frontend:**
+
+- **Dashboard**: Resumen con métricas clave y gráficos
+- **Gestión de Vehículos**: Búsqueda, creación y edición de vehículos con carga de imágenes
+- **Gestión de Clientes**: Formularios de clientes persona y empresa
+- **Gestión de Contratos**: Creación y visualización de contratos de compraventa
+- **Gestión de Usuarios**: Interfaz de administración para usuarios y roles
+- **Autenticación**: Integración OAuth2/OIDC vía Gateway
+- **Gestión de Sesión**: Renovación automática de tokens
+- **Manejo de Errores**: Interceptor de errores global
+- **Estados de Carga**: Pantallas skeleton y spinners
+
+**Componentes de UI:**
+
+- Estilos con Bootstrap 5
+- Bootstrap Icons
+- Validadores de formularios personalizados
+- Componentes reutilizables (tablas, modales, tarjetas)
+- Pagination components
+- File upload with progress
+
+## Database Features
+
+### Flyway Migrations (Java Services)
+
+**Version-Controlled Schema:**
+
+```bash
+src/main/resources/db/migration/
+├── V1__initial_schema.sql
+├── V2__add_vehicle_images.sql
+├── V3__add_contract_status.sql
+└── R__seed_data.sql (repeatable)
+```
+
+**Migration Features:**
+
+- Automatic execution on startup
+- Version tracking in `flyway_schema_history` table
+- Rollback support (via scripts)
+- Repeatable migrations for seed data
+- Checksum validation
+
+### Alembic Migrations (sgivu-ml)
+
+**Esquema versionado para el servicio ML (FastAPI):**
+
+```bash
+alembic/versions/
+└── V1_initial_schema.py
+```
+
+**Características:**
+
+- Ejecución automática al iniciar (`alembic upgrade head`)
+- Seguimiento de versiones en tabla `alembic_version`
+- Soporte upgrade/downgrade
+- Autogeneración de migraciones desde modelos ORM
+- Integrado con Pydantic Settings (DSN sync vía `psycopg`)
+
+### Database Per Service
+
+**Isolation:**
+
+Each microservice has its own database:
+
+- **Data Isolation**: Service owns its data schema
+- **Independent Scaling**: Scale databases independently
+- **Technology Freedom**: Different services can use different DB technologies
+- **Fault Isolation**: Database failure affects only one service
+
+### PostgreSQL Features
+
+- **Indexes**: Optimized queries with strategic indexes
+- **Constraints**: Foreign keys, unique constraints, check constraints
+- **JSON Support**: JSONB columns for flexible data
+- **Full-Text Search**: Text search capabilities
+- **Audit Columns**: `created_at`, `updated_at` timestamps
+
+## Docker & Deployment
+
+### Containerization
+
+<Info>
+All services are containerized with multi-stage Docker builds for optimal image size.
+</Info>
+
+**Docker Features:**
+
+- Multi-stage builds (build → runtime)
+- Minimal base images (Alpine, Distroless)
+- Non-root users for security
+- Health checks in Dockerfile
+- Build scripts for automation
+
+**Example Multi-Stage Build:**
+
+```dockerfile
+# Stage 1: Build
+FROM eclipse-temurin:21-jdk-alpine AS build
+WORKDIR /workspace
+COPY mvnw .
+COPY .mvn .mvn
+COPY pom.xml .
+RUN ./mvnw dependency:go-offline
+COPY src src
+RUN ./mvnw package -DskipTests
+
+# Stage 2: Runtime
+FROM eclipse-temurin:21-jre-alpine
+WORKDIR /app
+COPY --from=build /workspace/target/*.jar app.jar
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "app.jar"]
+```
+
+### Docker Compose
+
+**Development Stack:**
+
+```bash
+cd infra/compose/sgivu-docker-compose
+./run.bash --dev
+```
+
+**Stack Components:**
+
+- All microservices
+- PostgreSQL (with init scripts)
+- Redis
+- Zipkin (optional)
+- Nginx (optional)
+
+**Environment Configuration:**
+
+```bash
+# .env.example
+SPRING_PROFILES_ACTIVE=dev
+REDIS_PASSWORD=dev-password
+POSTGRES_PASSWORD=dev-password
+SERVICE_INTERNAL_SECRET_KEY=dev-internal-key
+```
+
+### Build & Push Automation
+
+**Orchestrated Build:**
+
+```bash
+cd infra/compose/sgivu-docker-compose
+./build-and-push-images.bash
+```
+
+Este script:
+
+1. Construye las imágenes Docker de todos los servicios
+2. Aplica tags de versión
+3. Publica en el registro Docker
+4. Actualiza archivos de Docker Compose
+
+## Próximos pasos
+
+<CardGroup cols={3}>
+  <Card title="API Reference" icon="code" href="/api/auth/oauth2">
+    Explora la documentación detallada de APIs
+  </Card>
+  <Card title="Deployment Guide" icon="rocket" href="/infrastructure/deployment">
+    Aprende cómo desplegar en producción
+  </Card>
+  <Card title="Primeros pasos" icon="laptop-code" href="/getting-started/quickstart">
+    Configura tu entorno de desarrollo
+  </Card>
+</CardGroup>
+
+<Tip>
+Si tienes preguntas o problemas, revisa la sección de solución de problemas en el README de cada servicio o abre un issue en GitHub.
+</Tip>

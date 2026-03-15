@@ -1,0 +1,385 @@
+---
+title: 'Entorno de Desarrollo'
+description: 'Configuraciones y buenas prácticas para el entorno de desarrollo (dev)'
+icon: 'flask'
+---
+
+## Propósito
+
+El entorno de **desarrollo (dev)** está diseñado para:
+
+- Desarrollo y pruebas locales
+- Depuración con logging detallado
+- Iteración rápida sin preocupaciones de persistencia de datos
+- Pruebas de integración con bases de datos de desarrollo
+- Acceso completo a endpoints de gestión
+
+<Note>
+Las configuraciones de dev priorizan la experiencia del desarrollador y las capacidades de depuración sobre la seguridad y el rendimiento.
+</Note>
+
+## Configuraciones Comunes Específicas de Dev
+
+### Depuración Mejorada
+
+Todos los perfiles dev habilitan características extensivas de logging y depuración:
+
+```yaml
+# Common across all *-dev.yml files
+spring:
+  jpa:
+    show-sql: true              # Show SQL queries
+    properties:
+      hibernate:
+        format_sql: true        # Format SQL for readability
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"            # Expose all actuator endpoints
+  endpoint:
+    health:
+      show-details: always      # Show full health details
+```
+
+### Configuración de Migraciones Flyway
+
+Los entornos dev permiten migraciones Flyway con baseline en bases de datos existentes:
+
+```yaml
+spring:
+  flyway:
+    baseline-on-migrate: true   # Allow migrations on existing schemas
+    clean-disabled: false       # Allow database cleanup (use with caution)
+```
+
+<Warning>
+`clean-disabled: false` permite que Flyway elimine todos los objetos de la base de datos. Esto es conveniente para dev pero **nunca** se debe usar en producción.
+</Warning>
+
+### CORS y Seguridad Relajados
+
+Las configuraciones de dev permiten herramientas de desarrollo local:
+
+```yaml
+# sgivu-vehicle.yml (base)
+aws:
+  s3:
+    allowed-origins: ${AWS_S3_ALLOWED_ORIGINS:http://localhost:4200,https://localhost:4200}
+```
+
+## Configuración de Bases de Datos para Dev
+
+### Base de Datos del Servicio Auth
+
+```yaml
+# sgivu-auth-dev.yml
+spring:
+  datasource:
+    url: jdbc:postgresql://${DEV_AUTH_DB_HOST:host.docker.internal}:${DEV_AUTH_DB_PORT:5432}/${DEV_AUTH_DB_NAME}
+    username: ${DEV_AUTH_DB_USERNAME}
+    password: ${DEV_AUTH_DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate        # Validate schema against entities
+  session:
+    timeout: 2h               # Extended session timeout for debugging
+```
+
+**Variables requeridas:**
+- `DEV_AUTH_DB_HOST` (default: `host.docker.internal`)
+- `DEV_AUTH_DB_PORT` (default: `5432`)
+- `DEV_AUTH_DB_NAME`
+- `DEV_AUTH_DB_USERNAME`
+- `DEV_AUTH_DB_PASSWORD`
+
+### Base de Datos del Servicio User
+
+```yaml
+# sgivu-user-dev.yml
+spring:
+  datasource:
+    url: jdbc:postgresql://${DEV_USER_DB_HOST:host.docker.internal}:${DEV_USER_DB_PORT:5432}/${DEV_USER_DB_NAME}
+    username: ${DEV_USER_DB_USERNAME}
+    password: ${DEV_USER_DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  flyway:
+    locations: classpath:db/migration, classpath:db/seed  # Includes seed data
+    baseline-on-migrate: true
+    clean-disabled: false
+```
+
+<Info>
+El servicio de usuarios incluye la ubicación `classpath:db/seed` para cargar datos de prueba en el entorno dev.
+</Info>
+
+### Base de Datos del Servicio Client
+
+```yaml
+# sgivu-client-dev.yml
+spring:
+  datasource:
+    url: jdbc:postgresql://${DEV_CLIENT_DB_HOST:host.docker.internal}:${DEV_CLIENT_DB_PORT:5432}/${DEV_CLIENT_DB_NAME}
+    username: ${DEV_CLIENT_DB_USERNAME}
+    password: ${DEV_CLIENT_DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+```
+
+### Base de Datos del Servicio Vehicle
+
+```yaml
+# sgivu-vehicle-dev.yml
+spring:
+  datasource:
+    url: jdbc:postgresql://${DEV_VEHICLE_DB_HOST:host.docker.internal}:${DEV_VEHICLE_DB_PORT:5432}/${DEV_VEHICLE_DB_NAME}
+    username: ${DEV_VEHICLE_DB_USERNAME}
+    password: ${DEV_VEHICLE_DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+```
+
+### Base de Datos del Servicio Purchase Sale
+
+```yaml
+# sgivu-purchase-sale-dev.yml
+spring:
+  datasource:
+    url: jdbc:postgresql://${DEV_PURCHASE_SALE_DB_HOST:host.docker.internal}:${DEV_PURCHASE_SALE_DB_PORT:5432}/${DEV_PURCHASE_SALE_DB_NAME}
+    username: ${DEV_PURCHASE_SALE_DB_USERNAME}
+    password: ${DEV_PURCHASE_SALE_DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+```
+
+## URLs de Servicios en el Entorno Dev
+
+El entorno dev usa la URL del cliente Angular para redirecciones OAuth y CORS:
+
+```yaml
+# All services with Angular client integration
+angular-client:
+  url: ${DEV_ANGULAR_APP_URL}
+```
+
+**Valor de ejemplo:**
+```bash
+DEV_ANGULAR_APP_URL=http://localhost:4200
+```
+
+## Configuración Específica del Gateway para Dev
+
+El servicio gateway incluye depuración mejorada para flujos OAuth:
+
+```yaml
+# sgivu-gateway-dev.yml
+angular-client:
+  url: ${DEV_ANGULAR_APP_URL}
+
+# Detailed logging for authentication/authorization debugging
+logging:
+  level:
+    com.sgivu.gateway.security: DEBUG
+    com.sgivu.gateway.controller: DEBUG
+    com.sgivu.gateway.config: DEBUG
+    org.springframework.security.oauth2.client: DEBUG
+    org.springframework.security.web.server.authentication: DEBUG
+    org.springframework.session.web.server: DEBUG
+```
+
+<Info>
+Estos niveles de log proporcionan trazabilidad detallada para los flujos de tokens OAuth, la gestión de sesiones y las cadenas de filtros de seguridad.
+</Info>
+
+## Cómo Agregar una Nueva Configuración Dev
+
+<Steps>
+  <Step title="Crear el archivo de perfil">
+    Crea un nuevo archivo llamado `{application}-dev.yml` en la raíz del repositorio:
+    
+    ```bash
+    cd ~/workspace/source
+    touch sgivu-newservice-dev.yml
+    ```
+  </Step>
+  
+  <Step title="Definir las sobrescrituras específicas de dev">
+    Agrega las sobrescrituras de configuración para desarrollo:
+    
+    ```yaml
+    # sgivu-newservice-dev.yml
+    spring:
+      datasource:
+        url: jdbc:postgresql://${DEV_NEWSERVICE_DB_HOST:host.docker.internal}:${DEV_NEWSERVICE_DB_PORT:5432}/${DEV_NEWSERVICE_DB_NAME}
+        username: ${DEV_NEWSERVICE_DB_USERNAME}
+        password: ${DEV_NEWSERVICE_DB_PASSWORD}
+      jpa:
+        show-sql: true
+        properties:
+          hibernate:
+            format_sql: true
+      flyway:
+        baseline-on-migrate: true
+        clean-disabled: false
+    
+    management:
+      endpoints:
+        web:
+          exposure:
+            include: "*"
+      endpoint:
+        health:
+          show-details: always
+    ```
+  </Step>
+  
+  <Step title="Hacer commit y push">
+    ```bash
+    git add sgivu-newservice-dev.yml
+    git commit -m "Add dev configuration for newservice"
+    git push origin main
+    ```
+  </Step>
+  
+  <Step title="Configurar variables de entorno">
+    Establece las variables de entorno requeridas en tu entorno de desarrollo:
+    
+    ```bash
+    export DEV_NEWSERVICE_DB_HOST=localhost
+    export DEV_NEWSERVICE_DB_PORT=5432
+    export DEV_NEWSERVICE_DB_NAME=newservice_dev
+    export DEV_NEWSERVICE_DB_USERNAME=dev_user
+    export DEV_NEWSERVICE_DB_PASSWORD=dev_password
+    ```
+  </Step>
+  
+  <Step title="Activar el perfil dev">
+    Inicia el servicio con el perfil dev:
+    
+    ```bash
+    java -jar sgivu-newservice.jar --spring.profiles.active=dev
+    ```
+  </Step>
+</Steps>
+
+## Resumen de Variables de Entorno Dev
+
+<AccordionGroup>
+  <Accordion title="Servicio Auth" icon="key">
+    - `DEV_AUTH_DB_HOST` (default: `host.docker.internal`)
+    - `DEV_AUTH_DB_PORT` (default: `5432`)
+    - `DEV_AUTH_DB_NAME`
+    - `DEV_AUTH_DB_USERNAME`
+    - `DEV_AUTH_DB_PASSWORD`
+    - `DEV_ANGULAR_APP_URL`
+  </Accordion>
+  
+  <Accordion title="Servicio User" icon="user">
+    - `DEV_USER_DB_HOST` (default: `host.docker.internal`)
+    - `DEV_USER_DB_PORT` (default: `5432`)
+    - `DEV_USER_DB_NAME`
+    - `DEV_USER_DB_USERNAME`
+    - `DEV_USER_DB_PASSWORD`
+  </Accordion>
+  
+  <Accordion title="Servicio Client" icon="building">
+    - `DEV_CLIENT_DB_HOST` (default: `host.docker.internal`)
+    - `DEV_CLIENT_DB_PORT` (default: `5432`)
+    - `DEV_CLIENT_DB_NAME`
+    - `DEV_CLIENT_DB_USERNAME`
+    - `DEV_CLIENT_DB_PASSWORD`
+  </Accordion>
+  
+  <Accordion title="Servicio Vehicle" icon="car">
+    - `DEV_VEHICLE_DB_HOST` (default: `host.docker.internal`)
+    - `DEV_VEHICLE_DB_PORT` (default: `5432`)
+    - `DEV_VEHICLE_DB_NAME`
+    - `DEV_VEHICLE_DB_USERNAME`
+    - `DEV_VEHICLE_DB_PASSWORD`
+  </Accordion>
+  
+  <Accordion title="Servicio Purchase Sale" icon="cart-shopping">
+    - `DEV_PURCHASE_SALE_DB_HOST` (default: `host.docker.internal`)
+    - `DEV_PURCHASE_SALE_DB_PORT` (default: `5432`)
+    - `DEV_PURCHASE_SALE_DB_NAME`
+    - `DEV_PURCHASE_SALE_DB_USERNAME`
+    - `DEV_PURCHASE_SALE_DB_PASSWORD`
+  </Accordion>
+  
+  <Accordion title="Servicio Gateway" icon="gateway">
+    - `DEV_ANGULAR_APP_URL`
+  </Accordion>
+</AccordionGroup>
+
+## Buenas Prácticas para Dev
+
+<CardGroup cols={2}>
+  <Card title="Usar Redes Docker" icon="docker">
+    Usa `host.docker.internal` como host de base de datos cuando los servicios corren en Docker pero la base de datos está en la máquina host.
+  </Card>
+  
+  <Card title="Bases de Datos Separadas" icon="database">
+    Usa instancias de base de datos separadas para cada servicio para simular la arquitectura de producción.
+  </Card>
+  
+  <Card title="Habilitar Todos los Endpoints" icon="chart-line">
+    Expón todos los endpoints de Actuator para depuración, pero recuerda restringirlos en producción.
+  </Card>
+  
+  <Card title="Probar Migraciones" icon="rotate">
+    Prueba regularmente las migraciones Flyway limpiando y reconstruyendo las bases de datos.
+  </Card>
+</CardGroup>
+
+## Solución de Problemas en el Entorno Dev
+
+### Problemas de Conexión a Base de Datos
+
+```bash
+# Test PostgreSQL connection
+psql -h localhost -p 5432 -U dev_user -d auth_dev
+
+# Check if Docker can reach host database
+docker run --rm -it postgres:15 psql -h host.docker.internal -U dev_user -d auth_dev
+```
+
+### Ver la Configuración Completa
+
+```bash
+# Use actuator endpoint to view resolved configuration
+curl http://localhost:9000/actuator/configprops | jq
+
+# View environment variables
+curl http://localhost:9000/actuator/env | jq
+```
+
+### Problemas Comunes
+
+<AccordionGroup>
+  <Accordion title="Errores de baseline en Flyway">
+    Si ves errores de baseline, asegúrate de que `baseline-on-migrate: true` esté configurado en el perfil dev.
+  </Accordion>
+  
+  <Accordion title="Errores de sintaxis SQL en los logs">
+    Esto es esperado con `show-sql: true`. Solo investiga si las consultas están fallando.
+  </Accordion>
+  
+  <Accordion title="Problemas de timeout de sesión">
+    Las sesiones dev expiran después de 2 horas. Reinicia el flujo de autenticación si es necesario.
+  </Accordion>
+</AccordionGroup>
+
+## Ver También
+
+<CardGroup cols={3}>
+  <Card title="Visión General" icon="layer-group" href="/config/environments/overview">
+    Mecanismo de perfiles y combinación de configuraciones
+  </Card>
+  
+  <Card title="Entorno de Producción" icon="server" href="/config/environments/prod">
+    Configuraciones del entorno de producción
+  </Card>
+  
+  <Card title="Referencia de Variables" icon="gear" href="/config/environments/variables">
+    Lista completa de variables de entorno
+  </Card>
+</CardGroup>

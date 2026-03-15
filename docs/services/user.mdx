@@ -1,0 +1,438 @@
+---
+title: Servicio de Usuarios
+description: Servicio de gestión de usuarios, roles y permisos
+---
+
+## Descripción general
+
+`sgivu-user` gestiona usuarios, roles y permisos en el ecosistema SGIVU. Proporciona operaciones CRUD para usuarios y personas, gestión de roles y permisos, búsqueda multicriterio y endpoints de soporte para el Authorization Server (consulta de nombre de usuario para emisión de JWT).
+
+## Tecnologías
+
+- **Java**: 21
+- **Spring Boot**: 4.0.1
+- **Spring Security**: Resource Server (validación JWT)
+- **Spring Data JPA**: Persistencia en PostgreSQL
+- **Flyway**: Migraciones de base de datos
+- **Spring Cloud Config Client**: Configuración centralizada
+- **Spring Cloud Eureka Client**: Registro de servicios
+- **SpringDoc OpenAPI**: Documentación Swagger UI
+- **MapStruct**: Mapeo de DTOs
+- **Lombok**: Generación de código
+
+## Prerrequisitos
+
+- JDK 21
+- Maven 3.9+
+- Base de datos PostgreSQL
+- Servicios `sgivu-config` y `sgivu-discovery` en ejecución
+
+## Ejecución del servicio
+
+### Desarrollo con Docker Compose
+
+```bash
+cd infra/compose/sgivu-docker-compose
+docker compose -f docker-compose.dev.yml up -d
+```
+
+### Ejecución local
+
+```bash
+./mvnw clean install -DskipTests
+./mvnw spring-boot:run
+```
+
+### Construcción Docker
+
+```bash
+./build-image.bash
+docker build -t sgivu-user:local .
+```
+
+## Seguridad
+
+### Autenticación
+
+**Validación de tokens JWT**:
+- Tokens emitidos por el Authorization Server `sgivu-auth`
+- Validación mediante `NimbusJwtDecoder` apuntando al emisor
+- Configuración de Resource Server que valida la firma vía endpoint JWKS
+
+### Autorización
+
+**Autorización basada en claims**:
+- Claim `rolesAndPermissions` utilizado para autorización granular
+- Permisos requeridos por endpoint:
+  - `user:create` - Crear usuarios
+  - `user:read` - Consultar usuarios
+  - `user:update` - Actualizar usuarios
+  - `user:delete` - Eliminar usuarios
+  - `person:create`, `person:read`, `person:update`, `person:delete` - Operaciones de personas
+
+### Autenticación interna entre servicios
+
+**Header X-Internal-Service-Key**:
+- Permite a `sgivu-auth` consultar usuarios por nombre de usuario durante la emisión de tokens
+- Utilizado para autenticación entre servicios
+- **Crítico**: No exponer esta clave externamente
+
+<Warning>
+El header `X-Internal-Service-Key` omite la autenticación normal. Asegúrese de que esta clave:
+- Se almacene de forma segura (variable de entorno o gestor de secretos)
+- Solo sea conocida por los servicios autorizados
+- Se rote periódicamente
+- Nunca se registre en logs ni se exponga en mensajes de error
+</Warning>
+
+### Validadores personalizados
+
+**Validador PasswordStrength**:
+- Requisitos de longitud mínima
+- Reglas de complejidad (mayúsculas, minúsculas, números, caracteres especiales)
+- Aplicado en la creación de usuarios y actualización de contraseñas
+
+**Validador NoSpecialCharacters**:
+- Previene caracteres especiales en campos específicos
+- Aplicado a nombres de usuario y otros campos de texto
+- Lista de caracteres permitidos configurable
+
+## Esquema de base de datos
+
+### Migraciones Flyway
+
+**Ubicación**: `src/main/resources/db/migration`
+
+**V1__initial_schema.sql** crea:
+
+<Tabs>
+  <Tab title="Tablas principales">
+    - `permissions`: Catálogo de permisos del sistema
+    - `roles`: Roles de usuario
+    - `persons`: Información personal
+    - `users`: Cuentas de usuario
+  </Tab>
+  <Tab title="Tablas de relación">
+    - `roles_permissions`: Relación muchos a muchos entre roles y permisos
+    - `users_roles`: Relación muchos a muchos entre usuarios y roles
+  </Tab>
+  <Tab title="Tablas relacionadas">
+    - `addresses`: Direcciones físicas de las personas
+  </Tab>
+</Tabs>
+
+**Índices**:
+- `users.username` (único)
+- `persons.document_number` (único)
+- `permissions.name` (único)
+- `roles.name` (único)
+
+### Datos iniciales
+
+**Ubicación**: `src/main/resources/db/seed/R__seed_data.sql`
+
+**Crea**:
+- Usuario administrador: `steven` con rol `ADMIN`
+- Catálogo completo de permisos
+- Roles predeterminados (ADMIN, USER, etc.)
+- Datos de ejemplo de personas y direcciones
+
+<Info>
+La migración repetible (`R__`) se ejecuta en cada inicio si el checksum cambia. Úsela para datos de referencia que puedan necesitar actualizaciones.
+</Info>
+
+## Endpoints de la API
+
+### Gestión de usuarios
+
+<ResponseField name="GET /v1/users" type="protected">
+  Listar todos los usuarios con paginación
+  
+  **Permiso requerido**: `user:read`
+  
+  **Parámetros de consulta**:
+  - `page`: Número de página (por defecto: 0)
+  - `size`: Tamaño de página (por defecto: 20)
+  - `sort`: Campo y dirección de ordenamiento
+</ResponseField>
+
+<ResponseField name="GET /v1/users/{id}" type="protected">
+  Obtener usuario por ID
+  
+  **Permiso requerido**: `user:read`
+</ResponseField>
+
+<ResponseField name="POST /v1/users" type="protected">
+  Crear nuevo usuario
+  
+  **Permiso requerido**: `user:create`
+  
+  **Validaciones**:
+  - Nombre de usuario único
+  - Requisitos de fortaleza de contraseña
+  - Asignación de roles válidos
+</ResponseField>
+
+<ResponseField name="PUT /v1/users/{id}" type="protected">
+  Actualizar usuario existente
+  
+  **Permiso requerido**: `user:update`
+</ResponseField>
+
+<ResponseField name="DELETE /v1/users/{id}" type="protected">
+  Eliminar usuario (eliminación lógica)
+  
+  **Permiso requerido**: `user:delete`
+</ResponseField>
+
+### Gestión de personas
+
+<ResponseField name="GET /v1/persons" type="protected">
+  Listar personas con búsqueda avanzada
+  
+  **Permiso requerido**: `person:read`
+  
+  **Soporta**:
+  - Filtrado multicriterio
+  - Ordenamiento y paginación
+  - Búsqueda por número de documento, nombre, etc.
+</ResponseField>
+
+<ResponseField name="GET /v1/persons/{id}" type="protected">
+  Obtener persona por ID incluyendo direcciones
+  
+  **Permiso requerido**: `person:read`
+</ResponseField>
+
+<ResponseField name="POST /v1/persons" type="protected">
+  Crear persona con direcciones opcionales
+  
+  **Permiso requerido**: `person:create`
+</ResponseField>
+
+<ResponseField name="PUT /v1/persons/{id}" type="protected">
+  Actualizar información de persona
+  
+  **Permiso requerido**: `person:update`
+</ResponseField>
+
+<ResponseField name="DELETE /v1/persons/{id}" type="protected">
+  Eliminar persona
+  
+  **Permiso requerido**: `person:delete`
+</ResponseField>
+
+### Endpoints internos
+
+<ResponseField name="GET /internal/users/by-username/{username}" type="internal">
+  Consultar usuario por nombre de usuario para emisión de tokens
+  
+  **Autenticación**: Requiere header `X-Internal-Service-Key`
+  
+  **Utilizado por**: `sgivu-auth` durante el flujo de inicio de sesión
+  
+  **Retorna**: Detalles del usuario con roles y permisos
+</ResponseField>
+
+<Warning>
+Los endpoints internos no deben exponerse a través del API Gateway. Configure el gateway para bloquear las rutas `/internal/*`.
+</Warning>
+
+## Ejemplos de request/response
+
+### Crear usuario
+
+```json
+POST /v1/users
+Authorization: Bearer <jwt-token>
+Content-Type: application/json
+
+{
+  "username": "jdoe",
+  "password": "SecureP@ssw0rd!",
+  "email": "jdoe@example.com",
+  "personId": 123,
+  "roleIds": [1, 2],
+  "enabled": true
+}
+```
+
+### Respuesta
+
+```json
+{
+  "id": 456,
+  "username": "jdoe",
+  "email": "jdoe@example.com",
+  "enabled": true,
+  "person": {
+    "id": 123,
+    "firstName": "John",
+    "lastName": "Doe",
+    "documentNumber": "12345678"
+  },
+  "roles": [
+    {
+      "id": 1,
+      "name": "USER",
+      "permissions": ["user:read", "person:read"]
+    },
+    {
+      "id": 2,
+      "name": "MANAGER",
+      "permissions": ["vehicle:create", "vehicle:update"]
+    }
+  ],
+  "createdAt": "2024-03-06T10:30:00Z",
+  "updatedAt": "2024-03-06T10:30:00Z"
+}
+```
+
+## Observabilidad
+
+### Endpoints de Actuator
+
+- `/actuator/health`: Estado de salud del servicio
+- `/actuator/info`: Metadatos de la aplicación
+- Endpoints adicionales configurables por entorno
+
+### Documentación OpenAPI
+
+**Swagger UI**: `/swagger-ui/index.html`
+
+**Configuración**: `OpenApiConfig` define las URLs del servidor para los diferentes entornos
+
+```java
+@Configuration
+public class OpenApiConfig {
+    @Bean
+    public OpenAPI customOpenAPI() {
+        return new OpenAPI()
+            .info(new Info()
+                .title("SGIVU User Service API")
+                .version("1.0"))
+            .addServersItem(new Server()
+                .url("http://localhost:8080")
+                .description("API Gateway"));
+    }
+}
+```
+
+### Trazabilidad distribuida
+
+Configurado vía `sgivu-config`:
+- Endpoint de Zipkin para exportación de trazas
+- IDs de traza propagados mediante headers
+- Integración con Micrometer
+
+## Pruebas
+
+```bash
+./mvnw test
+```
+
+**Cobertura de pruebas**:
+- Pruebas unitarias para servicios y validadores
+- Pruebas de integración para repositorios
+- Pruebas de controladores con MockMvc
+- Pruebas de seguridad para verificación de permisos
+
+## Solución de problemas
+
+<AccordionGroup>
+  <Accordion title="Errores de autorización 401/403">
+    **Síntomas**: Las solicitudes a la API retornan no autorizado o prohibido
+    
+    **Soluciones**:
+    - Verificar que el token Bearer esté presente y sea válido
+    - Comprobar que el token contenga las autoridades requeridas en el claim `rolesAndPermissions`
+    - Asegurar que el emisor del token coincida con el Authorization Server configurado
+    - Verificar que el usuario tenga roles asignados con los permisos necesarios
+    - Comprobar que el token no haya expirado
+  </Accordion>
+  
+  <Accordion title="Falla en endpoint interno">
+    **Síntomas**: El servicio de autenticación no puede consultar usuarios durante el inicio de sesión
+    
+    **Soluciones**:
+    - Verificar que el header `X-Internal-Service-Key` esté presente
+    - Comprobar que la clave interna coincida entre los servicios de autenticación y usuarios
+    - Asegurar que los endpoints internos no estén bloqueados por el gateway
+    - Revisar la conectividad de red entre los servicios
+    - Verificar que el descubrimiento de servicios en Eureka esté funcionando
+  </Accordion>
+  
+  <Accordion title="Errores en migraciones de base de datos">
+    **Síntomas**: El servicio no inicia debido a errores de Flyway
+    
+    **Soluciones**:
+    - Verificar los parámetros de conexión a PostgreSQL
+    - Comprobar que la base de datos exista y el usuario tenga los permisos adecuados
+    - Revisar la tabla de historial de migraciones de Flyway
+    - Asegurar que los scripts de migración tengan la sintaxis correcta
+    - Verificar conflictos en los datos iniciales (claves duplicadas)
+  </Accordion>
+  
+  <Accordion title="Falla en la validación de contraseña">
+    **Síntomas**: La creación de usuario es rechazada con errores de contraseña
+    
+    **Soluciones**:
+    - Revisar los requisitos de fortaleza de contraseña
+    - Asegurar que la contraseña cumpla la longitud mínima
+    - Incluir los tipos de caracteres requeridos (mayúsculas, minúsculas, números, especiales)
+    - Verificar la configuración del validador personalizado
+  </Accordion>
+  
+  <Accordion title="Usuario/documento duplicado">
+    **Síntomas**: Errores de violación de restricción al crear registros
+    
+    **Soluciones**:
+    - Verificar la unicidad antes de la creación
+    - Manejar las excepciones de clave duplicada de forma adecuada
+    - Retornar mensajes de error claros a los clientes
+    - Considerar la eliminación lógica para usuarios desactivados
+  </Accordion>
+</AccordionGroup>
+
+## Variables de entorno
+
+| Variable | Descripción | Ejemplo |
+|----------|-------------|----------|
+| `DB_HOST` | Host de PostgreSQL | `sgivu-postgres-user` |
+| `DB_PORT` | Puerto de PostgreSQL | `5432` |
+| `DB_NAME` | Nombre de la base de datos | `sgivu_user` |
+| `DB_USERNAME` | Usuario de la base de datos | `sgivu_user` |
+| `DB_PASSWORD` | Contraseña de la base de datos | `secure_password` |
+| `SERVICE_INTERNAL_SECRET_KEY` | Clave de servicio interno | `secret-key-value` |
+| `SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI` | Emisor del servidor de autenticación | `http://sgivu-auth:9000` |
+
+## Buenas prácticas
+
+<CardGroup cols={2}>
+  <Card title="Modelo de permisos" icon="shield-check">
+    Utilizar permisos granulares para un control de acceso flexible
+  </Card>
+  <Card title="Política de contraseñas" icon="lock">
+    Aplicar requisitos estrictos de contraseña con validadores personalizados
+  </Card>
+  <Card title="Registro de auditoría" icon="clock">
+    Registrar createdAt/updatedAt en todas las entidades
+  </Card>
+  <Card title="Eliminación lógica" icon="trash-can">
+    Considerar eliminaciones lógicas para mantener la integridad de los datos
+  </Card>
+</CardGroup>
+
+## Servicios relacionados
+
+<CardGroup cols={2}>
+  <Card title="Servidor de autenticación" icon="lock" href="/services/auth">
+    Consulta al servicio de usuarios para la validación de credenciales
+  </Card>
+  <Card title="Gateway" icon="shield" href="/services/gateway">
+    Enruta las solicitudes de la API de gestión de usuarios
+  </Card>
+  <Card title="Servicio de clientes" icon="address-book" href="/services/client">
+    Patrones de gestión de entidades similares
+  </Card>
+</CardGroup>

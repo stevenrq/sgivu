@@ -1,0 +1,383 @@
+---
+title: Arquitectura de Despliegue
+description: Arquitectura de despliegue en producción y configuración de infraestructura para SGIVU
+---
+
+## Descripción General
+
+SGIVU está diseñado para desplegarse en infraestructura AWS con una arquitectura de microservicios orquestada por Docker Compose. La configuración recomendada para producción utiliza una VPC privada con servicios expuestos públicamente detrás de un Application Load Balancer (ALB) y un proxy inverso Nginx.
+
+## Componentes de Infraestructura
+
+### Arquitectura AWS Sugerida
+
+- **VPC**: Red privada con subredes públicas y privadas
+- **EC2/ECS/EKS**: Orquestación de contenedores (EC2 con Docker Compose es la línea base)
+- **RDS**: Instancias administradas de PostgreSQL y MySQL
+- **S3**: Alojamiento estático del Frontend y almacenamiento de imágenes de vehículos
+- **ALB**: Application Load Balancer para terminación HTTPS y distribución de tráfico
+- **Nginx**: Proxy inverso para enrutamiento y aislamiento de servicios
+
+<Warning>
+  Solo exponga el Gateway y el Auth Server públicamente a través de Nginx. Todos los demás microservicios deben permanecer en la red interna.
+</Warning>
+
+## Puertos de Servicios
+
+### Desarrollo (docker-compose.dev.yml)
+
+| Servicio | Puerto | Acceso Público |
+|----------|--------|----------------|
+| sgivu-gateway | 8080 | Sí (vía Nginx) |
+| sgivu-auth | 9000 | Sí (vía Nginx) |
+| sgivu-config | 8888 | No |
+| sgivu-discovery (Eureka) | 8761 | Solo depuración |
+| sgivu-user | 8081 | No |
+| sgivu-client | 8082 | No |
+| sgivu-vehicle | 8083 | No |
+| sgivu-purchase-sale | 8084 | No |
+| sgivu-ml | 8000 | No |
+| sgivu-zipkin | 9411 | Solo depuración |
+| PostgreSQL | 5432 | No |
+| MySQL | 3306 | No |
+| Redis | 6379 | No |
+
+### Producción (docker-compose.yml)
+
+En producción, solo el Gateway (8080) y Auth (9000) se exponen a través de Nginx en los puertos 80/443. Todos los demás servicios no tienen mapeo de puertos y solo son accesibles dentro de la red bridge Docker `sgivu-network`.
+
+## Patrones de Despliegue
+
+### Nginx como Punto de Entrada Único
+
+Nginx actúa como el único punto de entrada público (configurado en `infra/nginx/sites-available/default.conf`):
+
+- **Auth Server (puerto 9000)**: Rutas `/login`, `/oauth2/*`, `/.well-known/*` para flujos OIDC
+- **Gateway (puerto 8080)**: Rutas `/v1/*` para APIs de negocio y `/auth/session` para gestión de sesiones BFF
+- **Frontend**: El bucket S3 sirve como fallback catch-all para la SPA Angular
+
+Esta separación permite:
+- Escalado independiente de los servicios Auth y Gateway
+- Reglas de firewall simplificadas (solo 80/443 expuestos)
+- Aislamiento del ciclo de vida de autenticación respecto a las APIs de negocio
+
+### Patrón BFF (Backend For Frontend)
+
+El Gateway implementa el patrón BFF:
+- Almacena `access_token` y `refresh_token` en sesiones del lado del servidor (respaldadas por Redis)
+- El Frontend nunca maneja tokens directamente (protección contra XSS)
+- La cookie de sesión es `HttpOnly`, `SameSite=Lax`
+
+Consulte `~/workspace/source/README.md:49-61` para detalles de configuración de Redis.
+
+## Arquitectura de Red
+
+### Red Docker
+
+Todos los servicios se comunican a través de la red bridge `sgivu-network`:
+
+```yaml
+networks:
+  sgivu-network:
+    driver: bridge
+```
+
+### Descubrimiento de Servicios
+
+Eureka Discovery Service (`sgivu-discovery:8761`) proporciona registro y descubrimiento de servicios:
+- El Gateway utiliza enrutamiento `lb://service-name` a través de Eureka
+- Los servicios se registran automáticamente al iniciar
+- Los health checks evitan enrutar tráfico a instancias no saludables
+
+### Comunicación Interna
+
+Las llamadas entre servicios utilizan:
+1. **Tokens JWT Bearer** (retransmitidos por el Gateway para solicitudes iniciadas por el usuario)
+2. **Header `X-Internal-Service-Key`** para llamadas internas entre servicios sin contexto de usuario
+
+<Warning>
+  El `SERVICE_INTERNAL_SECRET_KEY` debe ser idéntico en los 7 servicios Backend + sgivu-ml. Las discrepancias causan errores 401/403.
+</Warning>
+
+## Configuración del Entorno
+
+### Perfiles de Configuración
+
+- **Desarrollo**: `.env.dev` → `docker-compose.dev.yml`
+- **Producción**: `.env` → `docker-compose.yml`
+
+`SPRING_PROFILES_ACTIVE` selecciona la capa YAML correspondiente del Config Server:
+- `dev` → carga `{service}-dev.yml`
+- `prod` → carga `{service}-prod.yml`
+
+### Config Server
+
+Configuración centralizada mediante `sgivu-config` (puerto 8888):
+
+**Modo desarrollo** (perfil native):
+```yaml
+environment:
+  - SPRING_PROFILES_ACTIVE=native
+  - SPRING_CLOUD_CONFIG_SERVER_NATIVE_SEARCH_LOCATIONS=file:/config-repo
+volumes:
+  - ../../../../sgivu-config-repo:/config-repo
+```
+
+**Modo producción** (perfil git):
+```yaml
+environment:
+  - SPRING_PROFILES_ACTIVE=git
+  - SPRING_CLOUD_CONFIG_SERVER_GIT_URI=https://github.com/stevenrq/sgivu-config-repo.git
+  - SPRING_CLOUD_CONFIG_SERVER_GIT_DEFAULT_LABEL=main
+```
+
+### Variables de Entorno Críticas
+
+Consulte la [Referencia de Variables de Entorno](/infrastructure/docker-compose#environment-variables) para detalles completos. Variables clave:
+
+| Variable | Propósito | Impacto si está mal configurada |
+|----------|-----------|----------------------------------|
+| `ISSUER_URL` ↔ `SGIVU_AUTH_URL` | Validación del emisor JWT | Todos los tokens JWT rechazados (fallo total de autenticación) |
+| `REDIS_PASSWORD` | Almacenamiento de sesiones del Gateway | Sin sesiones = sin autenticación |
+| `SERVICE_INTERNAL_SECRET_KEY` | Llamadas internas entre servicios | Las llamadas entre servicios fallan (401/403) |
+| `SGIVU_GATEWAY_SECRET` | Secreto del cliente OAuth2 | El intercambio de código de autorización falla |
+
+## Persistencia de Datos
+
+### Volúmenes Montados
+
+```yaml
+volumes:
+  mysql-data:      # Zipkin traces only
+  postgres-data:   # All service databases
+  redis-data:      # Gateway sessions
+```
+
+PostgreSQL aloja bases de datos separadas:
+- `sgivu_auth_db` (clientes OAuth2, autorizaciones, sesiones)
+- `sgivu_user_db` (usuarios, roles, permisos)
+- `sgivu_client_db` (datos de clientes)
+- `sgivu_vehicle_db` (inventario de vehículos)
+- `sgivu_purchase_sale_db` (transacciones)
+- `sgivu_ml_db` (artefactos de modelos ML, predicciones)
+
+MySQL se utiliza exclusivamente por Zipkin para almacenamiento de trazas distribuidas.
+
+## Pasos de Despliegue
+
+### Configuración Inicial
+
+1. **Preparar archivo de entorno**:
+   ```bash
+   cd infra/compose/sgivu-docker-compose
+   cp .env.example .env
+   # Edit .env and replace all placeholders
+   ```
+
+2. **Configurar recursos AWS**:
+   - Crear instancias RDS para PostgreSQL y MySQL
+   - Configurar buckets S3 para el Frontend e imágenes de vehículos
+   - Configurar ALB y grupos de seguridad
+   - Actualizar `.env` con los endpoints y credenciales de AWS
+
+3. **Construir y publicar imágenes** (si no se usan imágenes preconstruidas `stevenrq/*`):
+   ```bash
+   ./build-and-push-images.bash
+   ```
+
+4. **Desplegar en EC2**:
+   ```bash
+   # SSH to EC2 instance
+   ssh -i clave.pem ec2-user@your-ec2-hostname
+   
+   # Clone repository and navigate to compose directory
+   cd infra/compose/sgivu-docker-compose
+   
+   # Launch stack
+   ./run.bash --prod
+   ```
+
+### Actualizaciones sin Tiempo de Inactividad
+
+Actualizar un servicio individual sin tiempo de inactividad:
+
+```bash
+./rebuild-service.bash --prod sgivu-auth
+```
+
+Este script:
+1. Reconstruye/descarga la imagen del servicio
+2. Recrea únicamente ese contenedor
+3. Deja los demás servicios en ejecución
+
+### Escalado Horizontal
+
+Para escalar un servicio (por ejemplo, el Gateway para alto tráfico):
+
+```bash
+docker compose up -d --scale sgivu-gateway=3
+```
+
+<Info>
+  El Gateway puede escalar horizontalmente porque las sesiones se almacenan en Redis (estado compartido). Otros servicios también pueden escalar si se hacen stateless.
+</Info>
+
+## Consideraciones de Seguridad
+
+### Gestión de Secretos
+
+<Warning>
+  Nunca versione archivos `.env` en el control de versiones. Use AWS Secrets Manager o Parameter Store en producción.
+</Warning>
+
+- Almacene `.env` de forma segura en el servidor de despliegue
+- Use `chmod 400` para claves SSH (`clave.pem`)
+- Rote `JWT_KEYSTORE_PASSWORD` y `SERVICE_INTERNAL_SECRET_KEY` regularmente
+- Use roles AWS IAM en lugar de `AWS_ACCESS_KEY`/`AWS_SECRET_KEY` hardcodeados cuando sea posible
+
+### Seguridad de Red
+
+- Coloque las instancias EC2 en subredes privadas
+- Solo el ALB debe estar en la subred pública
+- Configure los grupos de seguridad para permitir:
+  - Entrada: ALB → EC2 (80/443)
+  - Salida: EC2 → RDS, S3, VPC endpoints
+  - Interno: Servicios dentro de `sgivu-network`
+
+### Endurecimiento de Servicios
+
+- Exponga Eureka (`/eureka/`) y Zipkin (`/zipkin/`) solo vía VPN o lista blanca de IPs
+- Habilite terminación HTTPS/TLS en el ALB
+- Use AWS WAF para rate limiting y protección contra DDoS
+- Restrinja los endpoints de actuator (`/actuator/*`) a la red interna
+
+## Monitoreo de Salud del Despliegue
+
+### Orden de Inicio de Servicios
+
+Los servicios tienen relaciones `depends_on` que aseguran el inicio correcto:
+
+1. Bases de datos: `sgivu-postgres`, `sgivu-mysql`, `sgivu-redis`
+2. Infraestructura: `sgivu-config`, `sgivu-discovery`
+3. Auth: `sgivu-auth`
+4. Servicios: `sgivu-user`, `sgivu-client`, `sgivu-vehicle`, `sgivu-purchase-sale`
+5. Gateway: `sgivu-gateway` (depende de auth + redis)
+6. ML: `sgivu-ml` (depende de todos los servicios)
+
+### Verificar Despliegue
+
+```bash
+# Check all services are running
+docker compose ps
+
+# View logs for a specific service
+docker compose logs -f sgivu-gateway
+
+# Check service registration in Eureka
+curl http://localhost:8761/eureka/apps
+
+# Verify Config Server
+curl http://localhost:8888/sgivu-gateway/dev
+
+# Health checks
+curl http://localhost:8080/actuator/health  # Gateway
+curl http://localhost:9000/actuator/health  # Auth
+curl http://localhost:8000/health           # ML service
+```
+
+## Solución de Problemas
+
+### Conflictos de Puertos
+
+**Problema**: `Error: port 8080 is already allocated`
+
+**Solución**: 
+```bash
+# Find process using port
+lsof -i :8080
+# Kill process or adjust port mapping in docker-compose
+```
+
+### Config Server Inalcanzable
+
+**Problema**: Los servicios fallan al iniciar con errores de configuración
+
+**Solución**:
+- Verifique que `SPRING_CLOUD_CONFIG_URI` apunte a `http://sgivu-config:8888`
+- Revise los logs del Config Server: `docker compose logs sgivu-config`
+- Para el perfil Git, verifique la URL del repositorio y las credenciales
+- Para el perfil native, verifique el montaje de volumen: `../../../../sgivu-config-repo:/config-repo`
+
+### Servicio No Se Registra en Eureka
+
+**Problema**: El Gateway retorna 503 en llamadas a la API
+
+**Solución**:
+- Verifique `EUREKA_URL=http://sgivu-discovery:8761/eureka`
+- Confirme que el servicio puede alcanzar Eureka: `docker compose exec sgivu-user curl sgivu-discovery:8761`
+- Revise la UI de Eureka para ver las instancias registradas
+
+### Fallos de Validación JWT
+
+**Problema**: Todas las llamadas a la API retornan 401 Unauthorized
+
+**Solución**:
+- Asegúrese de que `ISSUER_URL` y `SGIVU_AUTH_URL` sean idénticos
+- En producción, ambos deben ser `http://your-ec2-hostname` (no hostnames internos de Docker)
+- Verifique que `extra_hosts` en docker-compose mapee el hostname de EC2 a `host-gateway`
+- Compruebe que el Auth Server sea accesible en `/.well-known/openid-configuration`
+
+### Fallos de Conexión a Redis
+
+**Problema**: El Gateway falla al iniciar con "Unable to connect to Redis"
+
+**Solución**:
+- Verifique que `REDIS_PASSWORD` coincida entre el contenedor Redis y la configuración del Gateway
+- Compruebe que Redis esté en ejecución: `docker compose ps sgivu-redis`
+- Pruebe la conexión: `docker compose exec sgivu-redis redis-cli -a "$REDIS_PASSWORD" ping`
+
+## Procedimientos de Rollback
+
+### Rollback de un Servicio Individual
+
+```bash
+# Pull previous version
+docker pull stevenrq/sgivu-gateway:v0
+
+# Update image tag in docker-compose.yml
+# Then recreate service
+docker compose up -d sgivu-gateway
+```
+
+### Rollback Completo del Stack
+
+```bash
+# Stop current stack
+docker compose down
+
+# Checkout previous version from Git
+git checkout <previous-commit>
+
+# Restore previous .env if needed
+cp .env.backup .env
+
+# Restart stack
+./run.bash --prod
+```
+
+### Rollback de Base de Datos
+
+Las migraciones Flyway (servicios Java) y Alembic (sgivu-ml) están versionadas. Para hacer rollback:
+1. Restaurar la base de datos desde un backup
+2. Desplegar la versión del servicio que coincida con el esquema de la base de datos
+3. Para sgivu-ml, opcionalmente ejecutar `alembic downgrade <revision>` hacia una versión específica
+
+<Warning>
+  Los servicios Java no utilizan migraciones undo de Flyway. Los rollbacks de base de datos requieren intervención manual o restauración desde un backup. El servicio ML (Alembic) sí soporta `downgrade` programático.
+</Warning>
+
+## Próximos Pasos
+
+- [Configuración de Docker Compose](/infrastructure/docker-compose): Referencia detallada del archivo compose
+- [Configuración de Nginx](/infrastructure/nginx): Configuración del proxy inverso y reglas de enrutamiento
+- [Configuración de Monitoreo](/infrastructure/monitoring): Observabilidad y trazas distribuidas
