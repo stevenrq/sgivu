@@ -1,0 +1,470 @@
+---
+title: 'Metadatos del Modelo'
+description: 'Consultar información sobre modelos entrenados, importancia de features y monitoreo de drift'
+---
+
+## Descripción General
+
+La API de Metadatos del Modelo proporciona endpoints para inspeccionar el modelo de pronóstico de demanda activo, su importancia de features y registrar/consultar drift contra valores reales. Todos los endpoints están bajo `/v1/ml/`.
+
+## URL Base
+
+```
+https://your-domain.com/v1/ml
+```
+
+---
+
+## Obtener Modelo Más Reciente
+
+```http
+GET /v1/ml/models/latest
+```
+
+Recupera los metadatos del modelo de predicción actualmente activo.
+
+**Autenticación:** Requerida (JWT o clave de servicio interno).
+
+**Autorización:** Requiere el permiso `ml:models` (configurable vía `PERMISSIONS_MODELS`).
+
+### Respuesta
+
+<ResponseField name="version" type="string">
+  Identificador de versión del modelo. Formato `YYYYMMDDHHMMSS` en UTC (sin separadores).
+</ResponseField>
+
+<ResponseField name="trained_at" type="string">
+  Marca de tiempo de finalización del entrenamiento (ISO 8601, UTC).
+</ResponseField>
+
+<ResponseField name="target" type="string">
+  Variable objetivo. Por defecto `sales_count` (configurable vía `TARGET_COLUMN`).
+</ResponseField>
+
+<ResponseField name="features" type="array">
+  Lista ordenada de nombres de features que el pipeline espera (categóricas + numéricas).
+</ResponseField>
+
+<ResponseField name="metrics" type="object">
+  Métricas de rendimiento del modelo seleccionado sobre el conjunto de prueba.
+</ResponseField>
+
+<ResponseField name="metrics.mae" type="number">
+  Error Absoluto Medio (MAE).
+</ResponseField>
+
+<ResponseField name="metrics.rmse" type="number">
+  Raíz del Error Cuadrático Medio (RMSE).
+</ResponseField>
+
+<ResponseField name="metrics.mape" type="number">
+  Error Porcentual Absoluto Medio (MAPE), expresado como decimal (0.14 = 14 %).
+</ResponseField>
+
+<ResponseField name="metrics.wape" type="number">
+  Weighted Absolute Percentage Error. Métrica usada por defecto para seleccionar el mejor modelo (modo `weighted`). Más estable que MAPE en meses con ventas cercanas a cero.
+</ResponseField>
+
+<ResponseField name="metrics.r2" type="number">
+  Coeficiente de determinación (R²).
+</ResponseField>
+
+<ResponseField name="metrics.residual_std" type="number">
+  Desviación estándar de los residuos. Se utiliza para construir intervalos de confianza.
+</ResponseField>
+
+<ResponseField name="metrics.baselines" type="object" nullable>
+  Métricas de baselines naive (`naive_lag1_rmse`, etc.) calculadas sobre el conjunto de prueba para validar la mejora del modelo entrenado.
+</ResponseField>
+
+<ResponseField name="candidates" type="array">
+  Métricas comparativas de cada algoritmo evaluado durante el entrenamiento (Random Forest y XGBoost).
+</ResponseField>
+
+<ResponseField name="train_samples" type="integer">
+  Cantidad de muestras de entrenamiento.
+</ResponseField>
+
+<ResponseField name="test_samples" type="integer">
+  Cantidad de muestras de prueba.
+</ResponseField>
+
+<ResponseField name="total_samples" type="integer">
+  Cantidad total de muestras en el dataset.
+</ResponseField>
+
+```json
+{
+  "version": "20260306143522",
+  "trained_at": "2026-03-06T14:35:22.123456+00:00",
+  "target": "sales_count",
+  "features": [
+    "vehicle_type",
+    "brand",
+    "model",
+    "line",
+    "purchases_count",
+    "avg_margin",
+    "avg_sale_price",
+    "avg_purchase_price",
+    "avg_days_inventory",
+    "inventory_rotation",
+    "lag_1",
+    "lag_3",
+    "lag_6",
+    "rolling_mean_3",
+    "rolling_mean_6",
+    "month",
+    "year",
+    "month_sin",
+    "month_cos",
+    "quarter",
+    "quarter_sin",
+    "quarter_cos",
+    "horizon_step"
+  ],
+  "metrics": {
+    "mae": 1.32,
+    "rmse": 1.95,
+    "mape": 0.14,
+    "wape": 0.11,
+    "r2": 0.87,
+    "residual_std": 1.78,
+    "baselines": {
+      "naive_lag1_rmse": 2.94
+    }
+  },
+  "candidates": [
+    {
+      "model": "random_forest",
+      "rmse": 2.18,
+      "mae": 1.45,
+      "mape": 0.16,
+      "wape": 0.13,
+      "r2": 0.82,
+      "samples": 2135
+    },
+    {
+      "model": "xgboost",
+      "rmse": 1.95,
+      "mae": 1.32,
+      "mape": 0.14,
+      "wape": 0.11,
+      "r2": 0.87,
+      "samples": 2135
+    }
+  ],
+  "train_samples": 8540,
+  "test_samples": 2135,
+  "total_samples": 10675
+}
+```
+
+### Códigos de Estado
+
+- `200 OK` — Metadatos del modelo recuperados correctamente.
+- `401 Unauthorized` — Autenticación faltante o inválida.
+- `403 Forbidden` — Permiso `ml:models` faltante.
+- `404 Not Found` — No hay modelo entrenado disponible.
+
+### Ejemplo
+
+```bash
+curl -X GET https://your-domain.com/v1/ml/models/latest \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+---
+
+## Obtener Importancia de Features
+
+```http
+GET /v1/ml/models/latest/feature-importance
+```
+
+Devuelve los pesos de importancia que el modelo activo asigna a cada feature de entrada. Útil para auditoría e interpretación del pronóstico.
+
+**Autenticación:** Requerida.
+
+**Autorización:** Requiere el permiso `ml:models`.
+
+### Respuesta
+
+<ResponseField name="model_version" type="string">
+  Versión del modelo cuya importancia se reporta.
+</ResponseField>
+
+<ResponseField name="feature_importances" type="object">
+  Mapa `nombre_feature` → `importancia`. Para Random Forest se reportan los `feature_importances_`; para XGBoost, los `feature_importances_` (gain). Tras el one-hot encoding, las features categóricas se devuelven como pares `categoria=valor`.
+</ResponseField>
+
+```json
+{
+  "model_version": "20260306143522",
+  "feature_importances": {
+    "lag_1": 0.42,
+    "rolling_mean_3": 0.18,
+    "month_sin": 0.09,
+    "horizon_step": 0.07,
+    "avg_margin": 0.05
+  }
+}
+```
+
+### Ejemplo
+
+```bash
+curl -X GET https://your-domain.com/v1/ml/models/latest/feature-importance \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### Códigos de Estado
+
+- `200 OK` — Importancias recuperadas correctamente.
+- `401 Unauthorized` — Autenticación faltante o inválida.
+- `403 Forbidden` — Permiso `ml:models` faltante.
+- `404 Not Found` — No hay modelo disponible.
+
+---
+
+## Registrar Demanda Real (Drift)
+
+```http
+POST /v1/ml/actuals
+```
+
+Registra una observación de demanda real para alimentar el monitoreo de drift del modelo. La tabla `ml_drift_records` almacena cada par predicción/real con su error absoluto.
+
+**Autenticación:** Requerida (JWT o clave de servicio interno).
+
+**Autorización:** Requiere el permiso `ml:retrain` (configurable vía `PERMISSIONS_RETRAIN`).
+
+### Cuerpo de la solicitud
+
+<ParamField body="model_version" type="string" required>
+  Versión del modelo contra el cual se compara el valor real (formato `YYYYMMDDHHMMSS`).
+</ParamField>
+
+<ParamField body="vehicle_type" type="string" required>
+  Tipo de vehículo: `CAR` o `MOTORCYCLE`.
+</ParamField>
+
+<ParamField body="brand" type="string" required>
+  Marca del vehículo.
+</ParamField>
+
+<ParamField body="model" type="string" required>
+  Modelo del vehículo.
+</ParamField>
+
+<ParamField body="line" type="string" required>
+  Línea/versión del vehículo. Mínimo 1 carácter.
+</ParamField>
+
+<ParamField body="month" type="string" required>
+  Mes de la predicción en formato ISO `YYYY-MM-DD` (validado por el patrón `^\d{4}-\d{2}-\d{2}$`).
+</ParamField>
+
+<ParamField body="actual_demand" type="number" required>
+  Demanda real observada en el mes. Debe ser >= 0.
+</ParamField>
+
+<ParamField body="predicted_demand" type="number">
+  Predicción original asociada al registro (opcional).
+</ParamField>
+
+### Respuesta
+
+```json
+{
+  "status": "recorded",
+  "model_version": "20260306143522",
+  "month": "2026-03-01"
+}
+```
+
+### Ejemplo
+
+```bash
+curl -X POST https://your-domain.com/v1/ml/actuals \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model_version": "20260306143522",
+    "vehicle_type": "CAR",
+    "brand": "TOYOTA",
+    "model": "COROLLA",
+    "line": "XEI 2.0",
+    "month": "2026-03-01",
+    "actual_demand": 12,
+    "predicted_demand": 10.5
+  }'
+```
+
+### Códigos de Estado
+
+- `200 OK` — Observación registrada correctamente.
+- `400 Bad Request` — Parámetros inválidos.
+- `401 Unauthorized` — Autenticación faltante o inválida.
+- `403 Forbidden` — Permiso `ml:retrain` faltante.
+- `503 Service Unavailable` — Persistencia ML deshabilitada (sin base de datos configurada).
+
+---
+
+## Obtener Reporte de Drift
+
+```http
+GET /v1/ml/drift-report
+```
+
+Genera un reporte con los registros de drift acumulados para una versión de modelo: errores absolutos por segmento, agregados temporales, etc.
+
+**Autenticación:** Requerida.
+
+**Autorización:** Requiere el permiso `ml:models`.
+
+### Parámetros de consulta
+
+<ParamField query="model_version" type="string" required>
+  Versión del modelo a analizar (formato `YYYYMMDDHHMMSS`).
+</ParamField>
+
+### Ejemplo
+
+```bash
+curl -G "https://your-domain.com/v1/ml/drift-report" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  --data-urlencode "model_version=20260306143522"
+```
+
+### Códigos de Estado
+
+- `200 OK` — Reporte generado correctamente.
+- `401 Unauthorized` — Autenticación faltante o inválida.
+- `403 Forbidden` — Permiso `ml:models` faltante.
+- `404 Not Found` — No hay registros para esa versión.
+- `503 Service Unavailable` — Persistencia ML deshabilitada.
+
+---
+
+## Endpoint de Health Check
+
+```http
+GET /health
+```
+
+**Autenticación:** Ninguna (público).
+
+### Respuesta
+
+```json
+{
+  "status": "ok",
+  "version": "0.1.0"
+}
+```
+
+```bash
+curl https://your-domain.com/health
+```
+
+---
+
+## Casos de Uso
+
+### Dashboard de Monitoreo del Modelo
+
+```javascript
+fetch('https://your-domain.com/v1/ml/models/latest', {
+  headers: { Authorization: `Bearer ${token}` },
+})
+  .then((res) => res.json())
+  .then((model) => {
+    console.log(`Versión actual: ${model.version}`);
+    console.log(`MAE: ${model.metrics.mae}`);
+    console.log(`WAPE: ${(model.metrics.wape * 100).toFixed(1)}%`);
+    console.log(`Entrenado: ${new Date(model.trained_at).toLocaleString()}`);
+  });
+```
+
+### Comparación tras reentrenamiento
+
+```python
+import requests
+
+headers = {"Authorization": f"Bearer {token}"}
+
+current = requests.get(
+    "https://your-domain.com/v1/ml/models/latest", headers=headers
+).json()
+
+new_model = requests.post(
+    "https://your-domain.com/v1/ml/retrain",
+    headers=headers,
+    json={},
+).json()
+
+improvement = current["metrics"]["wape"] - new_model["metrics"]["wape"]
+print(f"Mejora WAPE: {improvement:.4f}")
+```
+
+### Detección de obsolescencia
+
+```python
+from datetime import datetime, timezone
+
+def is_model_stale(max_age_days=30):
+    response = requests.get(
+        "https://your-domain.com/v1/ml/models/latest",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    if response.status_code == 404:
+        return True
+    data = response.json()
+    trained_at = datetime.fromisoformat(data["trained_at"])
+    age = datetime.now(timezone.utc) - trained_at
+    return age.days > max_age_days
+```
+
+---
+
+## Respuestas de Error
+
+### 401 Unauthorized
+
+```json
+{ "detail": "Not authenticated" }
+```
+
+### 403 Forbidden
+
+```json
+{ "detail": "User does not have required permission: ml:models" }
+```
+
+### 404 Not Found (sin modelo)
+
+```json
+{ "detail": "Aún no existe un modelo entrenado." }
+```
+
+---
+
+## Integración con el Gateway
+
+En producción, los endpoints de ML se consumen a través del API gateway:
+
+```
+Gateway: https://your-domain.com/v1/ml/**
+  → Routes to: http://sgivu-ml:8000/v1/ml/**
+```
+
+El gateway se encarga de:
+
+- Relay del access token vía filtro `tokenRelay()`.
+- Circuit breaker (`mlServiceCircuitBreaker` y `mlRetrainCircuitBreaker`).
+- Inyección del header `X-User-ID` con el subject del JWT (filtro `AddUserIdHeaderGlobalFilter`).
+
+<Note>
+La ruta `/v1/ml/retrain` tiene su propio timeout (1800 s / 30 min) y su propio circuit breaker para tolerar entrenamientos largos.
+</Note>

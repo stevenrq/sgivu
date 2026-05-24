@@ -1,0 +1,5 @@
+spring:
+  application:
+    name: sgivu-auth
+  config:
+    import: ${SPRING_CONFIG_IMPORT:configserver:http://sgivu-config:8888}

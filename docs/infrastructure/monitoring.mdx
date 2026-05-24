@@ -1,0 +1,337 @@
+---
+title: Monitoreo y Observabilidad
+description: Health Checks y funcionalidades de observabilidad en SGIVU
+---
+
+## Descripción general
+
+SGIVU implementa observabilidad en todos los servicios utilizando Spring Boot Actuator. Esto permite monitoreo de salud en tiempo real y gestión de los servicios.
+
+## Health Checks
+
+### Endpoints de Actuator
+
+Todos los servicios Spring Boot exponen endpoints de Health Check a través de Spring Boot Actuator:
+
+| Servicio | Endpoint | Puerto |
+|----------|----------|--------|
+| sgivu-auth | `/actuator/health` | 9000 |
+| sgivu-gateway | `/actuator/health` | 8080 |
+| sgivu-config | `/actuator/health` | 8888 |
+| sgivu-discovery | `/actuator/health` | 8761 |
+| sgivu-user | `/actuator/health` | 8081 |
+| sgivu-client | `/actuator/health` | 8082 |
+| sgivu-vehicle | `/actuator/health` | 8083 |
+| sgivu-purchase-sale | `/actuator/health` | 8084 |
+| sgivu-ml (FastAPI) | `/health` o `/actuator/health` | 8000 |
+
+### Ejemplos de Health Check
+
+#### Servicios Spring Boot
+
+```bash
+# Gateway health
+curl http://localhost:8080/actuator/health
+
+# Response
+{
+  "status": "UP",
+  "components": {
+    "diskSpace": {
+      "status": "UP",
+      "details": {
+        "total": 250790436864,
+        "free": 100000000000,
+        "threshold": 10485760
+      }
+    },
+    "ping": {
+      "status": "UP"
+    },
+    "redis": {
+      "status": "UP",
+      "details": {
+        "version": "7.0.0"
+      }
+    }
+  }
+}
+```
+
+#### Servicio ML (FastAPI)
+
+```bash
+curl http://localhost:8000/health
+
+# Response
+{
+  "status": "healthy",
+  "service": "sgivu-ml",
+  "version": "0.1.0"
+}
+```
+
+### Exposición según entorno
+
+La exposición de endpoints de Actuator varía según el perfil:
+
+**Desarrollo** (`application-dev.yml`):
+```yaml
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,env,configprops
+```
+
+**Producción** (`application-prod.yml`):
+```yaml
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+```
+
+<Warning>
+  En producción, restrinja los endpoints de Actuator a redes internas o requiera autenticación. Exponer métricas y detalles del entorno públicamente representa un riesgo de seguridad.
+</Warning>
+
+### Sondas de Liveness y Readiness
+
+Para despliegues en Kubernetes:
+
+```yaml
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true
+```
+
+**Endpoints**:
+- `GET /actuator/health/liveness`: Sonda de Liveness (debe reiniciarse si está DOWN)
+- `GET /actuator/health/readiness`: Sonda de Readiness (no debe recibir tráfico si está DOWN)
+
+## Monitoreo de Service Discovery
+
+### Dashboard de Eureka
+
+**Acceso**: `http://localhost:8761` (desarrollo) o `http://your-ec2-hostname/eureka/` (producción)
+
+#### Funcionalidades del Dashboard
+
+**1. Estado de instancias**
+- Nombre del servicio
+- Cantidad de instancias
+- IDs de instancias
+- Estado (UP, DOWN, OUT_OF_SERVICE)
+
+**2. Información del sistema**
+- Entorno
+- Centro de datos
+- Tiempo de actividad
+
+**3. Aplicaciones registradas**
+```
+Application         | AMIs        | Availability Zones | Status
+--------------------|-------------|--------------------|---------
+SGIVU-AUTH          | n/a (1)     | (1)               | UP (1)
+SGIVU-GATEWAY       | n/a (1)     | (1)               | UP (1)
+SGIVU-USER          | n/a (1)     | (1)               | UP (1)
+SGIVU-CLIENT        | n/a (1)     | (1)               | UP (1)
+SGIVU-VEHICLE       | n/a (1)     | (1)               | UP (1)
+SGIVU-PURCHASE-SALE | n/a (1)     | (1)               | UP (1)
+```
+
+### API REST
+
+**Obtener todas las aplicaciones**:
+```bash
+curl http://localhost:8761/eureka/apps
+```
+
+**Obtener una aplicación específica**:
+```bash
+curl http://localhost:8761/eureka/apps/SGIVU-GATEWAY
+```
+
+**Respuesta** (XML):
+```xml
+<application>
+  <name>SGIVU-GATEWAY</name>
+  <instance>
+    <instanceId>sgivu-gateway:8080</instanceId>
+    <hostName>sgivu-gateway</hostName>
+    <app>SGIVU-GATEWAY</app>
+    <ipAddr>172.18.0.10</ipAddr>
+    <status>UP</status>
+    <port enabled="true">8080</port>
+    <healthCheckUrl>http://sgivu-gateway:8080/actuator/health</healthCheckUrl>
+  </instance>
+</application>
+```
+
+<Warning>
+  El dashboard de Eureka se expone sin autenticación. En producción, utilice listas blancas de IP o acceso por VPN.
+</Warning>
+
+## Logging
+
+### Niveles de log
+
+**Desarrollo**:
+```yaml
+logging:
+  level:
+    root: INFO
+    com.sgivu: DEBUG
+    org.springframework.security: DEBUG
+    org.springframework.cloud.gateway: DEBUG
+```
+
+**Producción**:
+```yaml
+logging:
+  level:
+    root: INFO
+    com.sgivu: INFO
+    org.springframework.security: WARN
+```
+
+### Logging estructurado
+
+Los servicios utilizan SLF4J con Logback para logging estructurado:
+
+**Formato de log**:
+```
+%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n
+```
+
+**Ejemplo de log**:
+```
+2026-03-06 10:15:23.456 [http-nio-8080-exec-1] INFO  c.s.g.filter.AddUserIdHeaderGlobalFilter - Request: GET /v1/users
+2026-03-06 10:15:23.512 [http-nio-8080-exec-1] INFO  c.s.g.filter.AddUserIdHeaderGlobalFilter - Response: 200 (56ms)
+```
+
+### Visualización de logs
+
+**Docker Compose**:
+```bash
+# All services
+docker compose logs -f
+
+# Specific service
+docker compose logs -f sgivu-gateway
+
+# Last 100 lines
+docker compose logs --tail=100 sgivu-gateway
+
+# Since timestamp
+docker compose logs --since 2026-03-06T10:00:00 sgivu-gateway
+```
+
+## Alertas
+
+### Monitoreo de Health Checks
+
+**Script simple** (`monitor-health.sh`):
+```bash
+#!/bin/bash
+
+SERVICES=(
+  "http://localhost:8080/actuator/health"  # Gateway
+  "http://localhost:9000/actuator/health"  # Auth
+  "http://localhost:8081/actuator/health"  # User
+  "http://localhost:8082/actuator/health"  # Client
+  "http://localhost:8083/actuator/health"  # Vehicle
+  "http://localhost:8084/actuator/health"  # Purchase-sale
+  "http://localhost:8000/health"           # ML
+)
+
+for SERVICE in "${SERVICES[@]}"; do
+  STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$SERVICE")
+  if [ "$STATUS" -ne 200 ]; then
+    echo "ALERT: $SERVICE is DOWN (HTTP $STATUS)"
+    # Send alert (email, Slack, PagerDuty, etc.)
+  fi
+done
+```
+
+## Monitoreo de rendimiento
+
+### Análisis de duración de peticiones
+
+### Monitoreo de Circuit Breaker
+
+El Gateway utiliza Circuit Breakers de Resilience4j para resiliencia:
+
+**Configuración**:
+```yaml
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10000
+        permittedNumberOfCallsInHalfOpenState: 3
+```
+
+**Estados**:
+- **CLOSED**: Operación normal
+- **OPEN**: Las fallas superaron el umbral, las peticiones fallan rápidamente
+- **HALF_OPEN**: Verificando si el servicio se recuperó
+
+**Métricas**:
+```bash
+curl http://localhost:8080/actuator/metrics/resilience4j.circuitbreaker.state
+```
+
+### Pool de conexiones a base de datos
+
+Monitorear el pool de conexiones de HikariCP:
+
+```bash
+curl http://localhost:8081/actuator/metrics/hikaricp.connections.active
+curl http://localhost:8081/actuator/metrics/hikaricp.connections.idle
+```
+
+## Solución de problemas
+
+### El servicio no aparece en Eureka
+
+**Problema**: El servicio está en ejecución pero no se registra
+
+**Soluciones**:
+1. Verificar la configuración de Eureka:
+   ```yaml
+   eureka:
+     client:
+       service-url:
+         defaultZone: http://sgivu-discovery:8761/eureka
+       register-with-eureka: true
+       fetch-registry: true
+   ```
+
+2. Comprobar la conectividad de red:
+   ```bash
+   docker compose exec sgivu-user curl http://sgivu-discovery:8761
+   ```
+
+3. Revisar los logs del servicio en busca de errores de registro:
+   ```bash
+   docker compose logs sgivu-user | grep -i eureka
+   ```
+
+## Próximos pasos
+
+- [Arquitectura de despliegue](/infrastructure/deployment): Visión general de la infraestructura
+- [Docker Compose](/infrastructure/docker-compose): Orquestación de servicios
+- [Configuración de Nginx](/infrastructure/nginx): Configuración de proxy inverso

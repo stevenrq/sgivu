@@ -1,0 +1,106 @@
+---
+title: Autenticación
+description: Inicio de sesión seguro y gestión de acceso para la plataforma SGIVU
+---
+
+## Descripción General
+
+SGIVU utiliza un sistema de autenticación seguro basado en OAuth2 y OpenID Connect para proteger tu cuenta y tus datos. Todos los usuarios deben autenticarse antes de acceder a las funcionalidades de la plataforma.
+
+## Iniciar Sesión
+
+<Steps>
+  <Step title="Navegar al Login">
+    Accede a la plataforma SGIVU a través de tu navegador web. Serás redirigido automáticamente a la página de inicio de sesión si no estás autenticado.
+  </Step>
+  
+  <Step title="Ingresar Credenciales">
+    Introduce tu nombre de usuario y contraseña en el formulario de inicio de sesión. Asegúrate de que tus credenciales sean correctas y coincidan con las proporcionadas durante la creación de tu cuenta.
+  </Step>
+  
+  <Step title="Enviar">
+    Haz clic en el botón de inicio de sesión para autenticarte. El sistema verificará tus credenciales y emitirá un Access Token seguro.
+  </Step>
+  
+  <Step title="Acceder a la Plataforma">
+    Una vez autenticado, serás redirigido al panel principal de SGIVU donde podrás acceder a todas las funcionalidades según tus permisos.
+  </Step>
+</Steps>
+
+## Gestión de Sesiones
+
+<Card title="Manejo Automático de Sesiones" icon="clock">
+  Tu sesión es gestionada automáticamente por SGIVU. Las sesiones permanecen activas mientras utilizas la plataforma y expiran después de un período de inactividad por motivos de seguridad.
+</Card>
+
+<Card title="Almacenamiento Seguro de Tokens" icon="lock">
+  Los Access Tokens se almacenan de forma segura y se incluyen automáticamente en tus solicitudes. No necesitas gestionar manualmente los tokens de autenticación.
+</Card>
+
+## Características de Seguridad
+
+### Soporte Multi-Cliente
+
+SGIVU soporta diferentes tipos de clientes para diversos casos de uso:
+
+- **Aplicación Web**: La interfaz web principal de SGIVU
+- **Acceso API**: Acceso programático para integraciones
+- **Herramientas de Prueba**: Clientes de desarrollo y depuración para usuarios autorizados
+
+### Autenticación Basada en Tokens
+
+Todas las solicitudes autenticadas utilizan JSON Web Tokens (JWT) que contienen:
+
+- Tu identidad de usuario
+- Roles y permisos asignados
+- Tiempo de expiración del token
+- Firma digital segura
+
+### Descubrimiento OpenID Connect
+
+El sistema de autenticación proporciona Endpoints estándar de OpenID Connect:
+
+- **Authorization**: Gestiona el flujo de login y el consentimiento del usuario
+- **Emisión de Tokens**: Emite Access Tokens y Refresh Tokens seguros
+- **Distribución de Claves**: Publica las claves públicas para la verificación de tokens
+- **Información del Usuario**: Proporciona los datos del perfil del usuario autenticado
+
+## Solución de Problemas
+
+<AccordionGroup>
+  <Accordion title="Olvidé mi contraseña">
+    Contacta a tu administrador del sistema para restablecer tu contraseña. La funcionalidad de restablecimiento de contraseña debe ser iniciada por un administrador con los permisos apropiados.
+  </Accordion>
+  
+  <Accordion title="Estoy recibiendo errores 'Unauthorized'">
+    Esto generalmente significa que tu sesión ha expirado. Cierra sesión completamente y vuelve a iniciar sesión para obtener un nuevo token de autenticación.
+  </Accordion>
+  
+  <Accordion title="La página de login no carga">
+    Asegúrate de estar usando la URL correcta de SGIVU proporcionada por tu administrador. Verifica tu conexión a internet y la configuración de tu navegador.
+  </Accordion>
+  
+  <Accordion title="La autenticación falla inmediatamente después de iniciar sesión">
+    Esto puede indicar un problema de configuración con el Authorization Server. Contacta a tu administrador del sistema si el problema persiste.
+  </Accordion>
+</AccordionGroup>
+
+## Buenas Prácticas
+
+<CardGroup cols={2}>
+  <Card title="Contraseñas Seguras" icon="shield-halved">
+    Usa contraseñas complejas con una combinación de mayúsculas, minúsculas, números y caracteres especiales.
+  </Card>
+  
+  <Card title="Cierra Sesión al Terminar" icon="right-from-bracket">
+    Siempre cierra sesión cuando hayas terminado, especialmente en equipos compartidos.
+  </Card>
+  
+  <Card title="Protege tus Credenciales" icon="user-lock">
+    Nunca compartas tu nombre de usuario y contraseña con nadie, incluyendo colegas.
+  </Card>
+  
+  <Card title="Reporta Actividad Sospechosa" icon="triangle-exclamation">
+    Contacta a tu administrador de inmediato si notas cualquier acceso no autorizado a tu cuenta.
+  </Card>
+</CardGroup>

@@ -1,0 +1,22 @@
+repos:
+  - repo: https://github.com/psf/black
+    rev: 26.3.1
+    hooks:
+      - id: black
+        language_version: python3.12
+
+  - repo: https://github.com/charliermarsh/ruff-pre-commit
+    rev: 'v0.15.8'
+    hooks:
+      - id: ruff
+        args: ["--fix"]
+
+  - repo: local
+    hooks:
+      - id: pydocstyle
+        name: pydocstyle (numpy)
+        entry: pydocstyle --convention=numpy
+        language: python
+        additional_dependencies: [pydocstyle==6.2.1]
+        files: ^apps/ml/sgivu-ml/app/.*\.py$
+        pass_filenames: true

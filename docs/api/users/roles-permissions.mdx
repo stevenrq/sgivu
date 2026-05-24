@@ -1,0 +1,452 @@
+---
+title: 'Roles y Permisos'
+description: 'Gestión de roles y permisos para autorización'
+---
+
+## Descripción general
+
+La API de Roles y Permisos proporciona endpoints para gestionar el control de acceso basado en roles (RBAC). Los permisos son autoridades granulares (por ejemplo, `user:read`, `vehicle:create`) que se asignan a roles, los cuales a su vez se asignan a usuarios.
+
+## URL Base
+
+```
+https://your-domain.com/v1
+```
+
+---
+
+## Roles
+
+### Listar todos los roles
+
+```http
+GET /v1/roles
+```
+
+Recupera todos los roles definidos en el sistema.
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `user:read`
+
+#### Respuesta
+
+```json
+[
+  {
+    "id": 1,
+    "name": "ADMIN",
+    "description": "Rol con acceso total al sistema. Permite gestionar usuarios, roles, configuraciones y supervisar todas las operaciones sin restricciones.",
+    "permissions": [
+      { "id": 1, "name": "user:create", "description": "Permite crear nuevos usuarios en el sistema" },
+      { "id": 2, "name": "user:read",   "description": "Permite visualizar la información de los usuarios registrados." }
+    ]
+  },
+  {
+    "id": 2,
+    "name": "USER",
+    "description": "Rol base para usuarios estándar del sistema. Sus capacidades específicas son definidas por los permisos adicionales que se le asignen.",
+    "permissions": [
+      { "id": 2, "name": "user:read", "description": "Permite visualizar la información de los usuarios registrados." }
+    ]
+  }
+]
+```
+
+#### Códigos de estado
+
+- `200 OK` - Roles recuperados exitosamente
+- `401 Unauthorized` - No autenticado
+
+#### Ejemplo
+
+```bash
+curl -X GET https://your-domain.com/v1/roles \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+---
+
+### Agregar permisos a un rol
+
+```http
+POST /v1/roles/{id}/add-permissions
+```
+
+Agrega permisos a un rol sin sobrescribir los existentes.
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `user:create` o `user:update`
+
+#### Parámetros de ruta
+
+<ParamField path="id" type="integer" required>
+  ID del rol
+</ParamField>
+
+#### Cuerpo de la solicitud
+
+<ParamField body="permissions" type="array" required>
+  Arreglo de nombres de permisos a agregar
+</ParamField>
+
+```json
+[
+  "vehicle:read",
+  "vehicle:create"
+]
+```
+
+#### Respuesta
+
+```json
+{
+  "id": 2,
+  "name": "USER",
+  "description": "Standard user role",
+  "permissions": [
+    {
+      "id": 1,
+      "name": "user:read",
+      "description": "Read user information"
+    },
+    {
+      "id": 5,
+      "name": "vehicle:read",
+      "description": "Read vehicle information"
+    },
+    {
+      "id": 6,
+      "name": "vehicle:create",
+      "description": "Create new vehicles"
+    }
+  ]
+}
+```
+
+#### Códigos de estado
+
+- `200 OK` - Permisos agregados exitosamente
+- `401 Unauthorized` - No autenticado
+- `403 Forbidden` - Falta el permiso requerido
+- `404 Not Found` - Rol no encontrado
+
+#### Ejemplo
+
+```bash
+curl -X POST https://your-domain.com/v1/roles/2/add-permissions \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '["vehicle:read", "vehicle:create"]'
+```
+
+---
+
+### Reemplazar permisos de un rol
+
+```http
+PUT /v1/roles/{id}/permissions
+```
+
+Reemplaza todos los permisos de un rol (operación destructiva).
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `user:update`
+
+<Warning>
+  Esta operación reemplaza completamente los permisos del rol. Usar con precaución.
+</Warning>
+
+#### Parámetros de ruta
+
+<ParamField path="id" type="integer" required>
+  ID del rol
+</ParamField>
+
+#### Cuerpo de la solicitud
+
+<ParamField body="permissions" type="array" required>
+  Arreglo completo de nombres de permisos para el rol
+</ParamField>
+
+```json
+[
+  "user:read",
+  "vehicle:read"
+]
+```
+
+#### Respuesta
+
+```json
+{
+  "id": 2,
+  "name": "USER",
+  "description": "Standard user role",
+  "permissions": [
+    {
+      "id": 1,
+      "name": "user:read",
+      "description": "Read user information"
+    },
+    {
+      "id": 5,
+      "name": "vehicle:read",
+      "description": "Read vehicle information"
+    }
+  ]
+}
+```
+
+#### Códigos de estado
+
+- `200 OK` - Permisos actualizados exitosamente
+- `401 Unauthorized` - No autenticado
+- `403 Forbidden` - Falta el permiso `user:update`
+- `404 Not Found` - Rol no encontrado
+
+#### Ejemplo
+
+```bash
+curl -X PUT https://your-domain.com/v1/roles/2/permissions \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '["user:read", "vehicle:read"]'
+```
+
+---
+
+### Eliminar permisos de un rol
+
+```http
+DELETE /v1/roles/{id}/remove-permissions
+```
+
+Elimina permisos específicos de un rol.
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `user:delete`
+
+#### Parámetros de ruta
+
+<ParamField path="id" type="integer" required>
+  ID del rol
+</ParamField>
+
+#### Cuerpo de la solicitud
+
+<ParamField body="permissions" type="array" required>
+  Arreglo de nombres de permisos a eliminar
+</ParamField>
+
+```json
+[
+  "vehicle:delete"
+]
+```
+
+#### Respuesta
+
+```json
+{
+  "id": 2,
+  "name": "USER",
+  "description": "Standard user role",
+  "permissions": [
+    {
+      "id": 1,
+      "name": "user:read",
+      "description": "Read user information"
+    },
+    {
+      "id": 5,
+      "name": "vehicle:read",
+      "description": "Read vehicle information"
+    }
+  ]
+}
+```
+
+#### Códigos de estado
+
+- `200 OK` - Permisos eliminados exitosamente
+- `401 Unauthorized` - No autenticado
+- `403 Forbidden` - Falta el permiso `user:delete`
+- `404 Not Found` - Rol no encontrado
+
+#### Ejemplo
+
+```bash
+curl -X DELETE https://your-domain.com/v1/roles/2/remove-permissions \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '["vehicle:delete"]'
+```
+
+---
+
+## Permisos
+
+### Listar todos los permisos
+
+```http
+GET /v1/permissions
+```
+
+Recupera el catálogo completo de permisos granulares disponibles en el sistema.
+
+**Autenticación:** Requerida
+
+**Autorización:** Permiso `user:read`
+
+#### Respuesta
+
+```json
+[
+  { "id": 1,  "name": "user:create",         "description": "Permite crear nuevos usuarios en el sistema" },
+  { "id": 2,  "name": "user:read",           "description": "Permite visualizar la información de los usuarios registrados." },
+  { "id": 3,  "name": "user:update",         "description": "Permite modificar la información de los usuarios existentes." },
+  { "id": 4,  "name": "user:delete",         "description": "Permite eliminar usuarios del sistema." },
+  { "id": 5,  "name": "role:create",         "description": "Permite crear nuevos roles en el sistema." },
+  { "id": 6,  "name": "role:read",           "description": "Permite visualizar la información de los roles registrados." },
+  { "id": 7,  "name": "role:update",         "description": "Permite modificar la información de los roles existentes." },
+  { "id": 8,  "name": "role:delete",         "description": "Permite eliminar roles del sistema." },
+  { "id": 9,  "name": "permission:create",   "description": "Permite crear nuevos permisos en el sistema." },
+  { "id": 10, "name": "permission:read",     "description": "Permite visualizar la información de los permisos registrados." },
+  { "id": 11, "name": "permission:update",   "description": "Permite modificar la información de los permisos existentes." },
+  { "id": 12, "name": "permission:delete",   "description": "Permite eliminar permisos del sistema." },
+  { "id": 13, "name": "person:create",       "description": "Permite crear nuevas personas en el sistema." },
+  { "id": 14, "name": "person:read",         "description": "Permite visualizar la información de las personas registradas." },
+  { "id": 15, "name": "person:update",       "description": "Permite modificar la información de las personas existentes." },
+  { "id": 16, "name": "person:delete",       "description": "Permite eliminar personas del sistema." },
+  { "id": 17, "name": "company:create",      "description": "Permite crear nuevas empresas en el sistema." },
+  { "id": 18, "name": "company:read",        "description": "Permite visualizar la información de las empresas registradas." },
+  { "id": 19, "name": "company:update",      "description": "Permite modificar la información de las empresas existentes." },
+  { "id": 20, "name": "company:delete",      "description": "Permite eliminar empresas del sistema." },
+  { "id": 21, "name": "vehicle:create",      "description": "Permite crear nuevos vehículos en el sistema." },
+  { "id": 22, "name": "vehicle:read",        "description": "Permite visualizar la información de los vehículos registrados." },
+  { "id": 23, "name": "vehicle:update",      "description": "Permite modificar la información de los vehículos existentes." },
+  { "id": 24, "name": "vehicle:delete",      "description": "Permite eliminar vehículos del sistema." },
+  { "id": 25, "name": "car:create",          "description": "Permite crear nuevos automóviles en el sistema." },
+  { "id": 26, "name": "car:read",            "description": "Permite visualizar la información de los automóviles registrados." },
+  { "id": 27, "name": "car:update",          "description": "Permite modificar la información de los automóviles existentes." },
+  { "id": 28, "name": "car:delete",          "description": "Permite eliminar automóviles del sistema." },
+  { "id": 29, "name": "motorcycle:create",   "description": "Permite crear nuevas motocicletas en el sistema." },
+  { "id": 30, "name": "motorcycle:read",     "description": "Permite visualizar la información de las motocicletas registradas." },
+  { "id": 31, "name": "motorcycle:update",   "description": "Permite modificar la información de las motocicletas existentes." },
+  { "id": 32, "name": "motorcycle:delete",   "description": "Permite eliminar motocicletas del sistema." },
+  { "id": 33, "name": "purchase_sale:create","description": "Permite crear nuevos contratos de compraventa en el sistema." },
+  { "id": 34, "name": "purchase_sale:read",  "description": "Permite visualizar la información de los contratos de compraventa registrados." },
+  { "id": 35, "name": "purchase_sale:update","description": "Permite modificar la información de los contratos de compraventa existentes." },
+  { "id": 36, "name": "purchase_sale:delete","description": "Permite eliminar contratos de compraventa del sistema." },
+  { "id": 37, "name": "ml:predict",          "description": "Permite acceder a las funcionalidades de predicción del sistema." },
+  { "id": 38, "name": "ml:retrain",          "description": "Permite acceder a las funcionalidades de entrenamiento del sistema." },
+  { "id": 39, "name": "ml:models",           "description": "Permite gestionar los modelos de machine learning del sistema." }
+]
+```
+
+#### Códigos de estado
+
+- `200 OK` - Permisos recuperados exitosamente
+- `401 Unauthorized` - No autenticado
+
+#### Ejemplo
+
+```bash
+curl -X GET https://your-domain.com/v1/permissions \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+---
+
+## Convención de nomenclatura de permisos
+
+Los permisos siguen un patrón de nomenclatura consistente: `recurso:acción`
+
+### Tipos de recurso
+
+- `user` — Gestión de usuarios (`/v1/users`)
+- `role` — Gestión de roles
+- `permission` — Gestión de permisos
+- `person` — Clientes individuales (`/v1/persons`)
+- `company` — Clientes empresariales (`/v1/companies`)
+- `vehicle` — Operaciones generales sobre vehículos e imágenes (`/v1/vehicles/{id}/images`)
+- `car` — Automóviles (`/v1/cars`)
+- `motorcycle` — Motocicletas (`/v1/motorcycles`)
+- `purchase_sale` — Contratos de compraventa (`/v1/purchase-sales`)
+- `ml` — Funcionalidades del servicio ML (`predict`, `retrain`, `models`)
+
+<Note>
+No existe el recurso genérico `client`. Las operaciones sobre clientes se separan en `person` y `company` con permisos independientes.
+</Note>
+
+### Tipos de acción
+
+- `read` — Ver/recuperar información del recurso
+- `create` — Crear nuevos recursos
+- `update` — Modificar recursos existentes
+- `delete` — Eliminar recursos
+- `predict` / `retrain` / `models` — Acciones específicas del recurso `ml`
+
+### Ejemplos
+
+- `user:read` — Permiso para ver información de usuarios
+- `car:create` — Permiso para agregar nuevos automóviles
+- `purchase_sale:update` — Permiso para modificar contratos
+- `person:delete` — Permiso para eliminar personas
+- `ml:retrain` — Permiso para reentrenar modelos
+
+---
+
+## Roles predeterminados
+
+El sistema incluye dos roles base creados por el `seed_data` de `sgivu-user`:
+
+### ADMIN (id `1`)
+
+Rol con acceso total al sistema. Permite gestionar usuarios, roles, configuraciones y supervisar todas las operaciones sin restricciones. Tiene asignados los **39 permisos** definidos en la tabla `permissions`.
+
+### USER (id `2`)
+
+Rol base para usuarios estándar del sistema. Sus capacidades específicas se modelan creando roles adicionales (p. ej. vendedor, mecánico, comprador) y asignando subconjuntos de permisos a esos roles vía `POST /v1/roles/{id}/add-permissions`.
+
+<Note>
+Los roles `SALES`, `INVENTORY`, `MECHANIC` u otros similares **no** vienen precargados. Se crean a demanda con `POST /v1/roles` y se les asigna el conjunto de permisos correspondiente.
+</Note>
+
+---
+
+## Encabezados de autorización
+
+Todos los endpoints requieren un token JWT Bearer válido:
+
+```
+Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+El token debe incluir el claim `rolesAndPermissions` que contenga los permisos requeridos para el endpoint.
+
+---
+
+## Respuestas de error
+
+### 403 Forbidden
+
+```json
+{
+  "error": "forbidden",
+  "message": "User does not have required permission: user:update"
+}
+```
+
+### 404 Not Found
+
+```json
+{
+  "error": "not_found",
+  "message": "Role with ID 999 not found"
+}
+```

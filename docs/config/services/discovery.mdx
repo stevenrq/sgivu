@@ -1,0 +1,356 @@
+---
+title: Configuración del Servicio Discovery
+description: Configuración del registro de servicios Eureka para Service Discovery en la plataforma SGIVU
+---
+
+El servicio Discovery (`sgivu-discovery`) es un servidor Netflix Eureka que proporciona capacidades de registro y descubrimiento de servicios para la arquitectura de microservicios de SGIVU.
+
+## Descripción General del Servicio
+
+<CardGroup cols={2}>
+  <Card title="Puerto" icon="network-wired">
+    8761
+  </Card>
+  <Card title="Tipo" icon="compass">
+    Eureka Server
+  </Card>
+  <Card title="Clientes" icon="users">
+    Todos los microservicios
+  </Card>
+  <Card title="Base de Datos" icon="database">
+    Ninguna (en memoria)
+  </Card>
+</CardGroup>
+
+## Características Principales
+
+- Registro de servicios para todos los microservicios de SGIVU
+- Monitoreo de salud y gestión de heartbeats
+- Descubrimiento de instancias de servicios
+- Soporte para Load Balancing
+- Modo de auto-preservación para tolerancia a particiones de red
+
+## Configuración
+
+### Configuración del Servidor
+
+```yaml
+server:
+  port: 8761
+```
+
+<Info>
+El puerto 8761 es el puerto estándar de Eureka Server y es utilizado por todos los servicios de forma predeterminada.
+</Info>
+
+### Configuración de Eureka Server
+
+```yaml
+eureka:
+  instance:
+    hostname: host.docker.internal
+  client:
+    registerWithEureka: false
+    fetchRegistry: false
+    serviceUrl:
+      defaultZone: http://${eureka.instance.hostname}:${server.port}/eureka/
+```
+
+<Accordion title="Desglose de la Configuración">
+- **hostname**: El nombre de host utilizado para el registro del servidor Eureka
+- **registerWithEureka: false**: El servidor Eureka no se registra a sí mismo
+- **fetchRegistry: false**: El servidor Eureka no obtiene el registro de otros servidores
+- **defaultZone**: Apunta a sí mismo para operación independiente
+</Accordion>
+
+## Modo Standalone vs. Clúster
+
+La configuración actual ejecuta Eureka en **modo standalone** (servidor único).
+
+### Modo Standalone (Actual)
+
+```yaml
+eureka:
+  client:
+    registerWithEureka: false
+    fetchRegistry: false
+```
+
+<Note>
+El modo standalone es adecuado para desarrollo y despliegues pequeños. Para alta disponibilidad en producción, considere agrupar múltiples servidores Eureka en clúster.
+</Note>
+
+### Modo Clúster (Futuro)
+
+Para entornos de producción con múltiples instancias de Eureka:
+
+```yaml
+eureka:
+  client:
+    registerWithEureka: true
+    fetchRegistry: true
+    serviceUrl:
+      defaultZone: http://eureka-1:8761/eureka/,http://eureka-2:8761/eureka/
+```
+
+## Red en Docker
+
+```yaml
+eureka:
+  instance:
+    hostname: host.docker.internal
+```
+
+<Info>
+El hostname `host.docker.internal` permite que los servicios ejecutándose en contenedores Docker se comuniquen con el servidor Eureka.
+</Info>
+
+## Registro de Servicios
+
+Todos los microservicios se registran en Eureka usando este patrón de URL:
+
+```yaml
+# In client services
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://sgivu-discovery:8761/eureka}
+```
+
+## Configuración por Entorno
+
+<Tabs>
+  <Tab title="Desarrollo">
+    El entorno de desarrollo utiliza la misma configuración base sin sobrescrituras:
+    
+    ```yaml
+    # sgivu-discovery-dev.yml is empty
+    # Uses base configuration from sgivu-discovery.yml
+    ```
+    
+    No se necesita configuración especial para desarrollo.
+  </Tab>
+  <Tab title="Producción">
+    El entorno de producción también utiliza la configuración base:
+    
+    ```yaml
+    # sgivu-discovery-prod.yml is empty
+    # Uses base configuration from sgivu-discovery.yml
+    ```
+    
+    Considere agregar:
+    - Múltiples instancias de Eureka para alta disponibilidad
+    - Configuración personalizada de reconocimiento de pares
+    - Logging específico para producción
+  </Tab>
+</Tabs>
+
+## Registro de Servicios
+
+Eureka mantiene un registro de todos los servicios:
+
+| Servicio | Patrón de ID de Instancia |
+|---------|---------------------|
+| sgivu-auth | `hostname:sgivu-auth:random-value` |
+| sgivu-gateway | `hostname:sgivu-gateway:random-value` |
+| sgivu-user | `hostname:sgivu-user:random-value` |
+| sgivu-client | `hostname:sgivu-client:random-value` |
+| sgivu-vehicle | `hostname:sgivu-vehicle:random-value` |
+| sgivu-purchase-sale | `hostname:sgivu-purchase-sale:random-value` |
+
+<Note>
+El valor aleatorio en los IDs de instancia permite ejecutar múltiples instancias del mismo servicio simultáneamente.
+</Note>
+
+## Dashboard de Eureka
+
+El servidor Eureka proporciona un dashboard web para monitoreo:
+
+```
+http://localhost:8761/
+```
+
+El dashboard muestra:
+- Instancias de servicios registradas
+- Estado de instancias (UP, DOWN, OUT_OF_SERVICE)
+- Estadísticas de renovación
+- Información general del servidor
+
+<Accordion title="Características del Dashboard">
+- **Instances currently registered**: Lista de todos los servicios registrados
+- **General Info**: Configuración del servidor y entorno
+- **Instance Info**: Información detallada sobre cada instancia
+- **Lease expiration**: Cuándo expira el lease de cada instancia
+- **Renewal settings**: Intervalos de heartbeat y timeouts
+</Accordion>
+
+## Monitoreo de Salud
+
+Eureka utiliza un mecanismo de heartbeat para el monitoreo de salud:
+
+- **Intervalo de renovación predeterminado**: 30 segundos
+- **Timeout de expulsión predeterminado**: 90 segundos
+- **Umbral de auto-preservación**: 85%
+
+<Warning>
+En modo de auto-preservación, Eureka deja de expulsar instancias cuando las renovaciones caen por debajo del umbral, previniendo la expulsión masiva durante problemas de red.
+</Warning>
+
+## Service Discovery
+
+Los servicios cliente pueden descubrir otros servicios usando Eureka:
+
+```java
+// Example: Discovering User Service
+List<ServiceInstance> instances = discoveryClient.getInstances("sgivu-user");
+```
+
+## Load Balancing
+
+Eureka se integra con Spring Cloud LoadBalancer para balanceo de carga del lado del cliente:
+
+- Distribución round-robin por defecto
+- Failover automático a instancias saludables
+- Enrutamiento por zona (si está configurado)
+
+## Variables de Entorno Requeridas
+
+El servicio Discovery tiene requisitos mínimos de variables de entorno:
+
+| Variable | Descripción | Valor por Defecto |
+|----------|-------------|----------|
+| `PORT` | Puerto del servidor Eureka | `8761` |
+
+<Info>
+Toda la configuración está contenida en los archivos YAML. No se requieren dependencias externas.
+</Info>
+
+## Consideraciones de Red
+
+### Docker Compose
+
+En Docker Compose, los servicios referencian a Eureka por nombre de servicio:
+
+```yaml
+services:
+  sgivu-discovery:
+    ports:
+      - "8761:8761"
+  
+  sgivu-user:
+    environment:
+      - EUREKA_URL=http://sgivu-discovery:8761/eureka
+```
+
+### Kubernetes
+
+En Kubernetes, se utiliza el DNS del servicio:
+
+```yaml
+env:
+  - name: EUREKA_URL
+    value: http://sgivu-discovery.default.svc.cluster.local:8761/eureka
+```
+
+## Configuración de Alta Disponibilidad
+
+Para despliegues en producción, considere ejecutar múltiples instancias de Eureka:
+
+<Accordion title="Ejemplo de Configuración HA">
+**Eureka Instance 1:**
+```yaml
+eureka:
+  instance:
+    hostname: eureka-1
+  client:
+    registerWithEureka: true
+    fetchRegistry: true
+    serviceUrl:
+      defaultZone: http://eureka-2:8761/eureka/,http://eureka-3:8761/eureka/
+```
+
+**Eureka Instance 2:**
+```yaml
+eureka:
+  instance:
+    hostname: eureka-2
+  client:
+    registerWithEureka: true
+    fetchRegistry: true
+    serviceUrl:
+      defaultZone: http://eureka-1:8761/eureka/,http://eureka-3:8761/eureka/
+```
+
+**Eureka Instance 3:**
+```yaml
+eureka:
+  instance:
+    hostname: eureka-3
+  client:
+    registerWithEureka: true
+    fetchRegistry: true
+    serviceUrl:
+      defaultZone: http://eureka-1:8761/eureka/,http://eureka-2:8761/eureka/
+```
+</Accordion>
+
+## Consideraciones de Seguridad
+
+<Warning>
+La configuración actual no incluye autenticación. Para producción, considere agregar Spring Security para proteger el dashboard y la API de Eureka.
+</Warning>
+
+### Asegurar Eureka
+
+Para agregar autenticación básica:
+
+```yaml
+spring:
+  security:
+    user:
+      name: ${EUREKA_USERNAME}
+      password: ${EUREKA_PASSWORD}
+```
+
+## Solución de Problemas
+
+### Los Servicios No Se Registran
+
+1. Verifique la conectividad de red al puerto 8761
+2. Verifique la variable de entorno `EUREKA_URL`
+3. Revise los logs del servicio en busca de errores de registro
+4. Verifique que el servidor Eureka esté en ejecución
+
+### Modo de Auto-Preservación
+
+Si ve el mensaje "EMERGENCY! EUREKA MAY BE INCORRECTLY CLAIMING INSTANCES ARE UP":
+
+- Esto es normal durante el desarrollo con reinicios frecuentes
+- Eureka entra en auto-preservación para prevenir fallos en cascada
+- Espere a que los servicios se estabilicen o deshabilite la auto-preservación en desarrollo:
+
+```yaml
+eureka:
+  server:
+    enable-self-preservation: false
+```
+
+## Archivos de Configuración
+
+- `sgivu-discovery.yml` - Configuración base (utilizada en todos los entornos)
+- `sgivu-discovery-dev.yml` - Vacío (sin sobrescrituras)
+- `sgivu-discovery-prod.yml` - Vacío (sin sobrescrituras)
+
+## Servicios Relacionados
+
+<CardGroup cols={3}>
+  <Card title="Todos los Servicios" icon="network-wired" href="/config/services/overview">
+    Se registran en Eureka
+  </Card>
+  <Card title="Gateway" icon="door-open" href="/config/services/gateway">
+    Usa Eureka para enrutamiento
+  </Card>
+  <Card title="Monitoreo" icon="chart-line" href="/config/operations/monitoring">
+    Monitorear la salud de los servicios
+  </Card>
+</CardGroup>

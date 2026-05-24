@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="es" xmlns:th="https://www.thymeleaf.org">
+  <head>
+    <meta charset="UTF-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+
+    <title>Consentimiento requerido - SGIVU</title>
+
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link crossorigin href="https://fonts.gstatic.com" rel="preconnect" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      crossorigin="anonymous"
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" th:href="@{/css/consent.css}" />
+  </head>
+  <body class="consent-page position-relative bg-light text-dark">
+    <main
+      class="d-flex justify-content-center align-items-center min-vh-100 position-relative z-1 py-5"
+    >
+      <div
+        aria-hidden="true"
+        class="background-shape background-shape-left"
+      ></div>
+      <div
+        aria-hidden="true"
+        class="background-shape background-shape-right"
+      ></div>
+
+      <section
+        aria-labelledby="consent-title"
+        class="consent-card position-relative w-100 overflow-hidden"
+      >
+        <div class="consent-header text-center mb-3">
+          <h1 class="fs-3 fw-bold mb-2" id="consent-title">Permitir acceso</h1>
+          <p class="subtitle mx-auto mb-0">
+            <span
+              class="fw-semibold text-primary"
+              th:text="${clientDisplayName}"
+              >La aplicación</span
+            >
+            solicita permisos para
+            <span class="fw-semibold" th:text="${principalName}">usuario</span>
+          </p>
+        </div>
+
+        <section class="mb-3" th:if="${not #sets.isEmpty(scopes)}">
+          <div
+            class="d-flex justify-content-between align-items-center gap-3 mb-2 flex-wrap"
+          >
+            <h2 class="fs-6 fw-bold mb-0">Permisos solicitados</h2>
+            <span
+              class="scope-counter"
+              th:text="|${#sets.size(scopes)} permisos|"
+              >3 permisos</span
+            >
+          </div>
+
+          <div class="scope-grid">
+            <article class="scope-card" th:each="scopeView : ${scopes}">
+              <h3 class="scope-title" th:text="${scopeView.title}">
+                Perfil básico
+              </h3>
+              <span class="scope-code" th:text="${scopeView.scope}"
+                >profile</span
+              >
+            </article>
+          </div>
+        </section>
+
+        <section
+          class="mb-3"
+          th:if="${not #sets.isEmpty(previouslyApprovedScopes)}"
+        >
+          <h2 class="fs-6 fw-bold mb-2">Ya autorizados</h2>
+          <div class="approved-scope-list">
+            <div
+              class="approved-scope-item"
+              th:each="scopeView : ${previouslyApprovedScopes}"
+            >
+              <span class="approved-scope-title" th:text="${scopeView.title}"
+                >Perfil básico</span
+              >
+              <span class="scope-code" th:text="${scopeView.scope}"
+                >profile</span
+              >
+            </div>
+          </div>
+        </section>
+
+        <div
+          class="empty-state rounded-4 p-3 mb-3"
+          th:if="${#sets.isEmpty(scopes)}"
+        >
+          <p class="fw-semibold mb-1">No hay permisos nuevos por aprobar.</p>
+        </div>
+
+        <div class="action-row d-flex flex-column flex-sm-row gap-3">
+          <form
+            class="flex-grow-1"
+            method="post"
+            name="approve_consent_form"
+            th:action="${requestUri}"
+          >
+            <input name="client_id" th:value="${clientId}" type="hidden" />
+            <input name="state" th:value="${state}" type="hidden" />
+            <input
+              name="scope"
+              th:each="scopeView : ${scopes}"
+              th:value="${scopeView.scope}"
+              type="hidden"
+            />
+
+            <button
+              class="btn btn-primary stylish-btn w-100"
+              id="submit-consent"
+              type="submit"
+            >
+              <span class="btn-text">Aceptar</span>
+              <span class="btn-shine"></span>
+            </button>
+          </form>
+
+          <form
+            class="flex-grow-1 flex-sm-grow-0"
+            method="post"
+            name="cancel_consent_form"
+            th:action="${requestUri}"
+          >
+            <input name="client_id" th:value="${clientId}" type="hidden" />
+            <input name="state" th:value="${state}" type="hidden" />
+
+            <button
+              class="btn btn-outline-secondary cancel-btn w-100"
+              id="cancel-consent"
+              type="submit"
+            >
+              Cancelar
+            </button>
+          </form>
+        </div>
+
+        <div aria-hidden="true" class="card-decoration"></div>
+      </section>
+    </main>
+  </body>
+</html>
