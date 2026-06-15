@@ -1,0 +1,42 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+      - id: detect-private-key
+
+  - repo: https://github.com/psf/black
+    rev: 25.1.0
+    hooks:
+      - id: black
+        files: ^apps/ml/sgivu-ml/
+
+  - repo: local
+    hooks:
+      - id: pylint-ml
+        name: pylint (sgivu-ml)
+        entry: apps/ml/sgivu-ml/.venv/bin/pylint
+        language: system
+        # excluye alembic/ (generado) y scripts/ (banners ASCII, sin convenciones estrictas)
+        files: ^apps/ml/sgivu-ml/(?!alembic/|scripts/).*\.py$
+        args:
+          - "--rcfile=apps/ml/sgivu-ml/pyproject.toml"
+          # agrega el directorio raíz del paquete a sys.path porque pre-commit
+          # ejecuta desde la raíz del repo y los imports 'app.*' no se resuelven sin esto
+          - "--init-hook=import sys; sys.path.insert(0, 'apps/ml/sgivu-ml')"
+
+  - repo: local
+    hooks:
+      - id: spotless-java
+        name: spotless (módulos Java modificados)
+        entry: scripts/spotless-apply-changed.sh
+        language: script
+        types: [java]
+        pass_filenames: true
+        require_serial: true

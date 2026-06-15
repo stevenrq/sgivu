@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.pkl
+*.joblib
+*.csv
+*.parquet
+data/
+models/
+.git/
+.env*

@@ -1,0 +1,47 @@
+[tool.pydocstyle]
+convention = "numpy"
+
+[tool.black]
+line-length = 88
+
+[tool.pylint.main]
+# scripts/** contiene banners ASCII decorativos que exceden el largo de línea
+ignore-paths = ["scripts"]
+
+[tool.pylint.format]
+max-line-length = 88
+
+[tool.pylint.design]
+# Umbrales ajustados para código ML que maneja muchos parámetros y variables
+max-args = 10
+max-positional-arguments = 10
+max-locals = 40
+max-attributes = 15
+max-branches = 20
+max-statements = 70
+min-public-methods = 1
+
+[tool.pylint.messages_control]
+disable = [
+    "missing-module-docstring",
+    "missing-class-docstring",
+    "missing-function-docstring",
+    "duplicate-code",
+    # Falsos positivos de frameworks
+    "no-member",              # SQLAlchemy func.*, pandas/numpy usan atributos dinámicos
+    "not-callable",           # SQLAlchemy func.now() es dinámicamente callable
+    "redefined-outer-name",   # patrón pytest: los fixtures se pasan por nombre de parámetro
+    "unnecessary-ellipsis",   # '...' es correcto en cuerpos de métodos abstractos/Protocol
+    "too-few-public-methods", # SQLAlchemy models y Protocol classes tienen 0 métodos
+    # Patrones intencionales del proyecto
+    "invalid-name",           # el proyecto usa camelCase en nombres de tests (test_shouldX)
+    "protected-access",       # los tests acceden a métodos privados intencionalmente
+    "unused-argument",        # patrón FastAPI: lifespan/dependencies reciben args ignorados
+    "broad-exception-caught", # capturas amplias intencionales en error handlers y demos
+    "global-statement",       # uso intencional en inicialización de la base de datos
+    "import-outside-toplevel",# patrón de tests: imports locales para evitar importar todo
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "strict"
+testpaths = ["tests"]

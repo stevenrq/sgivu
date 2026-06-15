@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: Detectar servicios modificados
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      java: ${{ steps.java.outputs.changes }}
+      ml: ${{ steps.other.outputs.ml }}
+      infra: ${{ steps.other.outputs.infra }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: java
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            sgivu-auth: ['apps/backend/sgivu-auth/**', '.github/workflows/ci.yml']
+            sgivu-client: ['apps/backend/sgivu-client/**', '.github/workflows/ci.yml']
+            sgivu-config: ['apps/backend/sgivu-config/**', '.github/workflows/ci.yml']
+            sgivu-discovery: ['apps/backend/sgivu-discovery/**', '.github/workflows/ci.yml']
+            sgivu-gateway: ['apps/backend/sgivu-gateway/**', '.github/workflows/ci.yml']
+            sgivu-user: ['apps/backend/sgivu-user/**', '.github/workflows/ci.yml']
+            sgivu-vehicle: ['apps/backend/sgivu-vehicle/**', '.github/workflows/ci.yml']
+            sgivu-purchase-sale: ['apps/backend/sgivu-purchase-sale/**', '.github/workflows/ci.yml']
+      - id: other
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            ml: ['apps/ml/sgivu-ml/**', '.github/workflows/ci.yml']
+            infra: ['infra/**', '.github/workflows/ci.yml']
+
+  java:
+    name: Java · ${{ matrix.service }}
+    needs: changes
+    if: needs.changes.outputs.java != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJSON(needs.changes.outputs.java) }}
+    defaults:
+      run:
+        working-directory: apps/backend/${{ matrix.service }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: corretto
+          java-version: '25'
+          cache: maven
+          cache-dependency-path: apps/backend/${{ matrix.service }}/pom.xml
+      - name: Verificar formato (Spotless)
+        run: ./mvnw -B spotless:check
+      - name: Build y tests
+        run: ./mvnw -B verify
+
+  ml:
+    name: Python · sgivu-ml
+    needs: changes
+    if: needs.changes.outputs.ml == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/ml/sgivu-ml
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: |
+            apps/ml/sgivu-ml/requirements.txt
+            apps/ml/sgivu-ml/requirements-dev.txt
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Formato (black)
+        run: black --check .
+      - name: Lint (pylint)
+        run: pylint app/ tests/
+      - name: Tests (pytest)
+        run: pytest -q tests
+
+  infra:
+    name: Infra · validar compose
+    needs: changes
+    if: needs.changes.outputs.infra == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/compose/sgivu-docker-compose
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validar archivos compose
+        run: |
+          cp .env.dev.example .env.dev
+          cp .env.example .env
+          docker compose -f docker-compose.dev.yml --env-file .env.dev config -q
+          docker compose -f docker-compose.infra.yml --env-file .env.dev config -q
+          docker compose -f docker-compose.yml --env-file .env config -q

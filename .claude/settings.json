@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -c 'import json,sys; d=json.load(sys.stdin); print((d.get(\"tool_response\") or {}).get(\"filePath\") or (d.get(\"tool_input\") or {}).get(\"file_path\") or \"\")' | { read -r f; case \"$f\" in \"$CLAUDE_PROJECT_DIR\"/apps/ml/sgivu-ml/*.py) \"$CLAUDE_PROJECT_DIR/apps/ml/sgivu-ml/.venv/bin/black\" -q \"$f\" ;; esac; } 2>/dev/null || true",
+            "timeout": 30,
+            "statusMessage": "Formateando con black..."
+          }
+        ]
+      }
+    ]
+  }
+}

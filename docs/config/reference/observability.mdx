@@ -1,0 +1,433 @@
+---
+title: Configuración de Observabilidad
+description: Monitoreo, health checks, tracing distribuido y configuración de logging en SGIVU
+---
+
+SGIVU implementa observabilidad integral mediante Spring Boot Actuator y logging estructurado.
+
+## Endpoints de Actuator
+
+Spring Boot Actuator proporciona endpoints de monitoreo y gestión listos para producción.
+
+### Exposición de Endpoints
+
+<ParamField path="management.endpoints.web.exposure.include" type="string" required>
+  Lista separada por comas de endpoints de Actuator a exponer vía HTTP. Diferentes perfiles exponen diferentes endpoints.
+</ParamField>
+
+#### Perfil por Defecto (Todos los Servicios)
+
+```yaml
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+```
+
+<Info>
+  Por defecto, los servicios solo exponen los endpoints `health` e `info` para minimizar la superficie de ataque.
+</Info>
+
+#### Perfil de Desarrollo
+
+```yaml
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    health:
+      show-details: always
+```
+
+<Warning>
+  Los perfiles de desarrollo exponen todos los endpoints de Actuator para depuración. Nunca use `"*"` en producción.
+</Warning>
+
+#### Perfil de Producción
+
+```yaml
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+```
+
+### Endpoints Expuestos
+
+<CardGroup cols={2}>
+  <Card title="Health" icon="heart-pulse">
+    `GET /actuator/health`
+
+    Estado de salud del servicio y verificaciones de disponibilidad
+  </Card>
+  <Card title="Info" icon="circle-info">
+    `GET /actuator/info`
+
+    Metadatos de la aplicación e información de compilación
+  </Card>
+  <Card title="Todos los Endpoints" icon="asterisk">
+    `GET /actuator`
+
+    Lista todos los endpoints disponibles (solo desarrollo)
+  </Card>
+</CardGroup>
+
+## Configuración de Health Checks
+
+### Visibilidad de Detalles de Salud
+
+<ParamField path="management.endpoint.health.show-details" type="string" required>
+  Controla la visibilidad de los detalles del health check. Valores: `never`, `when-authorized`, `always`.
+</ParamField>
+
+#### Por Defecto y Producción
+
+```yaml
+management:
+  endpoint:
+    health:
+      show-details: never
+```
+
+<Info>
+  Los servicios ocultan los detalles de salud por defecto para prevenir filtración de información. El endpoint de health solo retorna el estado `UP` o `DOWN`.
+</Info>
+
+#### Desarrollo
+
+```yaml
+management:
+  endpoint:
+    health:
+      show-details: always
+```
+
+<Note>
+  Los perfiles de desarrollo muestran todos los detalles de salud, incluyendo conectividad a base de datos, espacio en disco y otros indicadores.
+</Note>
+
+### Ejemplos de Respuestas de Health
+
+#### Producción (show-details: never)
+
+```json
+{
+  "status": "UP"
+}
+```
+
+#### Desarrollo (show-details: always)
+
+```json
+{
+  "status": "UP",
+  "components": {
+    "db": {
+      "status": "UP",
+      "details": {
+        "database": "PostgreSQL",
+        "validationQuery": "isValid()"
+      }
+    },
+    "diskSpace": {
+      "status": "UP",
+      "details": {
+        "total": 499963174912,
+        "free": 262958080000,
+        "threshold": 10485760
+      }
+    },
+    "ping": {
+      "status": "UP"
+    }
+  }
+}
+```
+
+## Configuración de Logging
+
+SGIVU utiliza SLF4J con Logback para logging estructurado.
+
+### Niveles de Log
+
+<ParamField path="logging.level.root" type="string">
+  Nivel del logger raíz. Establecido en `INFO` en todos los entornos para un logging equilibrado.
+</ParamField>
+
+<ParamField path="logging.level.{package}" type="string">
+  Niveles de log por paquete para control granular.
+</ParamField>
+
+### Configuración Estándar
+
+```yaml
+logging:
+  level:
+    root: INFO
+```
+
+### Logging Específico por Servicio
+
+#### Servicio Gateway
+
+```yaml
+logging:
+  level:
+    root: INFO
+    com.sgivu.gateway.security: INFO
+    com.sgivu.gateway.controller: INFO
+```
+
+<Info>
+  El Gateway establece explícitamente los niveles de log para los paquetes de seguridad y controladores, asegurando que los eventos de autenticación/autorización se capturen.
+</Info>
+
+#### Servicio Vehicle
+
+```yaml
+logging:
+  level:
+    root: INFO
+    software:
+      amazon:
+        awssdk: info
+```
+
+<Note>
+  El servicio Vehicle establece el logging del AWS SDK en `info` para reducir la verbosidad de las operaciones con S3.
+</Note>
+
+### Guía de Niveles de Log
+
+<CardGroup cols={2}>
+  <Card title="ERROR" icon="circle-exclamation">
+    Fallos críticos que requieren atención inmediata
+  </Card>
+  <Card title="WARN" icon="triangle-exclamation">
+    Situaciones potencialmente dañinas que no detienen la ejecución
+  </Card>
+  <Card title="INFO" icon="circle-info">
+    Eventos importantes en tiempo de ejecución e hitos
+  </Card>
+  <Card title="DEBUG" icon="bug">
+    Información de diagnóstico detallada (solo desarrollo)
+  </Card>
+</CardGroup>
+
+## Ejemplos Completos de Observabilidad
+
+### Servicio Gateway
+
+```yaml
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+  endpoint:
+    health:
+      show-details: never
+
+logging:
+  level:
+    root: INFO
+    com.sgivu.gateway.security: INFO
+    com.sgivu.gateway.controller: INFO
+```
+
+### Servicio Auth
+
+```yaml
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+  endpoint:
+    health:
+      show-details: never
+
+logging:
+  level:
+    root: INFO
+```
+
+### Servicio User
+
+```yaml
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+  endpoint:
+    health:
+      show-details: never
+
+logging:
+  level:
+    root: INFO
+```
+
+### Servicio Client
+
+```yaml
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+  endpoint:
+    health:
+      show-details: never
+
+logging:
+  level:
+    root: INFO
+```
+
+### Servicio Vehicle
+
+```yaml
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+  endpoint:
+    health:
+      show-details: never
+
+logging:
+  level:
+    root: INFO
+    software:
+      amazon:
+        awssdk: info
+```
+
+### Servicio Purchase-Sale
+
+```yaml
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+  endpoint:
+    health:
+      show-details: never
+
+logging:
+  level:
+    root: INFO
+```
+
+## Stack de Observabilidad
+
+<Steps>
+  <Step title="Instrumentación de Servicios">
+    Spring Boot Actuator instrumenta automáticamente los servicios con health checks y métricas básicas de la JVM.
+  </Step>
+
+  <Step title="Monitoreo de Salud">
+    Los orquestadores y balanceadores de carga consultan `/actuator/health` para determinar la disponibilidad del servicio.
+  </Step>
+
+  <Step title="Agregación de Logs">
+    Los logs de contenedores (stdout/stderr) son recolectados por el runtime del contenedor y pueden enviarse a sistemas centralizados de logging.
+  </Step>
+</Steps>
+
+## Mejores Prácticas de Monitoreo
+
+<Accordion title="Configurar alertas de health check">
+  Configure su orquestador (Kubernetes, Docker Swarm, ECS) para:
+
+  1. Realizar health checks en `/actuator/health`
+  2. Establecer valores apropiados de timeout e intervalo
+  3. Reiniciar contenedores no saludables automáticamente
+  4. Alertar ante fallos repetidos de health check
+
+  Ejemplo de liveness probe en Kubernetes:
+  ```yaml
+  livenessProbe:
+    httpGet:
+      path: /actuator/health
+      port: 8080
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  ```
+</Accordion>
+
+<Accordion title="Implementar logging estructurado">
+  Use logging estructurado (formato JSON) para un mejor análisis de logs:
+
+  ```java
+  import org.slf4j.Logger;
+  import org.slf4j.LoggerFactory;
+
+  Logger log = LoggerFactory.getLogger(UserService.class);
+
+  // Good: Structured with context
+  log.info("User created: userId={}, email={}", user.getId(), user.getEmail());
+
+  // Better: With MDC for request tracing
+  MDC.put("userId", user.getId());
+  log.info("User login successful");
+  ```
+
+  Esto permite un filtrado y análisis potente de logs en sistemas centralizados de logging.
+</Accordion>
+
+## Solución de Problemas
+
+<Accordion title="El endpoint de health check retorna 404">
+  **Causas:**
+  - Dependencia de Actuator no incluida
+  - Endpoints no expuestos en la configuración
+  - Mala configuración del context path
+
+  **Soluciones:**
+  1. Verifique que `spring-boot-starter-actuator` esté en las dependencias
+  2. Revise la configuración de `management.endpoints.web.exposure.include`
+  3. Intente con la ruta completa: `/actuator/health` (no solo `/health`)
+</Accordion>
+
+<Accordion title="Demasiados endpoints de Actuator expuestos en producción">
+  **Riesgo:** Divulgación de información y potenciales vulnerabilidades de seguridad
+
+  **Solución:** Asegúrese de que el perfil de producción use exposición restringida de endpoints:
+  ```yaml
+  management:
+    endpoints:
+      web:
+        exposure:
+          include: health, info
+  ```
+
+  Nunca use `include: "*"` en producción.
+</Accordion>
+
+## Configuración Relacionada
+
+<CardGroup cols={2}>
+  <Card title="Configuración de Spring" icon="leaf" href="/config/reference/spring-configuration">
+    Ajustes del servidor y la aplicación
+  </Card>
+  <Card title="Variables de Entorno" icon="code" href="/config/environments/variables">
+    Variables de entorno relacionadas con observabilidad
+  </Card>
+  <Card title="Despliegue" icon="rocket" href="/config/getting-started/local-development">
+    Despliegue del stack de monitoreo
+  </Card>
+  <Card title="Arquitectura de Servicios" icon="sitemap" href="/config/architecture">
+    Cómo la observabilidad se integra en el sistema
+  </Card>
+</CardGroup>

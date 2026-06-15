@@ -1,0 +1,324 @@
+---
+title: Configuración de Nginx
+description: Reverse proxy de SGIVU — enrutamiento, timeouts, plantilla de configuración y errores comunes
+---
+
+## Descripción general
+
+Nginx es el **único punto de entrada público** de SGIVU en producción. Actúa como reverse proxy que:
+
+- Separa el **Auth Server** (puerto 9000, emisión OIDC/tokens) del **Gateway** (puerto 8080, BFF + APIs)
+- Enruta las solicitudes a los servicios backend apropiados
+- Sirve la SPA Angular desde S3 como fallback catch-all
+- Simplifica las reglas de firewall (solo puerto 80 expuesto)
+
+```
+Browser → Nginx :80 ─┬─ /login, /oauth2/*, /css/, /js/ → Auth :9000
+                     ├─ /v1/*, /auth/session, /docs/  → Gateway :8080 → lb:// microservicios
+                     └─ /* (catch-all)                → S3 (SPA Angular)
+```
+
+---
+
+## Gestión del archivo de configuración
+
+### Por qué `default.conf` no está en git
+
+El archivo `infra/nginx/sites-available/default.conf` contiene el hostname de EC2 y el endpoint de S3, que cambian por entorno. Está listado en `.gitignore` para evitar exponer infraestructura en el repositorio.
+
+```
+# .gitignore (raíz del repo)
+infra/nginx/sites-available/default.conf
+```
+
+### Plantilla versionada
+
+En su lugar se versiona `infra/nginx/sites-available/default.conf.template`, que usa dos variables de entorno como placeholders:
+
+| Variable | Ejemplo |
+|---|---|
+| `EC2_HOST` | `ec2-98-86-100-220.compute-1.amazonaws.com` |
+| `S3_WEBSITE_ENDPOINT` | `sgivu-frontend.s3-website-us-east-1.amazonaws.com` |
+
+### Generar y desplegar
+
+```bash
+# 1. Exportar variables del entorno destino
+export EC2_HOST=ec2-<ip>.compute-1.amazonaws.com
+export S3_WEBSITE_ENDPOINT=<bucket>.s3-website-<region>.amazonaws.com
+
+# 2. Generar default.conf a partir de la plantilla
+envsubst '${EC2_HOST} ${S3_WEBSITE_ENDPOINT}' \
+  < infra/nginx/sites-available/default.conf.template \
+  > infra/nginx/sites-available/default.conf
+
+# 3. Copiar a EC2 y recargar nginx
+scp infra/nginx/sites-available/default.conf \
+    ubuntu@${EC2_HOST}:/tmp/default.conf
+
+ssh ubuntu@${EC2_HOST} "
+  sudo cp /tmp/default.conf /etc/nginx/sites-available/default
+  sudo nginx -t && sudo nginx -s reload
+"
+```
+
+<Warning>
+  `envsubst` sin lista de variables reemplaza **todas** las variables `${}` del archivo, incluyendo las de nginx como `$host`, `$remote_addr`, etc. Siempre pasa la lista explícita: `envsubst '${EC2_HOST} ${S3_WEBSITE_ENDPOINT}'`.
+</Warning>
+
+### Verificar que EC2 coincide con local
+
+```bash
+# Comparar local con EC2 (después de desplegar)
+ssh ubuntu@${EC2_HOST} "cat /etc/nginx/sites-available/default" \
+  | diff - infra/nginx/sites-available/default.conf
+```
+
+---
+
+## Prioridad de `location` en nginx
+
+Entender la prioridad es **crítico** para evitar enrutamiento incorrecto. Nginx evalúa en este orden:
+
+| Prioridad | Sintaxis | Ejemplo |
+|---|---|---|
+| 1 (mayor) | `= /ruta` — exact match | `location = /v1/ml/retrain` |
+| 2 | `^~ /prefijo` — prefijo sin regex | `location ^~ /assets/` |
+| 3 | `~ regex` / `~* regex` — regex | `location ~ ^/oauth2/` |
+| 4 (menor) | `/prefijo` — prefijo normal | `location /v1/` |
+
+<Warning>
+  Una location `= /ruta` (exact match) siempre gana sobre `/prefijo` aunque esté definida después en el archivo. Sin embargo, es buena práctica declararla antes para que el archivo sea legible.
+</Warning>
+
+---
+
+## Mapeo completo de rutas
+
+Esta sección vincula cada `location` de nginx con su destino en `GatewayRoutesConfig.java` y el microservicio final.
+
+### Auth Server (puerto 9000) — sin pasar por Gateway
+
+Estas rutas van **directamente al Auth Server**, evitando el Gateway para romper la dependencia circular (el Gateway valida tokens emitidos por Auth).
+
+| Location nginx | Upstream | Propósito |
+|---|---|---|
+| `location /login` | `auth` | UI de login de Spring Authorization Server |
+| `location ^~ /api/` | `auth` | API interna del Auth Server |
+| `location ^~ /js/` | `auth` | JS de la UI de login |
+| `location ^~ /css/` | `auth` | CSS de la UI de login |
+| `location ^~ /assets/` | `auth` | Assets de la UI de login |
+| `location ^~ /images/` | `auth` | Imágenes de la UI de login |
+| `location = /favicon.ico` | `auth` | Favicon |
+| `location ~ ^/oauth2/(authorize\|token\|jwks\|...)` | `auth` | Endpoints OAuth2 estándar |
+| `location ~ ^/connect/logout` | `auth` | Logout OIDC |
+| `location ~ ^/(\.well-known/openid-configuration\|userinfo)` | `auth` | Discovery OIDC |
+| `location /auth/actuator/` | `auth` | Health check del Auth Server |
+
+<Info>
+  El prefijo `^~` en `/js/`, `/css/`, `/assets/`, `/images/` tiene **prioridad 2** y evita que esas rutas caigan en el catch-all de S3 (prioridad 4). Sin `^~`, la SPA capturaría `/assets/` y retornaría `index.html`.
+</Info>
+
+### Gateway como cliente OAuth2 (BFF)
+
+| Location nginx | Upstream | Propósito |
+|---|---|---|
+| `location ~ ^/(oauth2/authorization/\|login/oauth2/code/)` | `gateway` | Inicio del flujo Authorization Code + PKCE |
+| `location = /auth/session` | `gateway` | Estado de sesión para la SPA (sin exponer tokens) |
+| `location ~ ^/(logout\|session)` | `gateway` | Logout centralizado + revocación de tokens |
+
+### APIs de negocio — `GatewayRoutesConfig.java` → nginx → microservicio
+
+El Gateway recibe todas las rutas `/v1/*` desde nginx y las enruta internamente vía Eureka según `GatewayRoutesConfig.java`. Aplica `tokenRelay` (propaga el access token) y `circuitBreaker` (Resilience4j) en cada ruta.
+
+<Warning>
+  **`location = /v1/ml/retrain` debe estar declarada ANTES de `location /v1/`** en el archivo. Aunque el exact match tiene mayor prioridad en runtime, declararlo primero es obligatorio para la legibilidad y para evitar errores al reorganizar el archivo.
+</Warning>
+
+| Location nginx | Ruta en GatewayRoutesConfig | Microservicio final | Circuit Breaker | Timeout nginx |
+|---|---|---|---|---|
+| `location = /v1/ml/retrain` | `sgivu-ml-retrain` → `/v1/ml/retrain` | `sgivu-ml:8000` | `mlRetrainCircuitBreaker` (1800s) | **1800s** |
+| `location /v1/` | `sgivu-ml` → `/v1/ml/**` | `sgivu-ml:8000` | `mlServiceCircuitBreaker` | 60s (global) |
+| `location /v1/` | `sgivu-user` → `/v1/users/**`, `/v1/roles/**`, `/v1/permissions/**` | `lb://sgivu-user` | `userServiceCircuitBreaker` | 60s |
+| `location /v1/` | `sgivu-client` → `/v1/persons/**`, `/v1/companies/**` | `lb://sgivu-client` | `clientServiceCircuitBreaker` | 60s |
+| `location /v1/` | `sgivu-vehicle` → `/v1/vehicles/**`, `/v1/cars/**`, `/v1/motorcycles/**` | `lb://sgivu-vehicle` | `vehicleServiceCircuitBreaker` | 60s |
+| `location /v1/` | `sgivu-purchase-sale` → `/v1/purchase-sales/**` | `lb://sgivu-purchase-sale` | `purchaseSaleServiceCircuitBreaker` | 60s |
+| `location /v1/` | `sgivu-auth` → `/v1/auth/**` | `lb://sgivu-auth` | `authServiceCircuitBreaker` | 60s |
+
+### Swagger UI por microservicio
+
+Cada servicio tiene sus propias rutas de documentación. El patrón es:
+- `location = /docs/<servicio>` → redirect 302 a `/docs/<servicio>/swagger-ui.html`
+- `location /docs/<servicio>/` → Gateway reescribe a `/<segmento>` vía `RewritePath`
+- `location = /docs/<servicio>/v3/api-docs/swagger-config` → exact match necesario para Swagger UI
+
+```
+/docs/auth/      → Gateway → lb://sgivu-auth
+/docs/user/      → Gateway → lb://sgivu-user
+/docs/client/    → Gateway → lb://sgivu-client
+/docs/vehicle/   → Gateway → lb://sgivu-vehicle
+/docs/purchase-sale/ → Gateway → lb://sgivu-purchase-sale
+/docs/gateway/   → Gateway (self) → http://127.0.0.1:8080
+```
+
+<Info>
+  Swagger UI envía el header `Referer` en sus peticiones a `/v3/api-docs/swagger-config`. El Gateway usa ese header para enrutar la spec correcta a cada servicio (`GatewayRoutesConfig` tiene rutas como `sgivu-v3-swagger-config-user` que filtran por `Referer`).
+</Info>
+
+### Frontend Angular — catch-all S3
+
+```nginx
+location / {
+    proxy_pass http://${S3_WEBSITE_ENDPOINT}/;
+    proxy_set_header Host ${S3_WEBSITE_ENDPOINT};   # S3 requiere el Host exacto del bucket
+
+    location ~* \.(js|css|...)$ { expires 1y; }     # Assets inmutables (hash en nombre)
+    error_page 404 = /index.html;                   # SPA routing: Angular Router maneja el resto
+}
+```
+
+**Regla de oro**: Esta `location /` es el catch-all de prioridad más baja. Cualquier ruta que no coincida con ninguna location anterior llega aquí. Por eso es fundamental que todas las rutas de Auth, Gateway y Swagger estén declaradas antes.
+
+---
+
+## Timeouts
+
+| Ruta | `proxy_read_timeout` | Razón |
+|---|---|---|
+| Global | 60s | Suficiente para todas las APIs de negocio |
+| `= /v1/ml/retrain` | **1800s** | El reentrenamiento puede durar 10-30 minutos dependiendo del volumen de datos |
+| `/v1/ml/**` (predict) | 60s | Inferencias complejas pueden tardar ~30s; 60s es margen suficiente |
+
+<Warning>
+  El timeout de nginx es independiente del `TimeLimiter` de Resilience4j configurado en el Gateway (`AppConfig.java`). Ambos deben ser consistentes: si nginx corta la conexión a los 60s pero el circuit breaker espera 1800s, el cliente recibe un 504 de nginx aunque el Gateway esté procesando la solicitud.
+</Warning>
+
+---
+
+## Errores comunes
+
+### 504 Gateway Timeout en `/v1/ml/retrain`
+
+**Síntoma**: La UI muestra error a los exactamente 60 segundos.
+
+**Causa**: El `proxy_read_timeout` global de 60s corta la conexión antes de que termine el reentrenamiento.
+
+**Solución**: Verificar que existe la location exacta con timeout extendido:
+```nginx
+location = /v1/ml/retrain {
+    proxy_pass http://gateway/v1/ml/retrain;
+    proxy_set_header Host $host;
+    proxy_set_header Connection "";
+    proxy_read_timeout 1800s;
+    proxy_send_timeout 1800s;
+}
+```
+Y que esté declarada **antes** de `location /v1/`.
+
+---
+
+### Frontend Angular muestra error de servicio caído tras timeout de ML
+
+**Síntoma**: Después de un timeout del ML retrain, aparece el banner "Gateway caído" en la UI.
+
+**Causa**: El interceptor Angular `service-health.interceptor.ts` marcaba el gateway como DOWN ante cualquier 504, incluyendo los de rutas ML.
+
+**Solución** (aplicada en `sgivu-frontend`):
+```typescript
+const isMlUrl = req.url.includes('/v1/ml/');
+if (status === 0 || (status === 504 && !isMlUrl)) {
+  serviceHealth.markGatewayDown();
+}
+```
+
+---
+
+### Assets del Auth Server redirigen a la SPA (`/assets/`, `/js/`, `/css/`)
+
+**Síntoma**: La página de login carga sin estilos o scripts.
+
+**Causa**: Sin el prefijo `^~`, las rutas `/assets/`, `/js/`, `/css/` caen en el catch-all `location /` → S3 → 404 → `index.html`.
+
+**Solución**: Mantener `^~` en todos los static assets del Auth Server:
+```nginx
+location ^~ /assets/ { proxy_pass http://auth/assets/; ... }
+location ^~ /js/     { proxy_pass http://auth/js/; ... }
+location ^~ /css/    { proxy_pass http://auth/css/; ... }
+```
+
+---
+
+### 404 en Swagger UI de un microservicio
+
+**Síntoma**: Al acceder a `/docs/vehicle/` o similar, el browser muestra 404.
+
+**Causas frecuentes**:
+1. Falta el exact match para `/docs/<servicio>/v3/api-docs/swagger-config` → Swagger UI no puede inicializar
+2. Falta `proxy_redirect / /docs/<servicio>/;` → los links internos de la UI apuntan a rutas incorrectas
+3. El microservicio no está registrado en Eureka → Gateway retorna 503 (verificar en `/eureka/`)
+
+---
+
+### `/auth/session` redirige al login en bucle
+
+**Síntoma**: La SPA hace GET `/auth/session`, recibe 302 a `/login`, entra en bucle.
+
+**Causa frecuente**: La location `location = /auth/session` apunta a `gateway` pero está siendo capturada por `location ~ ^/(logout|session)` que también matchea `/auth/session` vía el grupo `session`.
+
+**Regla**: `location = /auth/session` (exact match, prioridad 1) siempre gana sobre `location ~ ^/(logout|session)` (regex, prioridad 3). No hay conflicto, pero verificar que el Gateway tenga la sesión Redis activa.
+
+---
+
+## Flujo de trabajo al modificar la configuración
+
+```bash
+# 1. Editar la plantilla (nunca editar default.conf directamente)
+$EDITOR infra/nginx/sites-available/default.conf.template
+
+# 2. Generar default.conf local
+envsubst '${EC2_HOST} ${S3_WEBSITE_ENDPOINT}' \
+  < infra/nginx/sites-available/default.conf.template \
+  > infra/nginx/sites-available/default.conf
+
+# 3. Validar sintaxis localmente (requiere nginx instalado)
+sudo nginx -t -c $(pwd)/infra/nginx/sites-available/default.conf
+
+# 4. Desplegar en EC2
+scp infra/nginx/sites-available/default.conf ubuntu@${EC2_HOST}:/tmp/default.conf
+ssh ubuntu@${EC2_HOST} "
+  sudo cp /tmp/default.conf /etc/nginx/sites-available/default
+  sudo nginx -t && sudo nginx -s reload
+"
+
+# 5. Hacer commit de la plantilla (no del default.conf generado)
+git add infra/nginx/sites-available/default.conf.template
+git commit -m "feat(nginx): ..."
+```
+
+---
+
+## Observabilidad
+
+```bash
+# Logs en tiempo real
+ssh ubuntu@${EC2_HOST} "sudo tail -f /var/log/nginx/sgivu-access.log"
+ssh ubuntu@${EC2_HOST} "sudo tail -f /var/log/nginx/sgivu-error.log"
+
+# Filtrar errores 5xx
+ssh ubuntu@${EC2_HOST} "grep ' 5[0-9][0-9] ' /var/log/nginx/sgivu-access.log | tail -50"
+
+# Estado de nginx
+ssh ubuntu@${EC2_HOST} "sudo nginx -t && sudo systemctl status nginx"
+
+# Eureka: verificar microservicios registrados
+curl http://${EC2_HOST}/eureka/
+```
+
+---
+
+## Próximos pasos
+
+- [Arquitectura de despliegue](/infrastructure/deployment): Configuración general de la infraestructura
+- [Docker Compose](/infrastructure/docker-compose): Orquestación de servicios
+- [Gateway — GatewayRoutesConfig](/services/gateway): Rutas internas del Spring Cloud Gateway
+- [Monitoreo](/infrastructure/monitoring): Health checks y observabilidad

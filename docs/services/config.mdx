@@ -1,0 +1,384 @@
+---
+title: Config Server
+description: Gestión centralizada de configuración con Spring Cloud Config
+---
+
+## Descripción General
+
+`sgivu-config` es el servidor de configuración central del ecosistema SGIVU. Utilizando Spring Cloud Config Server, expone configuración centralizada desde un repositorio Git o un sistema de archivos local (modo nativo), permitiendo a los microservicios obtener propiedades según la aplicación, el perfil y la etiqueta.
+
+## Tecnologías
+
+- **Java**: 25
+- **Spring Boot**: 3.5.8
+- **Spring Cloud Config Server**: 2025.x
+- **Spring Boot Actuator**: Monitoreo de salud
+
+## Configuración de Puerto
+
+- **Puerto por defecto**: 8888
+
+## Prerrequisitos
+
+- JDK 25
+- Maven 3.9+
+- Docker & docker-compose (opcional)
+- Acceso al repositorio de configuración: `https://github.com/stevenrq/sgivu-config-repo.git`
+  - O copia local para modo nativo
+
+## Endpoints
+
+<ResponseField name="GET /{application}/{profile}" type="JSON">
+  Retorna las propiedades para la aplicación y perfil especificados
+
+  **Ejemplo**: `GET /sgivu-auth/dev`
+</ResponseField>
+
+<ResponseField name="GET /{application}/{profile}/{label}" type="JSON">
+  Retorna las propiedades con una etiqueta específica (rama Git)
+
+  **Ejemplo**: `GET /sgivu-auth/prod/main`
+</ResponseField>
+
+<ResponseField name="GET /{application}-{profile}.yml" type="YAML">
+  Retorna el archivo de configuración en formato YAML
+
+  **Ejemplo**: `GET /sgivu-auth-dev.yml`
+</ResponseField>
+
+<ResponseField name="GET /actuator/health" type="JSON">
+  Estado de salud del servicio
+</ResponseField>
+
+## Ejecución del Servicio
+
+### Desarrollo con Docker Compose
+
+```bash
+cd infra/compose/sgivu-docker-compose
+docker compose -f docker-compose.dev.yml up -d
+```
+
+<Info>
+El modo de desarrollo usa el perfil `native` con el repositorio local montado como volumen.
+</Info>
+
+### Ejecución Local
+
+```bash
+./mvnw clean package
+./mvnw spring-boot:run
+```
+
+### Construcción con Docker
+
+```bash
+./build-image.sh          # construye localmente
+./build-image.sh --push   # construye y publica en Docker Hub
+
+docker run -p 8888:8888 --env-file .env stevenrq/sgivu-config:0.1.0
+```
+
+## Modos de Configuración
+
+### Modo Git (Producción)
+
+Configuración por defecto en `src/main/resources/application.yml`:
+
+```yaml
+spring:
+  profiles:
+    active: git
+  cloud:
+    config:
+      server:
+        git:
+          uri: https://github.com/stevenrq/sgivu-config-repo.git
+          default-label: main
+          clone-on-start: true
+```
+
+**Características**:
+- Obtiene la configuración desde un repositorio Git remoto
+- Soporta selección de rama mediante el parámetro `label`
+- Actualizaciones automáticas cuando el repositorio cambia
+- Seguro para uso en producción
+
+### Modo Nativo (Desarrollo)
+
+Configurado en docker-compose para desarrollo local:
+
+```yaml
+spring:
+  profiles:
+    active: native
+  cloud:
+    config:
+      server:
+        native:
+          search-locations: file:///config-repo
+```
+
+**Características**:
+- Lee desde el sistema de archivos local
+- Iteración rápida durante el desarrollo
+- Sin dependencia de red
+- Montado como volumen Docker
+
+## Ejemplos de Uso
+
+### Obtener Configuración
+
+```bash
+# Get dev configuration for auth service
+curl http://localhost:8888/sgivu-auth/dev
+
+# Get prod configuration with specific branch
+curl http://localhost:8888/sgivu-gateway/prod/main
+
+# Get raw YAML file
+curl http://localhost:8888/sgivu-user-dev.yml
+```
+
+### Formato de Respuesta
+
+```json
+{
+  "name": "sgivu-auth",
+  "profiles": ["dev"],
+  "label": "main",
+  "version": "abc123def456",
+  "state": null,
+  "propertySources": [
+    {
+      "name": "https://github.com/stevenrq/sgivu-config-repo.git/sgivu-auth-dev.yml",
+      "source": {
+        "server.port": 9000,
+        "spring.datasource.url": "jdbc:postgresql://...",
+        "...": "..."
+      }
+    }
+  ]
+}
+```
+
+## Configuración del Cliente
+
+Los microservicios se conectan al Config Server usando:
+
+```yaml
+spring:
+  application:
+    name: sgivu-auth
+  config:
+    import: optional:configserver:http://sgivu-config:8888
+  cloud:
+    config:
+      fail-fast: true
+      retry:
+        max-attempts: 6
+        initial-interval: 1000
+```
+
+<Warning>
+Establece `fail-fast: true` en producción para evitar que los servicios inicien con configuración incorrecta.
+</Warning>
+
+## Seguridad
+
+### Desarrollo
+
+- Usa modo `native` con montaje de repositorio local
+- No requiere autenticación para la red interna
+
+### Producción
+
+- Usa modo Git con repositorio remoto
+- Acceso al repositorio controlado mediante credenciales Git
+- Considerar el uso de un repositorio privado con autenticación
+- Cifrar propiedades sensibles usando el cifrado de Spring Cloud Config
+
+### Datos Sensibles
+
+<Warning>
+Nunca versiones datos sensibles directamente en el repositorio de configuración:
+- Contraseñas de base de datos
+- Claves de API
+- Secretos de clientes OAuth2
+- Contraseñas de keystore JWT
+
+Usa placeholders de variables de entorno: `${DB_PASSWORD}`
+</Warning>
+
+## Cifrado de Propiedades
+
+Spring Cloud Config soporta propiedades cifradas:
+
+```yaml
+# Encrypted property (example)
+spring:
+  datasource:
+    password: '{cipher}AQA4x8K8v...'
+```
+
+**Configuración**:
+1. Configurar la clave de cifrado
+2. Usar el endpoint `/encrypt` para cifrar valores
+3. Almacenar los valores cifrados en los archivos de configuración
+4. El Config Server descifra antes de servir a los clientes
+
+## Observabilidad
+
+### Health Check
+
+```bash
+curl http://localhost:8888/actuator/health
+```
+
+Respuesta:
+```json
+{
+  "status": "UP",
+  "components": {
+    "diskSpace": {"status": "UP"},
+    "ping": {"status": "UP"}
+  }
+}
+```
+
+### Monitoreo
+
+- Monitorear `/actuator/health` para verificar la disponibilidad del servicio
+- Rastrear métricas de solicitudes para el acceso a endpoints de configuración
+- Habilitar endpoints adicionales de Actuator en el perfil de desarrollo
+
+## Pruebas
+
+```bash
+./mvnw test
+```
+
+**Pruebas recomendadas**:
+- Verificar la conectividad con el repositorio Git
+- Probar el modo nativo con archivos locales
+- Validar el parseo de propiedades para cada servicio
+- Probar la resolución de perfiles y etiquetas
+
+## Actualización de Configuración
+
+Los clientes pueden actualizar la configuración sin reiniciar:
+
+```bash
+# Trigger refresh on client service
+curl -X POST http://client-service:port/actuator/refresh
+```
+
+<Info>
+Requiere la anotación `@RefreshScope` en los beans que deben actualizarse.
+</Info>
+
+## Solución de Problemas
+
+<AccordionGroup>
+  <Accordion title="URI de Git inaccesible">
+    **Síntomas**: El Config Server no inicia o retorna errores 500
+
+    **Soluciones**:
+    - Verificar la variable de entorno `SPRING_CLOUD_CONFIG_SERVER_GIT_URI`
+    - Comprobar el acceso de red al repositorio Git
+    - Verificar las credenciales Git si se usa un repositorio privado
+    - Revisar los logs del Config Server para errores de conexión
+  </Accordion>
+
+  <Accordion title="Los cambios no se reflejan">
+    **Síntomas**: Los servicios siguen usando valores de configuración antiguos
+
+    **Soluciones**:
+    - Verificar que se esté usando el `label` (rama) correcto
+    - Agregar `/?label=nombre-rama` a la solicitud
+    - Reiniciar el Config Server para limpiar la caché (modo nativo)
+    - Disparar `/actuator/refresh` en los servicios cliente
+    - Verificar si se está usando `@RefreshScope` en los beans de configuración
+  </Accordion>
+
+  <Accordion title="Aplicación no encontrada">
+    **Síntomas**: El Config Server retorna configuración vacía
+
+    **Soluciones**:
+    - Verificar el nombre del archivo: `{application}-{profile}.yml`
+    - Comprobar que `spring.application.name` en el cliente coincida con el nombre del archivo
+    - Asegurar que el archivo exista en la raíz del repositorio o en search-locations
+    - Revisar los logs del Config Server para la resolución de archivos
+  </Accordion>
+
+  <Accordion title="Falla en la resolución de propiedades">
+    **Síntomas**: Los clientes no inician con errores de enlace de propiedades
+
+    **Soluciones**:
+    - Validar la sintaxis YAML en los archivos de configuración
+    - Verificar si faltan placeholders de variables de entorno
+    - Comprobar que los tipos de propiedades coincidan con los valores esperados
+    - Probar el endpoint de configuración directamente: `/app/profile`
+  </Accordion>
+</AccordionGroup>
+
+## Estructura del Repositorio de Configuración
+
+```
+sgivu-config-repo/
+├── application.yml          # Common properties for all services
+├── application-dev.yml      # Common dev properties
+├── application-prod.yml     # Common prod properties
+├── sgivu-auth-dev.yml      # Auth service dev config
+├── sgivu-auth-prod.yml     # Auth service prod config
+├── sgivu-gateway.yml       # Gateway common config
+├── sgivu-gateway-dev.yml   # Gateway dev config
+├── sgivu-user-dev.yml      # User service dev config
+├── sgivu-client-dev.yml    # Client service dev config
+├── sgivu-vehicle-dev.yml   # Vehicle service dev config
+└── ...
+```
+
+## Variables de Entorno
+
+| Variable | Descripción | Por defecto |
+|----------|-------------|-------------|
+| `PORT` | Puerto del servidor | `8888` |
+| `SPRING_PROFILES_ACTIVE` | Perfil activo (git/native) | `git` |
+| `SPRING_CLOUD_CONFIG_SERVER_GIT_URI` | URL del repositorio Git | Repositorio en GitHub |
+| `SPRING_CLOUD_CONFIG_SERVER_GIT_DEFAULT_LABEL` | Rama por defecto | `main` |
+| `SPRING_CLOUD_CONFIG_SERVER_NATIVE_SEARCH_LOCATIONS` | Ruta del modo nativo | `file:///config-repo` |
+
+## Buenas Prácticas
+
+<CardGroup cols={2}>
+  <Card title="Usar modo Git" icon="git">
+    Usa el modo Git en producción para control de versiones y trazabilidad
+  </Card>
+  <Card title="Cifrar secretos" icon="shield">
+    Usa el cifrado de Spring Cloud Config para valores sensibles
+  </Card>
+  <Card title="Variables de entorno" icon="code">
+    Usa placeholders para valores específicos de cada entorno
+  </Card>
+  <Card title="Jerarquía de perfiles" icon="layer-group">
+    Usa archivos comunes + sobrescrituras específicas por perfil
+  </Card>
+</CardGroup>
+
+## Servicios Relacionados
+
+<CardGroup cols={2}>
+  <Card title="Discovery" icon="compass" href="/services/discovery">
+    Registro y descubrimiento de servicios
+  </Card>
+  <Card title="Gateway" icon="shield" href="/services/gateway">
+    Configuración del API Gateway
+  </Card>
+  <Card title="Auth" icon="lock" href="/services/auth">
+    Configuración del servidor de autorización
+  </Card>
+  <Card title="Todos los servicios" icon="server" href="/services/overview">
+    Vista general de todos los servicios
+  </Card>
+</CardGroup>

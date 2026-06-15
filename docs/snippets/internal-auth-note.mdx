@@ -1,0 +1,6 @@
+<Warning>
+**Autenticación entre servicios:** existen dos mecanismos complementarios:
+
+1. **Relay de tokens (preferido cuando hay usuario):** el Gateway retransmite el JWT Bearer hacia los microservicios. Cada servicio valida el token contra el `JwtAuthorizationInterceptor` y la JWKS de `sgivu-auth`.
+2. **`X-Internal-Service-Key` (fallback sin contexto de usuario):** llamadas directas servicio-a-servicio (p. ej. `sgivu-ml` → `sgivu-purchase-sale`) usan el header `X-Internal-Service-Key`, validado por `InternalServiceAuthorizationManager`. El secreto compartido se inyecta en cada servicio como `SERVICE_INTERNAL_SECRET_KEY`.
+</Warning>

@@ -1,0 +1,254 @@
+---
+title: Predicción de Demanda
+description: Pronóstico mensual de demanda de vehículos impulsado por IA para optimizar el inventario
+---
+
+## Descripción General
+
+La Predicción de Demanda utiliza Machine Learning para analizar los datos históricos de contratos de compraventa y pronosticar la demanda mensual futura por segmento de vehículo. Un **segmento** se define por cuatro dimensiones: tipo de vehículo, marca, modelo y línea.
+
+## Cómo Funciona
+
+El servicio ML de SGIVU construye una tabla de features mensuales por segmento a partir del historial de contratos. Evalúa **dos algoritmos** (Random Forest y XGBoost) con `RandomizedSearchCV` sobre `TimeSeriesSplit(n_splits=3)` y selecciona el mejor por **score compuesto WAPE+RMSE** (modo `weighted` por defecto, configurable vía `MODEL_SELECTION_METRIC`). El modelo genera pronósticos **multi-step directos** con dampening hacia el baseline del segmento; los intervalos de confianza usan residuos calibrados por horizonte.
+
+Datos que el modelo utiliza internamente:
+
+- Contratos de venta y compra históricos por segmento (fuente principal)
+- Métricas de negocio derivadas: precios promedio, margen, rotación de inventario, días en inventario
+- Features temporales: lags de 1/3/6 meses, medias móviles, codificación cíclica de estacionalidad (mes sin/cos)
+
+## Obtener Predicciones
+
+### Solicitar una Predicción
+
+<Steps>
+  <Step title="Navegar a Predicción de Demanda">
+    Acceda a la sección de Predicción de Demanda desde su panel de control o el menú de analíticas.
+  </Step>
+
+  <Step title="Definir el Segmento">
+    Especifique el segmento exacto de vehículo:
+    - **Tipo de vehículo**: `CAR` o `MOTORCYCLE`
+    - **Marca**: nombre del fabricante (ej. TOYOTA, HONDA)
+    - **Modelo**: nombre del modelo (ej. COROLLA, CIVIC)
+    - **Línea**: versión o equipamiento específico (ej. "XEI 2.0") — campo obligatorio, no puede estar vacío
+  </Step>
+
+  <Step title="Configurar el Horizonte">
+    Seleccione cuántos meses hacia adelante desea pronosticar (`horizon_months`, entre 1 y 24). El valor por defecto es 6 meses.
+
+    Opcionalmente, ajuste el nivel de confianza para los intervalos (`confidence`, entre 0.50 y 0.99; por defecto 0.95).
+  </Step>
+
+  <Step title="Generar Predicción">
+    El sistema envía sus parámetros al servicio de ML y devuelve la serie de predicciones mensuales con intervalos de confianza inferior y superior.
+  </Step>
+
+  <Step title="Revisar Resultados">
+    Analice los resultados, que incluyen por cada mes:
+    - **demand**: estimación puntual de unidades esperadas a vender
+    - **lower_ci** / **upper_ci**: intervalo de confianza inferior y superior
+    - **model_version**: versión del modelo utilizado (formato `YYYYMMDDHHMMSS`)
+    - **metrics**: métricas del modelo (RMSE, MAE, MAPE, WAPE, R², `residual_std`, `baselines`)
+  </Step>
+</Steps>
+
+### Interpretación de los Resultados
+
+<Card title="Estimación de Demanda" icon="chart-line">
+  Cada punto de la serie (`demand`) representa el número esperado de unidades del segmento que se venderán en ese mes. El modelo se basa en patrones históricos de contratos reales.
+</Card>
+
+<Card title="Intervalo de Confianza" icon="gauge-high">
+  `lower_ci` y `upper_ci` delimitan el rango dentro del cual se espera que caiga la demanda real con el nivel de confianza configurado. A mayor confianza, más amplio el intervalo.
+</Card>
+
+<Card title="Contexto Histórico" icon="clock-rotate-left">
+  Use el endpoint `/v1/ml/predict-with-history` para obtener también los datos históricos de ventas del segmento (`sales_count` por mes), útiles para graficar tendencias pasadas junto con el pronóstico futuro.
+</Card>
+
+## Predicción con Tendencias Históricas
+
+Para análisis visuales, el endpoint de predicción con historial devuelve adicionalmente:
+
+- **history**: lista de puntos históricos `{month, sales_count}` con las ventas reales pasadas del segmento
+- **segment**: las dimensiones del segmento canonicalizadas (marcas/modelos normalizados)
+- **trained_at**: timestamp de cuándo se entrenó el modelo activo
+
+<Steps>
+  <Step title="Solicitar Predicción con Historial">
+    Use el mismo body de petición que `/predict`, pero llame a `/v1/ml/predict-with-history`.
+  </Step>
+
+  <Step title="Ver Datos Históricos">
+    El sistema recupera los datos de ventas mensuales reales del segmento junto con el pronóstico generado.
+  </Step>
+
+  <Step title="Comparar Tendencias">
+    Visualice la tendencia histórica (`history`) junto a la predicción futura (`predictions`) en un mismo gráfico para identificar patrones estacionales y validar el pronóstico.
+  </Step>
+
+  <Step title="Identificar Oportunidades">
+    Use la vista combinada para detectar estacionalidades, niveles óptimos de inventario y momentos de alta rotación.
+  </Step>
+</Steps>
+
+## Casos de Uso
+
+### Optimización de Inventario
+
+<CardGroup cols={2}>
+  <Card title="Planificación de Stock" icon="boxes-stacked">
+    Prediga qué segmentos tendrán alta demanda para guiar sus decisiones de compra de vehículos.
+  </Card>
+
+  <Card title="Evitar Sobrestock" icon="warehouse">
+    Identifique segmentos de baja rotación para evitar inmovilizar capital en inventario de baja demanda.
+  </Card>
+
+  <Card title="Preparación Estacional" icon="calendar">
+    Anticipe los cambios de demanda estacionales (el modelo usa codificación cíclica de mes) y ajuste el inventario en consecuencia.
+  </Card>
+
+  <Card title="Asignación de Presupuesto" icon="dollar-sign">
+    Asigne el presupuesto de compras a los segmentos con mayor demanda pronosticada para un mejor retorno de inversión.
+  </Card>
+</CardGroup>
+
+### Estrategia de Precios
+
+<Card title="Precios Basados en Demanda" icon="tags">
+  Use las predicciones de demanda para informar decisiones de precios. Alta demanda prevista puede justificar precios premium; segmentos de baja demanda pueden requerir estrategias competitivas.
+</Card>
+
+### Planificación de Ventas
+
+<Card title="Objetivos de Ventas" icon="bullseye">
+  Establezca objetivos realistas basados en la demanda prevista para cada segmento de vehículos.
+</Card>
+
+<Card title="Enfoque de Marketing" icon="bullhorn">
+  Dirija los esfuerzos de marketing hacia los segmentos con mayor demanda pronosticada por el sistema.
+</Card>
+
+## Entrenamiento del Modelo
+
+### Reentrenamiento Manual
+
+<Steps>
+  <Step title="Solicitar Reentrenamiento">
+    Desde la sección de gestión de modelos, o llamando directamente a la API `POST /v1/ml/retrain`.
+  </Step>
+
+  <Step title="Especificar Rango de Datos (opcional)">
+    Indique `start_date` y `end_date` (formato ISO 8601) para limitar el período de datos de entrenamiento. Si se omiten, se usan todos los datos disponibles.
+  </Step>
+
+  <Step title="Proceso de Entrenamiento">
+    El servicio ML extrae contratos, construye las features, evalúa Random Forest y XGBoost con búsqueda aleatoria de hiperparámetros, y selecciona el mejor candidato por score compuesto WAPE+RMSE. Puede tardar varios minutos; el gateway reserva un timeout de 30 min para esta ruta (`/v1/ml/retrain`).
+  </Step>
+
+  <Step title="Validación y Despliegue">
+    El nuevo modelo se valida sobre un conjunto de prueba temporal (últimos ~20% de meses). El servicio computa baselines naive (p.ej. `naive_lag1_rmse`) para verificar que el modelo aporta valor real frente a heurísticas. Si pasa los criterios, se guarda con un timestamp `YYYYMMDDHHMMSS` y se activa automáticamente para todas las predicciones futuras. La respuesta incluye `version`, `metrics` (con WAPE y baselines) y `samples`.
+  </Step>
+</Steps>
+
+## Información del Modelo
+
+### Ver Detalles del Modelo
+
+<Card title="Metadatos del Modelo" icon="info-circle">
+  El endpoint `GET /v1/ml/models/latest` devuelve información del modelo activo:
+  - **version**: identificador basado en timestamp UTC (`YYYYMMDDHHMMSS`, sin separadores)
+  - **trained_at**: cuándo se completó el entrenamiento
+  - **features**: lista de features usadas por el modelo (incluye `horizon_step` para forecasting directo)
+  - **metrics**: RMSE, MAE, MAPE, WAPE, R², `residual_std`, `baselines`
+  - **candidates**: comparación de los algoritmos evaluados (Random Forest y XGBoost)
+  - **train_samples** / **test_samples** / **total_samples**: tamaño del dataset
+</Card>
+
+## Mejores Prácticas
+
+<AccordionGroup>
+  <Accordion title="Definir el campo 'line' en todos los contratos">
+    El campo `line` es obligatorio para la segmentación y el entrenamiento. Todos los contratos y vehículos deben tener una línea definida; de lo contrario, el segmento no puede predecirse.
+  </Accordion>
+
+  <Accordion title="Revisar predicciones periódicamente">
+    Genere predicciones mensualmente para anticipar tendencias del mercado y ajustar el inventario de forma proactiva.
+  </Accordion>
+
+  <Accordion title="Comparar con resultados reales">
+    Rastree la precisión comparando los pronósticos con las ventas reales del mes siguiente. Si el RMSE aumenta con el tiempo, es señal de que se necesita reentrenamiento.
+  </Accordion>
+
+  <Accordion title="Usar segmentos completos">
+    Genere predicciones para varios segmentos (tipo/marca/modelo/línea) para una visión integral de todo el inventario.
+  </Accordion>
+
+  <Accordion title="Considerar factores externos">
+    Las predicciones se basan en datos históricos internos. Eventos externos (cambios económicos, nuevas regulaciones, disrupciones de mercado) no son capturados automáticamente por el modelo.
+  </Accordion>
+</AccordionGroup>
+
+## Requisitos de Datos
+
+### Historial Mínimo
+
+<Card title="Al menos 6 meses por segmento" icon="database">
+  El sistema requiere mínimo 6 meses de datos por segmento para entrenar (configurable via `MIN_HISTORY_MONTHS`). Segmentos con historial insuficiente no generarán predicciones.
+</Card>
+
+### Calidad de Datos
+
+<CardGroup cols={2}>
+  <Card title="Contratos Completos" icon="check-circle">
+    Los contratos deben tener `vehicle_type`, `brand`, `model`, `line`, precios de compra/venta y fechas correctas.
+  </Card>
+
+  <Card title="Línea No Vacía" icon="layer-group">
+    El campo `line` no puede estar vacío. Es la dimensión de segmentación más específica.
+  </Card>
+
+  <Card title="Nomenclatura Consistente" icon="text">
+    Use nombres consistentes de marca/modelo/línea. El servicio normaliza automáticamente mayúsculas y espacios, pero las variaciones mayores deben corregirse en el origen.
+  </Card>
+
+  <Card title="Actualizaciones Regulares" icon="rotate">
+    Ingrese regularmente las nuevas transacciones para mantener el historial actualizado y la calidad de los pronósticos.
+  </Card>
+</CardGroup>
+
+## Integración con Otras Funcionalidades
+
+### Contratos de Compra y Venta
+
+<Card title="Fuente de Datos de Entrenamiento" icon="arrows-left-right">
+  Los contratos de `sgivu-purchase-sale` son la fuente principal de datos. Cuantos más contratos con información completa, mejores los pronósticos.
+</Card>
+
+### Gestión de Vehículos
+
+<Card title="Planificación de Inventario" icon="clipboard-list">
+  Use las predicciones para guiar las decisiones de compra de vehículos y la composición del inventario en la sección de Gestión de Vehículos.
+</Card>
+
+## Solución de Problemas
+
+<AccordionGroup>
+  <Accordion title="No hay predicciones disponibles">
+    No se ha entrenado ningún modelo todavía. Asegúrese de tener contratos históricos suficientes (mínimo 6 meses por segmento) y ejecute `POST /v1/ml/retrain`.
+  </Accordion>
+
+  <Accordion title="Error: campo 'line' vacío">
+    La predicción requiere que `line` no esté vacío. Verifique que el segmento solicitado tenga la línea definida.
+  </Accordion>
+
+  <Accordion title="Las predicciones parecen imprecisas">
+    Compare el RMSE del modelo con las ventas reales. Si el error es alto, reentrene el modelo con datos más recientes o revise la calidad de los datos de contratos del segmento.
+  </Accordion>
+
+  <Accordion title="El reentrenamiento falla">
+    Causas comunes: datos insuficientes (< 6 meses), campo `line` vacío en contratos históricos, o base de datos ML inaccesible. Revise los logs del servicio ML.
+  </Accordion>
+</AccordionGroup>

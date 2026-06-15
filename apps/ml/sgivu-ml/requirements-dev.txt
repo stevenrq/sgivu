@@ -1,0 +1,5 @@
+# Herramientas de desarrollo (no van en la imagen Docker)
+pytest>=9.0.0
+pytest-asyncio>=1.4.0
+pylint>=3.0.0
+black==25.1.0  # mantener en sync con rev de psf/black en .pre-commit-config.yaml

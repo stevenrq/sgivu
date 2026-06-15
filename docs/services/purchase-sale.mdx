@@ -1,0 +1,578 @@
+---
+title: Servicio de Compra-Venta
+description: Gestión de contratos e informes para transacciones de vehículos
+---
+
+## Descripción General
+
+`sgivu-purchase-sale` gestiona los contratos de compra y venta de vehículos. Proporciona creación, búsqueda avanzada, generación de informes (PDF/XLSX/CSV) y gestión del ciclo de vida de los contratos. El servicio se integra con `sgivu-user`, `sgivu-client` y `sgivu-vehicle` para el enriquecimiento de datos, y con `sgivu-auth` para la autorización.
+
+## Tecnologías
+
+- **Java**: 25
+- **Spring Boot**: 4.0.1
+- **Spring Security**: Resource Server (validación JWT)
+- **Spring Data JPA**: Persistencia en PostgreSQL
+- **Flyway**: Migraciones de base de datos
+- **Spring Cloud Config Client**: Configuración centralizada
+- **Spring Cloud Eureka Client**: Registro de servicios
+- **SpringDoc OpenAPI**: Documentación Swagger UI
+- **MapStruct**: Mapeo de DTOs
+- **Lombok**: Generación de código
+- **OpenPDF**: Generación de informes PDF
+- **Apache POI**: Generación de informes Excel (XLSX)
+- **Spring Cache + Caffeine**: Caché L1 in-memory
+- **Spring Data Redis**: Caché L2 distribuida (TTL ~60 s en `dashboard-summary`)
+
+## Requisitos Previos
+
+- JDK 25
+- Maven 3.9+
+- Base de datos PostgreSQL
+- Servicios `sgivu-config` y `sgivu-discovery` en ejecución
+- Servicios relacionados: `sgivu-user`, `sgivu-client`, `sgivu-vehicle` (para enriquecimiento de datos)
+
+## Ejecución del Servicio
+
+### Desarrollo con Docker Compose
+
+```bash
+cd infra/compose/sgivu-docker-compose
+docker compose -f docker-compose.dev.yml up -d
+```
+
+### Ejecución Local
+
+```bash
+./mvnw clean install -DskipTests
+./mvnw spring-boot:run
+```
+
+### Construcción Docker
+
+```bash
+./build-image.sh          # construye localmente
+./build-image.sh --push   # construye y publica en Docker Hub
+
+docker build -t sgivu-purchase-sale:local .
+```
+
+## Tipos de Contrato
+
+### Contrato de Compra
+
+**Cuándo**: La empresa adquiere un vehículo de un proveedor/particular
+
+**Campos Clave**:
+- `contractType`: `PURCHASE`
+- `clientId`: ID del vendedor/proveedor (sgivu-client)
+- `vehicleId`: Vehículo adquirido (sgivu-vehicle)
+- `userId`: Empleado responsable (sgivu-user)
+- `purchasePrice`: Monto pagado para adquirir el vehículo
+- `paymentMethod`: cualquiera de los 9 valores soportados
+- `paymentLimitations`, `paymentTerms`, `observations`: opcionales
+
+### Contrato de Venta
+
+**Cuándo**: La empresa vende un vehículo a un cliente
+
+**Campos Clave**:
+- `contractType`: `SALE`
+- `clientId`: ID del comprador/cliente
+- `vehicleId`: Vehículo en venta
+- `userId`: Representante de ventas
+- `salePrice`: Monto que paga el cliente
+- `paymentMethod`, `paymentLimitations`, `paymentTerms`, `observations`
+
+## Flujo de Estados del Contrato
+
+`ContractStatus` tiene exactamente cuatro valores reales:
+
+<Steps>
+  <Step title="PENDING">
+    Estado inicial al crear el contrato. Transiciones permitidas: `ACTIVE`, `COMPLETED`, `CANCELED`.
+  </Step>
+
+  <Step title="ACTIVE">
+    Contrato en curso (pago en cuotas, financiamiento, entrega parcial). Transiciones permitidas: `COMPLETED`, `CANCELED`.
+  </Step>
+
+  <Step title="COMPLETED">
+    Contrato ejecutado y transacción cerrada. **Estado terminal**.
+  </Step>
+
+  <Step title="CANCELED">
+    Contrato cancelado antes de la finalización. **Estado terminal**.
+  </Step>
+</Steps>
+
+<Note>
+Cada cambio de estado se persiste automáticamente en la tabla `contract_status_history` (V2 migration), capturando estado anterior, nuevo, usuario que realizó el cambio, timestamp y motivo opcional.
+</Note>
+
+## Seguridad
+
+### Autenticación
+
+**Validación de Tokens JWT**:
+- Tokens emitidos por `sgivu-auth`
+- `JwtAuthenticationConverter` mapea el claim `rolesAndPermissions` a authorities
+- El Resource Server valida la firma mediante el endpoint JWKS
+
+### Autorización
+
+**Permisos Requeridos**:
+- `purchase_sale:create` - Crear contratos
+- `purchase_sale:read` - Ver contratos, generar informes (PDF/XLSX/CSV) y consultar `dashboard-summary`
+- `purchase_sale:update` - Actualizar contratos
+- `purchase_sale:delete` - Eliminar contratos (solo perfil dev)
+
+### Comunicación Interna entre Servicios
+
+**Header X-Internal-Service-Key**:
+- Permite llamadas entre servicios sin JWT
+- Utilizado para endpoints internos
+- Debe mantenerse en secreto
+
+<Warning>
+La clave interna de servicio omite la autenticación. Asegúrese de que:
+- La clave esté almacenada en un gestor de secretos
+- Solo los servicios autorizados tengan acceso
+- La clave se rote periódicamente
+- El Gateway bloquee los endpoints `/internal/*`
+</Warning>
+
+## Esquema de Base de Datos
+
+### Migraciones Flyway
+
+**Ubicación**: `src/main/resources/db/migration`
+
+**V1__initial_schema.sql** crea:
+
+**Tabla purchase_sales**:
+- `id`: Clave primaria
+- `contract_type`: ENUM (`PURCHASE`, `SALE`)
+- `contract_status`: ENUM (`PENDING`, `ACTIVE`, `COMPLETED`, `CANCELED`)
+- `payment_method`: ENUM con 9 valores (`CASH`, `BANK_TRANSFER`, `BANK_DEPOSIT`, `CASHIERS_CHECK`, `MIXED`, `FINANCING`, `DIGITAL_WALLET`, `TRADE_IN`, `INSTALLMENT_PAYMENT`)
+- `client_id`: Referencia al cliente (sgivu-client)
+- `user_id`: Referencia al usuario responsable (sgivu-user)
+- `vehicle_id`: Referencia al vehículo (sgivu-vehicle)
+- `purchase_price`, `sale_price`: precios numéricos (uno u otro según `contract_type`)
+- `payment_limitations`, `payment_terms`, `observations`: campos de texto opcional
+- `created_at`, `updated_at`: Marcas de tiempo de auditoría
+
+**V2__add_contract_status_history.sql** añade:
+
+**Tabla contract_status_history** (audita transiciones de estado):
+- `id`: Clave primaria
+- `purchase_sale_id`: FK al contrato
+- `previous_status`, `new_status`: ENUM `ContractStatus` (previous puede ser NULL en la creación)
+- `changed_by`: ID del usuario que realizó el cambio
+- `changed_at`: timestamp del cambio
+- `reason`: motivo opcional del cambio
+
+**R__demo_data.sql** (migración repetible) carga ~12 000 contratos sintéticos con un modelo de demanda estacional para pruebas y entrenamiento ML.
+
+## Endpoints de la API
+
+### Gestión de Contratos
+
+<ResponseField name="GET /v1/purchase-sales" type="protected">
+  Listar contratos con filtrado avanzado
+
+  **Permiso Requerido**: `purchase_sale:read`
+
+  **Parámetros de Consulta**:
+  - `contractType`: Filtrar por PURCHASE o SALE
+  - `contractStatus`: Filtrar por estado
+  - `clientId`: Filtrar por cliente
+  - `vehicleId`: Filtrar por vehículo
+  - `userId`: Filtrar por usuario
+  - `startDate`, `endDate`: Rango de fechas
+  - `page`, `size`, `sort`: Paginación
+</ResponseField>
+
+<ResponseField name="GET /v1/purchase-sales/{id}" type="protected">
+  Obtener contrato por ID con datos enriquecidos
+
+  **Permiso Requerido**: `purchase_sale:read`
+
+  **Retorna**: Contrato con detalles del cliente, usuario y vehículo
+</ResponseField>
+
+<ResponseField name="POST /v1/purchase-sales" type="protected">
+  Crear nuevo contrato
+
+  **Permiso Requerido**: `purchase_sale:create`
+
+  **Validaciones**:
+  - Tipo de contrato válido
+  - Cliente, usuario y vehículo deben existir
+  - Campo de precio apropiado debe estar completo
+  - No se permiten fechas de contrato futuras
+</ResponseField>
+
+<ResponseField name="PUT /v1/purchase-sales/{id}" type="protected">
+  Actualizar contrato existente
+
+  **Permiso Requerido**: `purchase_sale:update`
+
+  **Restricciones**: No se pueden actualizar contratos completados o cancelados
+</ResponseField>
+
+<ResponseField name="DELETE /v1/purchase-sales/{id}" type="protected">
+  Eliminar contrato (solo perfil `dev`).
+
+  **Permiso Requerido**: `purchase_sale:delete`
+</ResponseField>
+
+<ResponseField name="GET /v1/purchase-sales/page/{page}" type="protected">
+  Listado paginado simple. Soporta `?size`, `?sort`.
+
+  **Permiso Requerido**: `purchase_sale:read`
+</ResponseField>
+
+<ResponseField name="GET /v1/purchase-sales/detailed" type="protected">
+  Listado completo enriquecido (cliente, usuario y vehículo embebidos).
+
+  **Permiso Requerido**: `purchase_sale:read`
+</ResponseField>
+
+<ResponseField name="GET /v1/purchase-sales/page/{page}/detailed" type="protected">
+  Listado paginado enriquecido.
+
+  **Permiso Requerido**: `purchase_sale:read`
+</ResponseField>
+
+<ResponseField name="GET /v1/purchase-sales/search" type="protected">
+  Búsqueda paginada con filtros (`contractType`, `contractStatus`, `paymentMethod`, `clientId`, `userId`, `vehicleId`, `startDate`, `endDate`, `minPurchasePrice`, `maxPurchasePrice`, `minSalePrice`, `maxSalePrice`, `term`).
+
+  **Permiso Requerido**: `purchase_sale:read`
+</ResponseField>
+
+<ResponseField name="GET /v1/purchase-sales/client/{clientId}" type="protected">
+  Contratos asociados a un cliente.
+</ResponseField>
+
+<ResponseField name="GET /v1/purchase-sales/user/{userId}" type="protected">
+  Contratos asociados a un usuario.
+</ResponseField>
+
+<ResponseField name="GET /v1/purchase-sales/vehicle/{vehicleId}" type="protected">
+  Contratos asociados a un vehículo.
+</ResponseField>
+
+<ResponseField name="GET /v1/purchase-sales/available-vehicles" type="protected">
+  IDs de vehículos comprados aún no vendidos (para selección de inventario al crear contratos de venta).
+
+  **Permiso Requerido**: `purchase_sale:read`
+</ResponseField>
+
+<ResponseField name="GET /v1/purchase-sales/dashboard-summary" type="protected">
+  Snapshot de KPIs (conteos por estado, métodos de pago, actividad reciente, agregados mensuales y conteos de vehículos). Cacheado con Caffeine (L1) y Redis (L2) por ~60 s.
+
+  **Permiso Requerido**: `purchase_sale:read`
+</ResponseField>
+
+### Informes
+
+<ResponseField name="GET /v1/purchase-sales/report/pdf" type="protected">
+  Generar informe PDF (OpenPDF). Parámetros de consulta opcionales: `startDate`, `endDate`.
+
+  **Permiso Requerido**: `purchase_sale:read`
+</ResponseField>
+
+<ResponseField name="GET /v1/purchase-sales/report/excel" type="protected">
+  Generar informe XLSX (Apache POI). Parámetros de consulta opcionales: `startDate`, `endDate`.
+
+  **Permiso Requerido**: `purchase_sale:read`
+</ResponseField>
+
+<ResponseField name="GET /v1/purchase-sales/report/csv" type="protected">
+  Generar informe CSV. Parámetros de consulta opcionales: `startDate`, `endDate`.
+
+  **Permiso Requerido**: `purchase_sale:read`
+</ResponseField>
+
+### Historial de Estados
+
+<ResponseField name="GET /v1/contract-status-history/contract/{purchaseSaleId}" type="protected">
+  Historial cronológico de cambios de estado para un contrato.
+
+  **Permiso Requerido**: `purchase_sale:read`
+</ResponseField>
+
+## Ejemplos de Solicitud/Respuesta
+
+### Crear Contrato de Compra
+
+```json
+POST /v1/purchase-sales
+Authorization: Bearer <jwt-token>
+Content-Type: application/json
+
+{
+  "contractType": "PURCHASE",
+  "contractStatus": "DRAFT",
+  "contractDate": "2024-03-06",
+  "clientId": 123,
+  "userId": 456,
+  "vehicleId": 789,
+  "purchasePrice": 25000.00,
+  "notes": "Vehicle purchased from private seller"
+}
+```
+
+### Respuesta
+
+```json
+{
+  "id": 1001,
+  "contractType": "PURCHASE",
+  "contractStatus": "DRAFT",
+  "contractDate": "2024-03-06",
+  "client": {
+    "id": 123,
+    "name": "John Doe",
+    "type": "PERSON"
+  },
+  "user": {
+    "id": 456,
+    "username": "jsmith",
+    "fullName": "Jane Smith"
+  },
+  "vehicle": {
+    "id": 789,
+    "vin": "1HGBH41JXMN109186",
+    "brand": "Toyota",
+    "model": "Camry",
+    "year": 2023
+  },
+  "purchasePrice": 25000.00,
+  "salePrice": null,
+  "notes": "Vehicle purchased from private seller",
+  "createdAt": "2024-03-06T10:30:00Z",
+  "updatedAt": "2024-03-06T10:30:00Z"
+}
+```
+
+### Actualizar Estado del Contrato
+
+```json
+PATCH /v1/purchase-sales/1001/status
+Authorization: Bearer <jwt-token>
+Content-Type: application/json
+
+{
+  "status": "PENDING"
+}
+```
+
+## Integración de Servicios
+
+### Enriquecimiento de Datos
+
+Las respuestas de contratos incluyen datos enriquecidos de servicios relacionados:
+
+**Información del Cliente** (desde `sgivu-client`):
+- Persona: Nombre completo, número de documento
+- Empresa: Razón social, CUIT/RUC
+
+**Información del Usuario** (desde `sgivu-user`):
+- Nombre de usuario, nombre completo
+- Información de rol
+
+**Información del Vehículo** (desde `sgivu-vehicle`):
+- VIN, marca, modelo, año
+- Estado actual
+- Imagen principal
+
+### Patrón de Comunicación
+
+```java
+// Example: Enriching contract with client data
+@Service
+public class ContractEnrichmentService {
+
+    @LoadBalanced
+    private final WebClient webClient;
+
+    public PurchaseSaleDTO enrichContract(PurchaseSale contract) {
+        // Fetch client data
+        ClientDTO client = webClient.get()
+            .uri("http://sgivu-client/v1/clients/{id}", contract.getClientId())
+            .header("X-Internal-Service-Key", internalKey)
+            .retrieve()
+            .bodyToMono(ClientDTO.class)
+            .block();
+
+        // Similar for user and vehicle...
+
+        return mapToDTO(contract, client, user, vehicle);
+    }
+}
+```
+
+## Generación de Informes
+
+### Informes PDF
+
+**Librería**: OpenPDF
+
+**Características**:
+- Encabezado de empresa con logotipo
+- Tabla de detalles del contrato
+- Información del cliente, usuario y vehículo
+- Sección de firmas
+- Numeración de páginas
+
+### Informes Excel
+
+**Librería**: Apache POI
+
+**Características**:
+- Encabezados formateados
+- Celdas de estado con código de colores
+- Celdas con fórmulas para totales
+- Columnas con tamaño automático
+- Paneles congelados
+
+### Informes CSV
+
+**Formato**: Compatible con RFC 4180
+
+**Características**:
+- Fila de encabezado
+- Escape adecuado de caracteres
+- Codificación UTF-8
+- Estructura plana (sin objetos anidados)
+
+## Observabilidad
+
+### Endpoints de Actuator
+
+- `/actuator/health`: Estado del servicio con conectividad a la base de datos
+- `/actuator/metrics`: Métricas personalizadas para operaciones de contratos
+- `/actuator/info`: Metadatos de la aplicación
+
+### Documentación OpenAPI
+
+**Swagger UI**: `/swagger-ui/index.html` (cuando está habilitado)
+
+## Pruebas
+
+```bash
+./mvnw test
+```
+
+**Cobertura de Pruebas**:
+- Pruebas unitarias para servicios y mappers
+- Pruebas de integración de repositorios
+- Pruebas de validación de transiciones de estado
+- Pruebas de generación de informes
+- Pruebas de autorización de seguridad
+
+## Solución de Problemas
+
+<AccordionGroup>
+  <Accordion title="Errores de autorización 401/403">
+    **Síntomas**: Las solicitudes a la API retornan no autorizado o prohibido
+
+    **Soluciones**:
+    - Verificar que el token Bearer contenga los permisos requeridos
+    - Comprobar que el emisor del token coincida con `sgivu-auth`
+    - Asegurarse de que el usuario tenga las asignaciones de rol apropiadas
+    - Validar que el token no haya expirado
+  </Accordion>
+
+  <Accordion title="Fallos de integración">
+    **Síntomas**: No se pueden obtener datos de cliente/usuario/vehículo
+
+    **Soluciones**:
+    - Verificar que `sgivu-config` y `sgivu-discovery` estén accesibles
+    - Comprobar que los servicios relacionados estén registrados en Eureka
+    - Asegurarse de que la clave interna de servicio sea correcta
+    - Revisar la conectividad de red entre servicios
+    - Verificar si el circuit breaker está en estado abierto
+  </Accordion>
+
+  <Accordion title="Transición de estado inválida">
+    **Síntomas**: La actualización de estado se rechaza con error de validación
+
+    **Soluciones**:
+    - Revisar las transiciones permitidas en el flujo de trabajo
+    - No se pueden actualizar contratos en estados terminales (`COMPLETED`, `CANCELED`)
+    - Verificar el estado actual antes de intentar la transición
+    - Comprobar que el usuario tenga permiso de aprobación para ciertas transiciones
+  </Accordion>
+
+  <Accordion title="Problemas en la generación de informes">
+    **Síntomas**: La generación de PDF/Excel falla o se agota el tiempo de espera
+
+    **Soluciones**:
+    - Verificar las dependencias de OpenPDF y Apache POI
+    - Revisar los límites de memoria (los informes pueden consumir mucha memoria)
+    - Limitar el tamaño del conjunto de resultados para informes grandes
+    - Verificar los permisos de escritura en el sistema de archivos
+    - Revisar los logs en busca de errores específicos de la librería
+    - Considerar la generación asíncrona de informes para grandes volúmenes de datos
+  </Accordion>
+
+  <Accordion title="Violaciones de restricciones de base de datos">
+    **Síntomas**: La creación del contrato falla con error de restricción FK
+
+    **Soluciones**:
+    - Verificar que client_id exista en el servicio de clientes
+    - Verificar que user_id exista en el servicio de usuarios
+    - Verificar que vehicle_id exista en el servicio de vehículos
+    - Comprobar que el vehículo no esté ya en un contrato activo
+    - Asegurarse de que las entidades referenciadas no estén eliminadas lógicamente
+  </Accordion>
+</AccordionGroup>
+
+## Variables de Entorno
+
+| Variable | Descripción | Ejemplo |
+|----------|-------------|----------|
+| `DEV_PURCHASE_SALE_DB_HOST` / `PROD_PURCHASE_SALE_DB_HOST` | Host de PostgreSQL | `sgivu-postgres` |
+| `DEV_PURCHASE_SALE_DB_PORT` / `PROD_PURCHASE_SALE_DB_PORT` | Puerto de PostgreSQL | `5432` |
+| `DEV_PURCHASE_SALE_DB_NAME` / `PROD_PURCHASE_SALE_DB_NAME` | Nombre de la base de datos | `sgivu_purchase_sale_db` |
+| `DEV_PURCHASE_SALE_DB_USERNAME` / `PROD_PURCHASE_SALE_DB_USERNAME` | Usuario de la base de datos | `postgres` |
+| `DEV_PURCHASE_SALE_DB_PASSWORD` / `PROD_PURCHASE_SALE_DB_PASSWORD` | Contraseña de la base de datos | `secure_password` |
+| `SERVICE_INTERNAL_SECRET_KEY` | Clave interna de servicio | `secret-key-value` |
+| `SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI` | Emisor del servidor de autorización | `http://sgivu-auth:9000` |
+
+## Buenas Prácticas
+
+<CardGroup cols={2}>
+  <Card title="Flujo de Estados" icon="diagram-project">
+    Aplicar transiciones de estado válidas para mantener la integridad de los datos
+  </Card>
+  <Card title="Enriquecimiento de Datos" icon="sitemap">
+    Cachear datos de referencia de acceso frecuente para reducir llamadas entre servicios
+  </Card>
+  <Card title="Informes Asíncronos" icon="clock">
+    Generar informes grandes de forma asíncrona para evitar tiempos de espera agotados
+  </Card>
+  <Card title="Registro de Auditoría" icon="file-lines">
+    Registrar todos los cambios de estado con usuario y marca de tiempo
+  </Card>
+</CardGroup>
+
+## Servicios Relacionados
+
+<CardGroup cols={2}>
+  <Card title="Servicio de Vehículos" icon="car" href="/services/vehicle">
+    Proporciona datos de vehículos para los contratos
+  </Card>
+  <Card title="Servicio de Clientes" icon="address-book" href="/services/client">
+    Proporciona datos de clientes (compradores/vendedores)
+  </Card>
+  <Card title="Servicio de Usuarios" icon="users" href="/services/user">
+    Proporciona datos de empleados para los contratos
+  </Card>
+  <Card title="Gateway" icon="shield" href="/services/gateway">
+    Enruta las solicitudes de la API de compra-venta
+  </Card>
+</CardGroup>

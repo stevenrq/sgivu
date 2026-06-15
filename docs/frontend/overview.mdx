@@ -1,0 +1,68 @@
+---
+title: Aplicación Frontend (Angular)
+description: Visión general de sgivu-frontend y cómo acceder a su documentación completa en local
+---
+
+# Aplicación Frontend
+
+<Note>
+  **sgivu-frontend** tiene su propia documentación Mintlify completa (~34 páginas) con guías de arquitectura, componentes, integración y testing. Como la capa gratuita de Mintlify permite un solo sitio desplegado (este, el del backend), la documentación del frontend se consulta en **local** con `mint dev`.
+</Note>
+
+**sgivu-frontend** es la SPA del ecosistema SGIVU, construida con **Angular 21**. Proporciona la interfaz de administración (dashboards, usuarios, clientes, vehículos, contratos de compra/venta y reportes) y delega autenticación, autorización y APIs al backend `sgivu-gateway` siguiendo el patrón **BFF**.
+
+## Stack
+
+- **Angular 21** · TypeScript 5.9 · standalone components · lazy loading por feature
+- **Zoneless** (`provideZonelessChangeDetection`) + `OnPush` en todos los componentes · signals como única fuente de verdad reactiva (sin NgRx ni zone.js)
+- **Bootstrap 5.3** + Bootstrap Icons · SweetAlert2 · Chart.js (tree-shaken)
+- **Autenticación BFF puro**: sin librerías OAuth cliente; el gateway gestiona todo el flujo OAuth 2.1/PKCE; el frontend solo consulta `/auth/session`
+- **RBAC** con permisos `recurso:accion` (ej. `vehicle:delete`, `purchase_sale:read`) vía `permissionGuard` y directiva `*appHasPermission`
+- **Testing**: Vitest 4 + jsdom (unitarios, sin navegador) · Playwright 1.60 + `page.route()` (e2e, sin backend real)
+- Localización única `es-CO`; labels de UI en español
+
+## Ver la Documentación Completa del Frontend
+
+<Steps>
+  <Step title="Clonar el repositorio frontend">
+    ```bash
+    git clone https://github.com/stevenrq/sgivu-frontend.git
+    cd sgivu-frontend
+    ```
+  </Step>
+  <Step title="Instalar la CLI de Mintlify (si aún no está instalada)">
+    ```bash
+    npm i -g mint
+    ```
+  </Step>
+  <Step title="Levantar el preview local">
+    ```bash
+    cd docs
+    mint dev
+    ```
+  </Step>
+  <Step title="Abrir en el navegador">
+    Abre [http://localhost:3000](http://localhost:3000). La documentación cubre arquitectura, componentes compartidos, integración con el gateway, testing y referencia de estilo de código.
+  </Step>
+</Steps>
+
+## Por qué solo funciona en local
+
+Mintlify en capa gratuita permite **un único sitio desplegado**. El sitio de la plataforma SGIVU (este) ocupa ese cupo. La documentación del frontend vive en `sgivu-frontend/docs/` y se previsualiza localmente con `mint dev`; no está publicada en `sgivu.mintlify.app`.
+
+## Recursos
+
+<CardGroup cols={2}>
+  <Card title="Repositorio GitHub" icon="github" href="https://github.com/stevenrq/sgivu-frontend">
+    Código fuente de sgivu-frontend
+  </Card>
+  <Card title="API del Gateway" icon="plug" href="/api/auth/oauth2">
+    Referencia de los endpoints que consume el frontend
+  </Card>
+  <Card title="Predicción de Demanda (ML)" icon="chart-line" href="/ml/prediction-api">
+    API ML que integra el dashboard del frontend
+  </Card>
+  <Card title="Patrón BFF" icon="shield" href="/security/bff-pattern">
+    Cómo el gateway actúa como BFF para el frontend
+  </Card>
+</CardGroup>
