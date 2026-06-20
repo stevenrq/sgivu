@@ -98,9 +98,12 @@ La plataforma SGIVU utiliza `sgivu-docker-compose` para la orquestación local. 
     # Service Discovery
     EUREKA_URL=http://sgivu-discovery:8761/eureka
 
-    # Service URLs (Docker internal)
-    SGIVU_AUTH_URL=http://sgivu-auth:9000
-    SGIVU_GATEWAY_URL=http://sgivu-gateway:8080
+    # Service URLs
+    # Hostname nip.io: resoluble desde el navegador (sin editar hosts) y desde los
+    # contenedores (alias de red en docker-compose.dev.yml). ISSUER_URL debe coincidir.
+    ISSUER_URL=http://sgivu-auth.127.0.0.1.nip.io:9000
+    SGIVU_AUTH_URL=http://sgivu-auth.127.0.0.1.nip.io:9000
+    SGIVU_GATEWAY_URL=http://localhost:8080
     DEV_ANGULAR_APP_URL=http://localhost:4200
 
     # Security

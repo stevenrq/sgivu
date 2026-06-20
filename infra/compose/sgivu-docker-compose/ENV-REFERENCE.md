@@ -31,7 +31,7 @@ Si difieren, **todos los JWT son rechazados** → fallo total de autenticación.
 
 En **producción**, ambas apuntan al hostname público de EC2 (ej: `http://ec2-...amazonaws.com`). Los contenedores resuelven este hostname vía `extra_hosts` en `docker-compose.yml` → `host-gateway` → Nginx.
 
-En **desarrollo**, solo se define `SGIVU_AUTH_URL=http://sgivu-auth:9000`. `ISSUER_URL` no se necesita porque los YAMLs base ya definen ese mismo default.
+En **desarrollo**, ambas apuntan a `http://sgivu-auth.127.0.0.1.nip.io:9000`. Este hostname wildcard-DNS se resuelve a `127.0.0.1` desde el navegador (sin editar `hosts`) y al contenedor de auth desde los demás servicios vía un alias de red en `docker-compose.dev.yml`. Como ya no coincide con el default `http://sgivu-auth:9000` de los YAML base, **ambas variables deben fijarse explícitamente** en `.env.dev`. Ver `apps/backend/sgivu-auth/sgivu-auth-access.md`.
 
 ### `SGIVU_GATEWAY_SECRET`
 
@@ -89,7 +89,7 @@ Relación con `AWS_S3_ALLOWED_ORIGINS`: deben incluir los mismos dominios para q
 | ------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | `EUREKA_URL`              | Todos los servicios               | Si es incorrecta, ningún servicio se registra y el gateway devuelve 503 en todas las rutas API (`lb://` no puede resolver).                |
 | `SGIVU_AUTH_URL`          | Resource servers + gateway        | Valida el claim `iss` de los JWT. Ver sección de dependencias arriba.                                                                      |
-| `ISSUER_URL`              | `sgivu-auth`                      | Define el `iss` de los JWT emitidos. Solo en prod (dev usa default). Ver sección de dependencias arriba.                                   |
+| `ISSUER_URL`              | `sgivu-auth`                      | Define el `iss` de los JWT emitidos. En dev y prod se fija explícitamente (dev: hostname nip.io). Ver sección de dependencias arriba.       |
 | `SGIVU_USER_URL`          | `sgivu-auth`                      | `sgivu-auth` llama a `sgivu-user` para validar credenciales en login (`CredentialsValidationService`).                                     |
 | `SGIVU_CLIENT_URL`        | `sgivu-purchase-sale`             | Obtiene datos de clientes al crear transacciones.                                                                                          |
 | `SGIVU_VEHICLE_URL`       | `sgivu-purchase-sale`, `sgivu-ml` | Datos de vehículos para transacciones y entrenamiento ML.                                                                                  |

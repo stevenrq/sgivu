@@ -63,7 +63,13 @@ services:
       - "9000:9000"
     restart: always
     networks:
-      - sgivu-network
+      sgivu-network:
+        # Alias de red para que el DNS embebido de Docker resuelva el hostname del
+        # issuer (sgivu-auth.127.0.0.1.nip.io) al contenedor de auth desde otros
+        # servicios. El navegador resuelve ese mismo nombre vía DNS público a
+        # 127.0.0.1, evitando editar el archivo hosts. Ver sgivu-auth-access.md.
+        aliases:
+          - sgivu-auth.127.0.0.1.nip.io
     env_file: .env.dev
     depends_on:
       sgivu-postgres:

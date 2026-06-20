@@ -282,7 +282,7 @@ Puertos típicos en local (según `docker-compose*.yml`):
 - Puertos ocupados (8000/8080/8081/8082/8083/8084/9000/8888/8761): libera procesos o ajusta mapeos.
 - Dependencias no listas: espera `sgivu-config`/`sgivu-discovery` antes de `auth`/`gateway`.
 - Sin acceso a Config Server: revisa `SPRING_CLOUD_CONFIG_SERVER_GIT_URI` y la etiqueta en Compose. Si usas el perfil `native`, valida el montaje del volumen `/config-repo`.
-- Acceso desde host (desarrollo local): agrega alias en `/etc/hosts` para `sgivu-auth` y `sgivu-gateway`. En producción con Nginx no es necesario.
+- Acceso desde host (desarrollo local): por defecto `sgivu-auth` se accede vía el hostname nip.io `sgivu-auth.127.0.0.1.nip.io:9000`, que no requiere editar `hosts` (alias de red en `docker-compose.dev.yml`). Si tu red bloquea nip.io, agrega `127.0.0.1 sgivu-auth` en `/etc/hosts` como alternativa. En producción con Nginx no es necesario.
   Ver `apps/backend/sgivu-auth/sgivu-auth-access.md` y `apps/backend/sgivu-gateway/sgivu-gateway-access.md`.
 
 ## Despliegue con GitHub Actions (configuración única)

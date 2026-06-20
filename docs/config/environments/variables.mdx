@@ -50,6 +50,8 @@ Estas variables se utilizan en múltiples servicios dentro de los archivos de co
   URL del servidor de autorización para autenticación OAuth2.
 
   **Utilizada por:** servicios Gateway, User, Client, Vehicle, Purchase-Sale
+
+  En desarrollo se fija a `http://sgivu-auth.127.0.0.1.nip.io:9000` para que el mismo hostname del `issuer` sea resoluble desde el navegador (sin editar `hosts`) y desde los contenedores (alias de red en `docker-compose.dev.yml`). Debe coincidir exactamente con `ISSUER_URL`.
 </ParamField>
 
 <ParamField path="SGIVU_GATEWAY_URL" type="string" default="http://sgivu-gateway:8080">
@@ -122,9 +124,11 @@ Estas variables se utilizan en múltiples servicios dentro de los archivos de co
 </ParamField>
 
 <ParamField path="ISSUER_URL" type="string" default="http://sgivu-auth:9000">
-  URL del emisor OAuth2 para la validación de tokens JWT.
+  URL del emisor OAuth2 (claim `iss`) de los tokens JWT.
 
   **Utilizada por:** servicio Auth
+
+  En desarrollo se fija a `http://sgivu-auth.127.0.0.1.nip.io:9000` (debe coincidir con `SGIVU_AUTH_URL`). Ver `apps/backend/sgivu-auth/sgivu-auth-access.md`.
 </ParamField>
 
 ### Migraciones Flyway

@@ -609,7 +609,7 @@ Estructura de tabs: **Documentación** (general, primeros pasos, funcionalidades
 - **Errores de issuer mismatch**: Verificar que `ISSUER_URL` coincida con la URL real usada por clientes
 - **Falla autenticación interna entre servicios**: Verificar que `SERVICE_INTERNAL_SECRET_KEY` coincida en todos los servicios
 - **Sesiones perdidas tras reinicio del gateway**: Verificar que `sgivu-redis` esté corriendo y que `DEV_REDIS_PASSWORD` (perfil dev) o `PROD_REDIS_PASSWORD` (perfil prod) coincidan entre el contenedor Redis (`--requirepass`), el gateway y `sgivu-purchase-sale`
-- **Acceso en desarrollo local**: Agregar `sgivu-auth` a `/etc/hosts` apuntando a `127.0.0.1`
+- **Acceso en desarrollo local**: Por defecto se usa el hostname nip.io `sgivu-auth.127.0.0.1.nip.io:9000` (resuelve a `127.0.0.1` sin editar `hosts`; alias de red en `docker-compose.dev.yml`). Alternativa si nip.io está bloqueado: agregar `sgivu-auth` a `/etc/hosts` apuntando a `127.0.0.1`. Ver `apps/backend/sgivu-auth/sgivu-auth-access.md`
 
 ## Reglas de Generación y Modificación de Código
 
